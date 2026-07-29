@@ -1,0 +1,30 @@
+{
+  "name": "ghcp-ai-credits-simulator-server",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@react-pdf/renderer": "^4.1.6",
+    "axios": "^1.7.9",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "express-rate-limit": "^8.6.1",
+    "express-session": "^1.18.1",
+    "lusca": "^1.7.0",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/express-session": "^1.18.0",
+    "@types/lusca": "^1.7.5",
+    "@types/node": "^22.10.5",
+    "@types/react": "^18.3.18",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.7.2"
+  }
+}
