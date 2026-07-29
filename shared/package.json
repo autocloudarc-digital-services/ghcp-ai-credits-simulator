@@ -1,0 +1,6 @@
+{
+  "name": "ghcp-ai-credits-simulator-shared",
+  "version": "1.0.0",
+  "private": true,
+  "main": "types.ts"
+}

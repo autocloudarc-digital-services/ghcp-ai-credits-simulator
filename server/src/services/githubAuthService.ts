@@ -1,0 +1,218 @@
+import crypto from 'crypto';
+import axios from 'axios';
+import { Session } from 'express-session';
+
+declare module 'express-session' {
+  interface SessionData {
+    oauthState?: string;
+    encryptedToken?: { iv: string; authTag: string; data: string };
+    enterprise?: string;
+    tokenObtainedAt?: number;
+    tokenExpiresIn?: number;
+    refreshToken?: string;
+  }
+}
+
+const GITHUB_OAUTH_AUTHORIZE_URL = 'https://github.com/login/oauth/authorize';
+const GITHUB_OAUTH_TOKEN_URL = 'https://github.com/login/oauth/access_token';
+const GITHUB_API_BASE_URL = 'https://api.github.com';
+const OAUTH_SCOPE = 'read:enterprise,read:org';
+
+function getClientCredentials() {
+  const clientId = process.env.GITHUB_APP_CLIENT_ID ?? '';
+  const clientSecret = process.env.GITHUB_APP_CLIENT_SECRET ?? '';
+  const callbackUrl = process.env.CALLBACK_URL ?? 'http://localhost:3001/auth/github/callback';
+  return { clientId, clientSecret, callbackUrl };
+}
+
+/**
+ * Derives a stable 32-byte AES key from the SESSION_SECRET environment
+ * variable so OAuth access tokens can be encrypted at rest within the
+ * server-side session store.
+ */
+function getEncryptionKey(): Buffer {
+  const secret = process.env.SESSION_SECRET ?? 'insecure-development-secret-change-me';
+  return crypto.createHash('sha256').update(secret).digest();
+}
+
+function encryptToken(token: string): { iv: string; authTag: string; data: string } {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', getEncryptionKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(token, 'utf8'), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return { iv: iv.toString('hex'), authTag: authTag.toString('hex'), data: encrypted.toString('hex') };
+}
+
+function decryptToken(payload: { iv: string; authTag: string; data: string }): string {
+  const decipher = crypto.createDecipheriv(
+    'aes-256-gcm',
+    getEncryptionKey(),
+    Buffer.from(payload.iv, 'hex')
+  );
+  decipher.setAuthTag(Buffer.from(payload.authTag, 'hex'));
+  const decrypted = Buffer.concat([
+    decipher.update(Buffer.from(payload.data, 'hex')),
+    decipher.final(),
+  ]);
+  return decrypted.toString('utf8');
+}
+
+/**
+ * Builds the GitHub OAuth authorization URL, generating and stashing a CSRF
+ * state token on the provided session. The state must be validated on the
+ * callback before an authorization code is exchanged for a token.
+ */
+export function getAuthorizationUrl(session: Session): string {
+  const { clientId, callbackUrl } = getClientCredentials();
+  const state = crypto.randomBytes(32).toString('hex');
+  (session as any).oauthState = state;
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: callbackUrl,
+    scope: OAUTH_SCOPE,
+    state,
+  });
+
+  return `${GITHUB_OAUTH_AUTHORIZE_URL}?${params.toString()}`;
+}
+
+/**
+ * Exchanges an OAuth authorization code for an access token, validating the
+ * CSRF state parameter first. The resulting token is encrypted and stored
+ * server-side on the session; it is never returned to the caller/browser.
+ */
+export async function exchangeCodeForToken(
+  code: string,
+  state: string,
+  session: Session
+): Promise<{ success: boolean; error?: string }> {
+  const sessionState = (session as any).oauthState;
+  if (!sessionState || sessionState !== state) {
+    return { success: false, error: 'Invalid or missing OAuth state parameter (possible CSRF attempt).' };
+  }
+
+  const { clientId, clientSecret, callbackUrl } = getClientCredentials();
+
+  try {
+    const response = await axios.post(
+      GITHUB_OAUTH_TOKEN_URL,
+      {
+        client_id: clientId,
+        client_secret: clientSecret,
+        code,
+        redirect_uri: callbackUrl,
+      },
+      { headers: { Accept: 'application/json' } }
+    );
+
+    if (response.data.error) {
+      return { success: false, error: response.data.error_description || response.data.error };
+    }
+
+    const accessToken: string = response.data.access_token;
+    if (!accessToken) {
+      return { success: false, error: 'GitHub did not return an access token.' };
+    }
+
+    (session as any).encryptedToken = encryptToken(accessToken);
+    (session as any).refreshToken = response.data.refresh_token;
+    (session as any).tokenObtainedAt = Date.now();
+    (session as any).tokenExpiresIn = response.data.expires_in;
+    delete (session as any).oauthState;
+
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: 'Failed to exchange authorization code for an access token.' };
+  }
+}
+
+/**
+ * Retrieves the decrypted access token from the session, if present.
+ * This function is the only place tokens are decrypted, and the result
+ * should never be sent back to the client.
+ */
+export function getTokenFromSession(session: Session): string | null {
+  const encrypted = (session as any).encryptedToken;
+  if (!encrypted) return null;
+  try {
+    return decryptToken(encrypted);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Refreshes the OAuth token for a session if it is close to expiring and a
+ * refresh token is available. GitHub Apps issue expiring user tokens when
+ * configured to do so; this is a no-op for non-expiring tokens.
+ */
+export async function refreshTokenIfNeeded(
+  session: Session
+): Promise<void> {
+  const obtainedAt = (session as any).tokenObtainedAt as number | undefined;
+  const expiresIn = (session as any).tokenExpiresIn as number | undefined;
+  const refreshToken = (session as any).refreshToken as string | undefined;
+
+  if (!obtainedAt || !expiresIn || !refreshToken) return;
+
+  const expiresAt = obtainedAt + expiresIn * 1000;
+  const bufferMs = 5 * 60 * 1000;
+  if (Date.now() < expiresAt - bufferMs) return;
+
+  const { clientId, clientSecret } = getClientCredentials();
+  try {
+    const response = await axios.post(
+      GITHUB_OAUTH_TOKEN_URL,
+      {
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      },
+      { headers: { Accept: 'application/json' } }
+    );
+
+    if (response.data.access_token) {
+      (session as any).encryptedToken = encryptToken(response.data.access_token);
+      (session as any).refreshToken = response.data.refresh_token ?? refreshToken;
+      (session as any).tokenObtainedAt = Date.now();
+      (session as any).tokenExpiresIn = response.data.expires_in;
+    }
+  } catch {
+    // If refresh fails, leave the existing (possibly expired) token in place;
+    // downstream API calls will surface a 401 and prompt re-authentication.
+  }
+}
+
+/**
+ * Revokes the OAuth token associated with the session and clears all
+ * auth-related session state.
+ */
+export async function revokeToken(session: Session): Promise<void> {
+  const token = getTokenFromSession(session);
+  const { clientId, clientSecret } = getClientCredentials();
+
+  if (token && clientId && clientSecret) {
+    try {
+      await axios.delete(`${GITHUB_API_BASE_URL}/applications/${clientId}/token`, {
+        auth: { username: clientId, password: clientSecret },
+        data: { access_token: token },
+        headers: { Accept: 'application/vnd.github+json' },
+      });
+    } catch {
+      // Best-effort revocation; continue clearing local session state regardless.
+    }
+  }
+
+  delete (session as any).encryptedToken;
+  delete (session as any).refreshToken;
+  delete (session as any).enterprise;
+  delete (session as any).tokenObtainedAt;
+  delete (session as any).tokenExpiresIn;
+  delete (session as any).oauthState;
+}
+
+export function isAuthenticated(session: Session): boolean {
+  return Boolean((session as any).encryptedToken);
+}
