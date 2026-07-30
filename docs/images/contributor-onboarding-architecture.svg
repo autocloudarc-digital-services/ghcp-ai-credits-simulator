@@ -1,0 +1,306 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200" role="img" aria-labelledby="title desc">
+  <title id="title">GitHub Copilot AI Credits Simulator contributor onboarding and architecture</title>
+  <desc id="desc">A visual guide showing five setup steps, the React client and Express server architecture, GitHub integrations, security controls, in-memory state, contributor file landmarks, and the simulation and assessment workflows.</desc>
+  <defs>
+    <style>
+      .bg { fill: #f7f9fc; }
+      .panel { fill: #ffffff; stroke: #cbd5e1; stroke-width: 2; }
+      .client-panel { fill: #ecfeff; stroke: #0f766e; stroke-width: 3; }
+      .server-panel { fill: #eff6ff; stroke: #2563eb; stroke-width: 3; }
+      .shared-panel { fill: #f5f3ff; stroke: #7c3aed; stroke-width: 2; }
+      .github-panel { fill: #f8fafc; stroke: #334155; stroke-width: 2; }
+      .memory-panel { fill: #fff7ed; stroke: #ea580c; stroke-width: 2; }
+      .success-panel { fill: #f0fdf4; stroke: #16a34a; stroke-width: 2; }
+      .warning-panel { fill: #fffbeb; stroke: #d97706; stroke-width: 2; }
+      .node { fill: #ffffff; stroke: #94a3b8; stroke-width: 1.5; }
+      .node-client { fill: #ffffff; stroke: #14b8a6; stroke-width: 2; }
+      .node-server { fill: #ffffff; stroke: #60a5fa; stroke-width: 2; }
+      .title { font: 700 34px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .subtitle { font: 400 17px 'Segoe UI', Arial, sans-serif; fill: #475569; }
+      .section { font: 700 22px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .section-light { font: 700 20px 'Segoe UI', Arial, sans-serif; fill: #ffffff; }
+      .label { font: 700 16px 'Segoe UI', Arial, sans-serif; fill: #0f172a; }
+      .body { font: 400 14px 'Segoe UI', Arial, sans-serif; fill: #334155; }
+      .small { font: 400 12px 'Segoe UI', Arial, sans-serif; fill: #475569; }
+      .code { font: 600 13px Consolas, 'Courier New', monospace; fill: #0f172a; }
+      .step-number { font: 700 18px 'Segoe UI', Arial, sans-serif; fill: #ffffff; text-anchor: middle; dominant-baseline: middle; }
+      .center { text-anchor: middle; }
+      .arrow { fill: none; stroke: #64748b; stroke-width: 2.5; marker-end: url(#arrow); }
+      .arrow-teal { fill: none; stroke: #0f766e; stroke-width: 3; marker-end: url(#arrow-teal); }
+      .arrow-blue { fill: none; stroke: #2563eb; stroke-width: 3; marker-end: url(#arrow-blue); }
+      .arrow-green { fill: none; stroke: #16a34a; stroke-width: 3; marker-end: url(#arrow-green); }
+      .arrow-dashed { fill: none; stroke: #7c3aed; stroke-width: 2; stroke-dasharray: 7 6; marker-end: url(#arrow-purple); }
+      .divider { stroke: #cbd5e1; stroke-width: 1.5; }
+      .pill { fill: #e2e8f0; }
+      .pill-text { font: 600 12px 'Segoe UI', Arial, sans-serif; fill: #334155; text-anchor: middle; }
+    </style>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#64748b" />
+    </marker>
+    <marker id="arrow-teal" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#0f766e" />
+    </marker>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#2563eb" />
+    </marker>
+    <marker id="arrow-green" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#16a34a" />
+    </marker>
+    <marker id="arrow-purple" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#7c3aed" />
+    </marker>
+  </defs>
+
+  <rect class="bg" width="1600" height="1200" />
+  <rect x="0" y="0" width="1600" height="108" fill="#0f172a" />
+  <circle cx="64" cy="54" r="28" fill="#14b8a6" />
+  <path d="M50 55 L61 66 L80 41" fill="none" stroke="#ffffff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+  <text x="110" y="48" class="section-light" style="font-size:30px">GitHub Copilot AI Credits Simulator</text>
+  <text x="110" y="77" class="subtitle" style="fill:#cbd5e1">Contributor onboarding, runtime architecture, and feature flow</text>
+  <rect x="1275" y="27" width="270" height="54" rx="8" fill="#1e293b" stroke="#475569" />
+  <text x="1410" y="49" class="small center" style="fill:#94a3b8">START HERE</text>
+  <text x="1410" y="70" class="label center" style="fill:#ffffff">npm workspace | Node.js LTS</text>
+
+  <text x="44" y="145" class="section">1. Get from repository to running app</text>
+  <text x="44" y="168" class="body">Codespaces is the preferred path when local security or package proxies block npm.</text>
+
+  <g transform="translate(44,190)">
+    <rect class="panel" width="272" height="112" rx="8" />
+    <circle cx="28" cy="28" r="18" fill="#2563eb" /><text x="28" y="29" class="step-number">1</text>
+    <text x="56" y="29" class="label">Open the workspace</text>
+    <text x="20" y="61" class="body">Fork or clone, then choose:</text>
+    <rect x="20" y="75" width="105" height="24" rx="12" class="pill" /><text x="72" y="91" class="pill-text">Codespaces</text>
+    <rect x="133" y="75" width="118" height="24" rx="12" class="pill" /><text x="192" y="91" class="pill-text">Local VS Code</text>
+  </g>
+  <path d="M320 246 H344" class="arrow" />
+  <g transform="translate(348,190)">
+    <rect class="panel" width="272" height="112" rx="8" />
+    <circle cx="28" cy="28" r="18" fill="#2563eb" /><text x="28" y="29" class="step-number">2</text>
+    <text x="56" y="29" class="label">Install dependencies</text>
+    <text x="20" y="63" class="code">node --version</text>
+    <text x="20" y="87" class="code">npm install</text>
+  </g>
+  <path d="M624 246 H648" class="arrow" />
+  <g transform="translate(652,190)">
+    <rect class="panel" width="272" height="112" rx="8" />
+    <circle cx="28" cy="28" r="18" fill="#7c3aed" /><text x="28" y="29" class="step-number">3</text>
+    <text x="56" y="29" class="label">Choose capability</text>
+    <text x="20" y="61" class="body">Simulation: no OAuth required</text>
+    <text x="20" y="86" class="body">Assessment: configure secrets</text>
+  </g>
+  <path d="M928 246 H952" class="arrow" />
+  <g transform="translate(956,190)">
+    <rect class="panel" width="272" height="112" rx="8" />
+    <circle cx="28" cy="28" r="18" fill="#0f766e" /><text x="28" y="29" class="step-number">4</text>
+    <text x="56" y="29" class="label">Start both services</text>
+    <text x="20" y="63" class="code">npm run dev</text>
+    <text x="20" y="88" class="body">Vite 5173 + Express 3001</text>
+  </g>
+  <path d="M1232 246 H1256" class="arrow" />
+  <g transform="translate(1260,190)">
+    <rect class="success-panel" width="296" height="112" rx="8" />
+    <circle cx="28" cy="28" r="18" fill="#16a34a" /><text x="28" y="29" class="step-number">5</text>
+    <text x="56" y="29" class="label">Verify and build</text>
+    <text x="20" y="61" class="code">GET /healthz -> {status: ok}</text>
+    <text x="20" y="87" class="code">npm run build</text>
+  </g>
+
+  <text x="44" y="348" class="section">2. Understand the runtime before changing code</text>
+  <text x="44" y="371" class="body">The browser talks to one development origin. Vite proxies API and authentication traffic to Express.</text>
+
+  <g transform="translate(44,398)">
+    <rect class="github-panel" width="170" height="126" rx="10" />
+    <circle cx="85" cy="38" r="22" fill="#334155" />
+    <path d="M73 38 H97 M85 26 V50" stroke="#ffffff" stroke-width="3" stroke-linecap="round" />
+    <text x="85" y="77" class="label center">Browser user</text>
+    <text x="85" y="99" class="small center">Open port 5173</text>
+    <text x="85" y="116" class="small center">One origin in dev</text>
+  </g>
+
+  <path d="M216 461 H254" class="arrow-teal" />
+  <text x="235" y="447" class="small center">UI</text>
+
+  <g transform="translate(258,398)">
+    <rect class="client-panel" width="548" height="354" rx="12" />
+    <rect x="0" y="0" width="548" height="52" rx="10" fill="#0f766e" />
+    <rect x="0" y="40" width="548" height="12" fill="#0f766e" />
+    <text x="22" y="33" class="section-light">React client</text>
+    <text x="442" y="32" class="small" style="fill:#ccfbf1">client/ | 5173</text>
+
+    <rect x="20" y="72" width="152" height="74" rx="8" class="node-client" />
+    <text x="96" y="98" class="label center">Vite + Router</text>
+    <text x="96" y="121" class="small center">SPA entry and proxy</text>
+    <text x="96" y="137" class="code center">src/App.tsx</text>
+
+    <rect x="194" y="72" width="334" height="74" rx="8" class="node-client" />
+    <text x="361" y="96" class="label center">Five route pages</text>
+    <text x="361" y="120" class="body center">Dashboard | Simulator | Assessment</text>
+    <text x="361" y="138" class="body center">Recommendations | Report</text>
+
+    <rect x="20" y="170" width="152" height="76" rx="8" class="node-client" />
+    <text x="96" y="197" class="label center">Zustand store</text>
+    <text x="96" y="220" class="small center">Browser state</text>
+    <text x="96" y="237" class="code center">store/appStore.ts</text>
+
+    <rect x="194" y="170" width="152" height="76" rx="8" class="node-client" />
+    <text x="270" y="197" class="label center">Credit engine</text>
+    <text x="270" y="220" class="small center">Pools, burn, overage</text>
+    <text x="270" y="237" class="code center">engine/...</text>
+
+    <rect x="368" y="170" width="160" height="76" rx="8" class="node-client" />
+    <text x="448" y="197" class="label center">Visual outputs</text>
+    <text x="448" y="220" class="small center">Charts + 3D + 2D</text>
+    <text x="448" y="237" class="code center">components/...</text>
+
+    <path d="M96 148 V166" class="arrow-teal" />
+    <path d="M172 208 H190" class="arrow-teal" />
+    <path d="M346 208 H364" class="arrow-teal" />
+
+    <rect x="20" y="272" width="508" height="58" rx="8" fill="#ccfbf1" stroke="#5eead4" />
+    <text x="274" y="296" class="label center">Client infrastructure</text>
+    <text x="274" y="317" class="body center">Axios + CSRF interceptor | React Hook Form + Zod | Tailwind CSS</text>
+  </g>
+
+  <path d="M808 462 H842" class="arrow-blue" />
+  <text x="825" y="432" class="small center">/api</text>
+  <text x="825" y="448" class="small center">/auth</text>
+
+  <g transform="translate(846,398)">
+    <rect class="server-panel" width="500" height="354" rx="12" />
+    <rect x="0" y="0" width="500" height="52" rx="10" fill="#2563eb" />
+    <rect x="0" y="40" width="500" height="12" fill="#2563eb" />
+    <text x="22" y="33" class="section-light">Express server</text>
+    <text x="386" y="32" class="small" style="fill:#dbeafe">server/ | 3001</text>
+
+    <rect x="20" y="72" width="460" height="54" rx="8" fill="#dbeafe" stroke="#60a5fa" />
+    <text x="250" y="95" class="label center">Request security gateway</text>
+    <text x="250" y="115" class="small center">CORS | session cookie | CSRF | rate limits | auth middleware</text>
+
+    <rect x="20" y="148" width="138" height="96" rx="8" class="node-server" />
+    <text x="89" y="175" class="label center">Auth routes</text>
+    <text x="89" y="197" class="small center">OAuth + status</text>
+    <text x="89" y="216" class="small center">logout + revoke</text>
+    <text x="89" y="235" class="code center">routes/auth.ts</text>
+
+    <rect x="181" y="148" width="138" height="96" rx="8" class="node-server" />
+    <text x="250" y="175" class="label center">Assessment</text>
+    <text x="250" y="197" class="small center">Start + poll jobs</text>
+    <text x="250" y="216" class="small center">Usage + governance</text>
+    <text x="250" y="235" class="code center">routes/assessment.ts</text>
+
+    <rect x="342" y="148" width="138" height="96" rx="8" class="node-server" />
+    <text x="411" y="175" class="label center">Reports</text>
+    <text x="411" y="197" class="small center">Render + stream PDF</text>
+    <text x="411" y="216" class="small center">Cache for download</text>
+    <text x="411" y="235" class="code center">routes/report.ts</text>
+
+    <path d="M250 128 V144" class="arrow-blue" />
+    <path d="M250 128 C250 138 89 136 89 144" class="arrow-blue" />
+    <path d="M250 128 C250 138 411 136 411 144" class="arrow-blue" />
+
+    <rect x="20" y="270" width="460" height="60" rx="8" class="memory-panel" />
+    <text x="250" y="294" class="label center">Process-local memory</text>
+    <text x="250" y="316" class="body center">Sessions | assessment jobs | generated PDF buffers</text>
+  </g>
+
+  <path d="M1348 461 H1378" class="arrow" />
+  <g transform="translate(1382,398)">
+    <rect class="github-panel" width="174" height="126" rx="10" />
+    <circle cx="87" cy="36" r="22" fill="#24292f" />
+    <path d="M73 36 C73 25 101 25 101 36 C101 48 94 51 87 58 C80 51 73 48 73 36" fill="#ffffff" />
+    <text x="87" y="77" class="label center">GitHub APIs</text>
+    <text x="87" y="99" class="small center">OAuth authorization</text>
+    <text x="87" y="116" class="small center">Billing + budgets</text>
+  </g>
+  <path d="M1469 526 V579 H1255 V752" class="arrow" />
+  <text x="1370" y="570" class="small center">OAuth and enterprise data</text>
+
+  <g transform="translate(44,548)">
+    <rect class="shared-panel" width="170" height="126" rx="10" />
+    <path d="M52 28 H118 V68 H52 Z M60 36 H110 M60 46 H102 M60 56 H108" fill="none" stroke="#7c3aed" stroke-width="2" />
+    <text x="85" y="88" class="label center">Shared contracts</text>
+    <text x="85" y="108" class="code center">shared/types.ts</text>
+  </g>
+  <path d="M216 611 H254" class="arrow-dashed" />
+  <path d="M216 635 C430 782 921 790 1050 754" class="arrow-dashed" />
+  <text x="154" y="697" class="small">Types bind both workspaces</text>
+
+  <g transform="translate(1382,548)">
+    <rect class="warning-panel" width="174" height="204" rx="10" />
+    <text x="87" y="29" class="label center">Security path</text>
+    <line x1="18" y1="42" x2="156" y2="42" class="divider" />
+    <circle cx="30" cy="68" r="5" fill="#d97706" /><text x="44" y="73" class="body">OAuth state</text>
+    <circle cx="30" cy="96" r="5" fill="#d97706" /><text x="44" y="101" class="body">AES-256-GCM</text>
+    <circle cx="30" cy="124" r="5" fill="#d97706" /><text x="44" y="129" class="body">HTTP-only cookie</text>
+    <circle cx="30" cy="152" r="5" fill="#d97706" /><text x="44" y="157" class="body">CSRF token</text>
+    <circle cx="30" cy="180" r="5" fill="#d97706" /><text x="44" y="185" class="body">Rate limiting</text>
+  </g>
+
+  <text x="44" y="804" class="section">3. Follow either user journey, then contribute at the owning layer</text>
+  <text x="44" y="827" class="body">Both paths produce governance insight. Only live assessment and server PDF endpoints require authentication.</text>
+
+  <g transform="translate(44,852)">
+    <rect class="panel" width="1512" height="224" rx="12" />
+    <rect x="0" y="0" width="232" height="224" rx="10" fill="#f1f5f9" />
+    <text x="24" y="34" class="label">Choose a journey</text>
+    <text x="24" y="62" class="body">Start with simulation for</text>
+    <text x="24" y="82" class="body">UI and calculation work.</text>
+    <text x="24" y="114" class="body">Add OAuth for live GitHub</text>
+    <text x="24" y="134" class="body">assessment and PDF APIs.</text>
+    <rect x="24" y="164" width="178" height="36" rx="18" fill="#0f172a" />
+    <text x="113" y="187" class="label center" style="fill:#ffffff">localhost:5173</text>
+
+    <rect x="270" y="22" width="190" height="74" rx="8" class="client-panel" />
+    <text x="365" y="48" class="label center">Simulation path</text>
+    <text x="365" y="70" class="body center">Configure populations</text>
+    <text x="365" y="87" class="small center">No OAuth required</text>
+    <path d="M462 59 H502" class="arrow-teal" />
+    <rect x="506" y="22" width="190" height="74" rx="8" class="node-client" />
+    <text x="601" y="48" class="label center">Calculate</text>
+    <text x="601" y="70" class="body center">Pool, burn, overage</text>
+    <text x="601" y="87" class="small center">Credit engine</text>
+    <path d="M698 59 H738" class="arrow-teal" />
+
+    <rect x="270" y="126" width="190" height="74" rx="8" class="server-panel" />
+    <text x="365" y="152" class="label center">Assessment path</text>
+    <text x="365" y="174" class="body center">Connect enterprise</text>
+    <text x="365" y="191" class="small center">OAuth required</text>
+    <path d="M462 163 H502" class="arrow-blue" />
+    <rect x="506" y="126" width="190" height="74" rx="8" class="node-server" />
+    <text x="601" y="152" class="label center">Assess</text>
+    <text x="601" y="174" class="body center">Usage and budgets</text>
+    <text x="601" y="191" class="small center">Async job + polling</text>
+    <path d="M698 163 H738" class="arrow-blue" />
+
+    <rect x="742" y="52" width="190" height="118" rx="8" class="shared-panel" />
+    <text x="837" y="80" class="label center">Governance insight</text>
+    <text x="837" y="104" class="body center">Readiness score</text>
+    <text x="837" y="124" class="body center">Concentration risk</text>
+    <text x="837" y="144" class="body center">Governance gaps</text>
+    <path d="M934 111 H974" class="arrow-green" />
+
+    <rect x="978" y="52" width="190" height="118" rx="8" class="success-panel" />
+    <text x="1073" y="80" class="label center">Recommendations</text>
+    <text x="1073" y="104" class="body center">Prioritized actions</text>
+    <text x="1073" y="124" class="body center">Budget hierarchy</text>
+    <text x="1073" y="144" class="body center">Executive preview</text>
+    <path d="M1170 111 H1210" class="arrow-green" />
+
+    <rect x="1214" y="52" width="266" height="118" rx="8" class="success-panel" />
+    <text x="1347" y="80" class="label center">Executive PDF</text>
+    <text x="1347" y="104" class="body center">React PDF Renderer</text>
+    <text x="1347" y="124" class="body center">Authenticated generate/download</text>
+    <text x="1347" y="146" class="small center">Stored in memory until restart</text>
+  </g>
+
+  <g transform="translate(44,1100)">
+    <rect x="0" y="0" width="1512" height="72" rx="10" fill="#0f172a" />
+    <text x="24" y="27" class="label" style="fill:#ffffff">Contributor landmarks</text>
+    <text x="24" y="52" class="small" style="fill:#cbd5e1">UI: client/src/pages + components</text>
+    <text x="330" y="52" class="small" style="fill:#cbd5e1">Math: client/src/engine</text>
+    <text x="570" y="52" class="small" style="fill:#cbd5e1">State: client/src/store</text>
+    <text x="805" y="52" class="small" style="fill:#cbd5e1">API: server/src/routes</text>
+    <text x="1050" y="52" class="small" style="fill:#cbd5e1">Integrations: server/src/services</text>
+    <text x="1338" y="52" class="small" style="fill:#cbd5e1">Contracts: shared/</text>
+  </g>
+</svg>
