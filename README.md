@@ -146,6 +146,118 @@ If organization policy restricts Codespaces, public forwarded ports, OAuth
 applications, or third-party npm packages, confirm access with an administrator
 before setup.
 
+## GitHub App Setup
+
+Use this runbook to configure the GitHub App credentials required for the
+Assessment and Report API flows.
+
+### Step 1: Choose the callback URL pattern
+
+Pick the callback URL based on where you run the app:
+
+1. Local development: `http://localhost:5173/auth/github/callback`
+2. Codespaces: `https://<codespace-name>-5173.<forwarding-domain>/auth/github/callback`
+
+For this project, use port `5173` for callbacks in development. The browser
+origin is the Vite app, and Vite proxies `/auth` and `/api` to Express.
+
+### Step 2: Create the GitHub App
+
+1. Open GitHub.
+2. Go to Settings.
+3. Go to Developer settings.
+4. Select GitHub Apps.
+5. Select New GitHub App.
+6. Set a unique app name.
+7. Set Homepage URL to your repository URL.
+8. Set Callback URL to the value from Step 1.
+9. Disable webhooks for now because this app does not consume webhook events.
+10. Create the app.
+
+### Step 3: Enable user authorization and install the app
+
+1. Ensure user authorization is enabled for the app.
+2. Install the app to the organization or account you will assess.
+3. Grant access to the target organization and enterprise resources.
+4. Use a GitHub user account with sufficient billing visibility.
+
+This backend requests OAuth scopes `read:enterprise,read:org` and calls
+enterprise and organization billing endpoints.
+
+### Step 4: Collect credentials
+
+From the GitHub App settings:
+
+1. Copy the Client ID.
+2. Generate a new Client Secret.
+3. Copy and store the secret immediately.
+
+Map them to:
+
+* `GITHUB_APP_CLIENT_ID`
+* `GITHUB_APP_CLIENT_SECRET`
+
+### Step 5: Set runtime environment variables
+
+Minimum required values:
+
+* `GITHUB_APP_CLIENT_ID`
+* `GITHUB_APP_CLIENT_SECRET`
+* `SESSION_SECRET`
+* `CALLBACK_URL`
+* `CLIENT_ORIGIN`
+
+Generate a strong session secret:
+
+```bash
+openssl rand -hex 32
+```
+
+### Step 6: Configure for local or Codespaces
+
+Local callback and origin values:
+
+* `CLIENT_ORIGIN=http://localhost:5173`
+* `CALLBACK_URL=http://localhost:5173/auth/github/callback`
+
+Codespaces callback and origin values:
+
+* `CLIENT_ORIGIN=https://${CODESPACE_NAME}-5173.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}`
+* `CALLBACK_URL=${CLIENT_ORIGIN}/auth/github/callback`
+
+In Codespaces, set port `5173` visibility to Public so GitHub can reach the
+callback URL.
+
+### Step 7: Validate sign-in flow
+
+1. Start the app with `npm run dev`.
+2. Open the app in the browser.
+3. Go to the Assessment page.
+4. Trigger sign-in with GitHub.
+5. Complete consent in GitHub.
+6. Confirm return to `/assessment`.
+7. Verify API health with `GET /healthz`.
+
+### Step 8: Validate assessment access
+
+1. Run an assessment job.
+2. Confirm status polling succeeds.
+3. Confirm results are returned.
+4. Generate and download the PDF report.
+
+If assessment calls fail after successful sign-in, verify app installation,
+organization access, enterprise access, and user billing permissions.
+
+### GitHub App troubleshooting
+
+* Authentication failure at callback: callback URL mismatch between app settings
+  and `CALLBACK_URL`
+* Redirect lands on wrong host or port: `CLIENT_ORIGIN` mismatch
+* Assessment APIs return unauthorized or forbidden: app not installed to target
+  org or enterprise, or user lacks required visibility
+* Codespaces sign-in worked earlier but now fails: Codespace name changed and
+  callback URL was not updated
+
 ## Choose Your Setup Path
 
 | Path | Typical setup time | Best for |
