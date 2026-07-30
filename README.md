@@ -158,21 +158,34 @@ Pick the callback URL based on where you run the app:
 1. Local development: `http://localhost:5173/auth/github/callback`
 2. Codespaces: `https://<codespace-name>-5173.<forwarding-domain>/auth/github/callback`
 
+Use this exact local callback when running on your machine now:
+
+* `http://localhost:5173/auth/github/callback`
+
 For this project, use port `5173` for callbacks in development. The browser
 origin is the Vite app, and Vite proxies `/auth` and `/api` to Express.
 
 ### Step 2: Create the GitHub App
 
 1. Open GitHub.
-2. Go to Settings.
-3. Go to Developer settings.
-4. Select GitHub Apps.
-5. Select New GitHub App.
-6. Set a unique app name.
-7. Set Homepage URL to your repository URL.
-8. Set Callback URL to the value from Step 1.
-9. Disable webhooks for now because this app does not consume webhook events.
-10. Create the app.
+1. Go to Settings.
+1. Go to Developer settings.
+1. Select GitHub Apps.
+1. Select New GitHub App.
+1. Set a unique app name.
+1. Set Homepage URL to:
+
+  `https://github.com/autocloudarc-digital-services/ghcp-ai-credits-simulator`
+
+  If you are configuring this in your fork, use your fork URL instead.
+
+1. Set Callback URL to one of these values: local
+  `http://localhost:5173/auth/github/callback` or Codespaces
+  `https://<codespace-name>-5173.<forwarding-domain>/auth/github/callback`.
+  For your current local setup, use
+  `http://localhost:5173/auth/github/callback`.
+1. Disable webhooks for now because this app does not consume webhook events.
+1. Create the app.
 
 ### Step 3: Enable user authorization and install the app
 
