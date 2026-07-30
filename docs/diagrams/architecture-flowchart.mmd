@@ -1,0 +1,38 @@
+flowchart LR
+    User[Browser user]
+    GitHub[GitHub OAuth and billing APIs]
+
+    subgraph Client[React client on port 5173]
+        Vite[Vite development server]
+        Router[Dashboard, Simulator, Assessment, Recommendations, Report]
+        Store[Zustand application state]
+        Engine[Credit calculation engine]
+        Visuals[Recharts and React Three Fiber]
+    end
+
+    subgraph Server[Express server on port 3001]
+        Security[CORS, sessions, CSRF, and rate limits]
+        Auth[Authentication routes]
+        Assessment[Assessment routes and jobs]
+        Report[Report routes and PDF renderer]
+        Memory[(In-memory sessions, jobs, and reports)]
+    end
+
+    Shared[Shared TypeScript contracts]
+
+    User --> Vite
+    Vite --> Router
+    Router <--> Store
+    Store --> Engine
+    Engine --> Visuals
+    Vite -- /auth and /api proxy --> Security
+    Security --> Auth
+    Security --> Assessment
+    Security --> Report
+    Auth <--> GitHub
+    Assessment <--> GitHub
+    Security <--> Memory
+    Assessment <--> Memory
+    Report <--> Memory
+    Shared -. types .-> Client
+    Shared -. types .-> Server
