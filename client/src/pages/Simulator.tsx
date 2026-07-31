@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
@@ -6,6 +6,10 @@ import { runSimulation } from '../engine/creditCalculationEngine';
 import LicensePoolConfig from '../components/simulator/LicensePoolConfig';
 import PopulationAllocation from '../components/simulator/PopulationAllocation';
 import WhatIfScenarioBuilder from '../components/simulator/WhatIfScenarioBuilder';
+import {
+  createPopulationAllocationFormSchema,
+  licensePoolFormSchema,
+} from '../schemas/forms';
 
 const TABS = [
   { id: 'license', label: 'License & Pool Config' },
@@ -18,9 +22,55 @@ type TabId = (typeof TABS)[number]['id'];
 export default function Simulator() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabId>('license');
+  const [validationError, setValidationError] = useState<string | null>(null);
+  const hasValidLicenseInputs = useRef(true);
+  const hasValidPopulationAllocation = useRef(true);
   const { simulatorConfig, assessmentResult, confirmSimulation } = useAppStore();
 
   const handleConfirm = () => {
+    if (!hasValidLicenseInputs.current) {
+      setActiveTab('license');
+      setValidationError('Resolve the highlighted license and pool fields before continuing.');
+      return;
+    }
+
+    if (!hasValidPopulationAllocation.current) {
+      setActiveTab('population');
+      setValidationError('Allocate every licensed user to exactly one population tier before continuing.');
+      return;
+    }
+
+    const licenseValidation = licensePoolFormSchema.safeParse({
+      enterpriseName: simulatorConfig.enterpriseName,
+      licenseCountBusiness: simulatorConfig.licenseCountBusiness,
+      licenseCountEnterprise: simulatorConfig.licenseCountEnterprise,
+      licenseCountCloudAgent: simulatorConfig.licenseCountCloudAgent,
+      licenseCountSpark: simulatorConfig.licenseCountSpark,
+      billingCycleStartDate: simulatorConfig.billingCycleStartDate,
+      currentDayOfCycle: simulatorConfig.currentDayOfCycle,
+      creditsConsumedSoFar: simulatorConfig.creditsConsumedSoFar ?? 0,
+    });
+    if (!licenseValidation.success) {
+      setActiveTab('license');
+      setValidationError(licenseValidation.error.issues[0].message);
+      return;
+    }
+
+    const totalUsers =
+      simulatorConfig.licenseCountBusiness +
+      simulatorConfig.licenseCountEnterprise +
+      simulatorConfig.licenseCountCloudAgent +
+      simulatorConfig.licenseCountSpark;
+    const allocationValidation = createPopulationAllocationFormSchema(totalUsers).safeParse(
+      simulatorConfig.populationAllocation
+    );
+    if (!allocationValidation.success) {
+      setActiveTab('population');
+      setValidationError(allocationValidation.error.issues[0].message);
+      return;
+    }
+
+    setValidationError(null);
     confirmSimulation(runSimulation(simulatorConfig));
     navigate('/dashboard');
   };
@@ -50,9 +100,19 @@ export default function Simulator() {
         ))}
       </div>
 
-      {activeTab === 'license' && <LicensePoolConfig />}
-      {activeTab === 'population' && <PopulationAllocation />}
+      {activeTab === 'license' && (
+        <LicensePoolConfig onValidityChange={(isValid) => { hasValidLicenseInputs.current = isValid; }} />
+      )}
+      {activeTab === 'population' && (
+        <PopulationAllocation onValidityChange={(isValid) => { hasValidPopulationAllocation.current = isValid; }} />
+      )}
       {activeTab === 'whatif' && <WhatIfScenarioBuilder />}
+
+      {validationError && (
+        <div role="alert" className="bg-red-500/10 border border-red-500/40 text-red-400 text-sm rounded-md px-4 py-3">
+          {validationError}
+        </div>
+      )}
 
       <div className="flex justify-end border-t border-slate-700 pt-5">
         <button

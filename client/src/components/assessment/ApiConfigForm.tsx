@@ -1,5 +1,10 @@
-import { useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
 import { AssessmentConfig } from '../../types';
+import {
+  assessmentFormSchema,
+  AssessmentFormValues,
+} from '../../schemas/forms';
 
 const API_VERSION = '2026-03-10';
 
@@ -11,28 +16,37 @@ interface ApiConfigFormProps {
 }
 
 export default function ApiConfigForm({ enterpriseSlug, onSubmit, isSubmitting, disabled = false }: ApiConfigFormProps) {
-  const [organizations, setOrganizations] = useState('');
-  const [period, setPeriod] = useState<'7' | '30' | 'custom'>('30');
-  const [customDays, setCustomDays] = useState(14);
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<AssessmentFormValues>({
+    resolver: zodResolver(assessmentFormSchema),
+    defaultValues: {
+      organizations: '',
+      period: '30',
+      customDays: 14,
+    },
+  });
+  const period = watch('period');
 
-  const periodDays = period === 'custom' ? customDays : Number(period);
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const submitAssessment = (values: AssessmentFormValues) => {
     onSubmit({
       enterpriseSlug,
-      organizations: organizations
+      organizations: values.organizations
         .split(',')
         .map((o) => o.trim())
         .filter(Boolean),
       sessionId: '',
       apiVersion: API_VERSION,
-      periodDays,
+      periodDays: values.period === 'custom' ? values.customDays : Number(values.period),
     });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-slate-800 border border-slate-700 rounded-lg p-5 space-y-4">
+    <form onSubmit={handleSubmit(submitAssessment)} noValidate className="bg-slate-800 border border-slate-700 rounded-lg p-5 space-y-4">
       <h3 className="text-lg font-semibold text-slate-100">Assessment Configuration</h3>
       <label className="flex flex-col gap-1">
         <span className="text-xs uppercase tracking-wide text-slate-400">
@@ -40,11 +54,12 @@ export default function ApiConfigForm({ enterpriseSlug, onSubmit, isSubmitting, 
         </span>
         <input
           type="text"
-          value={organizations}
-          onChange={(e) => setOrganizations(e.target.value)}
+          {...register('organizations')}
           placeholder="autocloudarc-digital-services, autocloudarc-space-fleet"
+          aria-invalid={Boolean(errors.organizations)}
           className="bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-400"
         />
+        {errors.organizations && <span className="text-xs text-red-400">{errors.organizations.message}</span>}
       </label>
 
       <div className="flex flex-col gap-2">
@@ -54,7 +69,7 @@ export default function ApiConfigForm({ enterpriseSlug, onSubmit, isSubmitting, 
             <button
               type="button"
               key={opt}
-              onClick={() => setPeriod(opt)}
+              onClick={() => setValue('period', opt, { shouldValidate: true })}
               className={`px-3 py-1.5 rounded-md text-sm border transition-colors ${
                 period === opt
                   ? 'bg-teal-500 border-teal-400 text-slate-900 font-medium'
@@ -70,11 +85,12 @@ export default function ApiConfigForm({ enterpriseSlug, onSubmit, isSubmitting, 
             type="number"
             min={1}
             max={90}
-            value={customDays}
-            onChange={(e) => setCustomDays(Number(e.target.value))}
+            {...register('customDays', { valueAsNumber: true })}
+            aria-invalid={Boolean(errors.customDays)}
             className="w-32 bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-slate-100 font-numeric focus:outline-none focus:ring-2 focus:ring-teal-400"
           />
         )}
+        {errors.customDays && <span className="text-xs text-red-400">{errors.customDays.message}</span>}
       </div>
 
       <div className="text-xs text-slate-500">

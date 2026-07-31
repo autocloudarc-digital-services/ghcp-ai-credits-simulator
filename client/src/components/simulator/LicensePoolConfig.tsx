@@ -1,4 +1,6 @@
-import { ChangeEvent } from 'react';
+import { useEffect } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { FieldError, Path, UseFormRegister, useForm } from 'react-hook-form';
 import { useAppStore } from '../../store/appStore';
 import {
   calculateExhaustionDay,
@@ -6,34 +8,73 @@ import {
   calculateOverageCost,
   calculateProjectedBurnRate,
 } from '../../engine/creditCalculationEngine';
+import { licensePoolFormSchema, LicensePoolFormValues } from '../../schemas/forms';
 
-function NumberField({
-  label,
-  value,
-  onChange,
-  min = 0,
-}: {
+interface NumberFieldProps {
   label: string;
-  value: number;
-  onChange: (value: number) => void;
+  name: Path<LicensePoolFormValues>;
+  register: UseFormRegister<LicensePoolFormValues>;
+  onBlur: () => void;
+  error?: FieldError;
   min?: number;
-}) {
+}
+
+function NumberField({ label, name, register, onBlur, error, min = 0 }: NumberFieldProps) {
   return (
     <label className="flex flex-col gap-1">
       <span className="text-xs uppercase tracking-wide text-slate-400">{label}</span>
       <input
         type="number"
         min={min}
-        value={value}
-        onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(Number(e.target.value))}
+        {...register(name, {
+          setValueAs: (value) => (value === '' ? 0 : Number(value)),
+          onBlur,
+        })}
+        aria-invalid={Boolean(error)}
         className="bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-slate-100 font-numeric focus:outline-none focus:ring-2 focus:ring-teal-400"
       />
+      {error && <span className="text-xs text-red-400">{error.message}</span>}
     </label>
   );
 }
 
-export default function LicensePoolConfig() {
+export default function LicensePoolConfig({ onValidityChange }: { onValidityChange: (isValid: boolean) => void }) {
   const { simulatorConfig, setSimulatorConfig } = useAppStore();
+  const {
+    register,
+    getValues,
+    watch,
+    formState: { errors },
+  } = useForm<LicensePoolFormValues>({
+    resolver: zodResolver(licensePoolFormSchema),
+    mode: 'onChange',
+    defaultValues: {
+      enterpriseName: simulatorConfig.enterpriseName,
+      licenseCountBusiness: simulatorConfig.licenseCountBusiness,
+      licenseCountEnterprise: simulatorConfig.licenseCountEnterprise,
+      licenseCountCloudAgent: simulatorConfig.licenseCountCloudAgent,
+      licenseCountSpark: simulatorConfig.licenseCountSpark,
+      billingCycleStartDate: simulatorConfig.billingCycleStartDate,
+      currentDayOfCycle: simulatorConfig.currentDayOfCycle,
+      creditsConsumedSoFar: simulatorConfig.creditsConsumedSoFar ?? 0,
+    },
+  });
+
+  const commitValidValues = () => {
+    const parsed = licensePoolFormSchema.safeParse(getValues());
+    onValidityChange(parsed.success);
+    if (parsed.success) {
+      setSimulatorConfig(parsed.data);
+    }
+  };
+
+  useEffect(() => {
+    onValidityChange(licensePoolFormSchema.safeParse(getValues()).success);
+    const subscription = watch((values) => {
+      onValidityChange(licensePoolFormSchema.safeParse(values).success);
+    });
+    return () => subscription.unsubscribe();
+  }, [getValues, onValidityChange, watch]);
 
   const pool = calculateIncludedPool(simulatorConfig);
   const burnRate = calculateProjectedBurnRate(simulatorConfig);
@@ -44,97 +85,56 @@ export default function LicensePoolConfig() {
   const exhaustionDate = (() => {
     const start = new Date(simulatorConfig.billingCycleStartDate);
     if (!isFinite(exhaustionDay) || isNaN(start.getTime())) return 'N/A';
-    const d = new Date(start);
-    d.setDate(d.getDate() + Math.round(exhaustionDay));
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    const date = new Date(start);
+    date.setDate(date.getDate() + Math.round(exhaustionDay));
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   })();
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="bg-slate-800 border border-slate-700 rounded-lg p-5 space-y-4">
+      <form onSubmit={(event) => event.preventDefault()} noValidate className="bg-slate-800 border border-slate-700 rounded-lg p-5 space-y-4">
         <h3 className="text-lg font-semibold text-slate-100">License &amp; Pool Configuration</h3>
         <label className="flex flex-col gap-1">
           <span className="text-xs uppercase tracking-wide text-slate-400">Enterprise Name</span>
           <input
             type="text"
-            value={simulatorConfig.enterpriseName}
-            onChange={(e) => setSimulatorConfig({ enterpriseName: e.target.value })}
+            {...register('enterpriseName', { onBlur: commitValidValues })}
+            aria-invalid={Boolean(errors.enterpriseName)}
             className="bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-400"
           />
+          {errors.enterpriseName && <span className="text-xs text-red-400">{errors.enterpriseName.message}</span>}
         </label>
         <div className="grid grid-cols-2 gap-4">
-          <NumberField
-            label="Copilot Business ($19/mo)"
-            value={simulatorConfig.licenseCountBusiness}
-            onChange={(v) => setSimulatorConfig({ licenseCountBusiness: v })}
-          />
-          <NumberField
-            label="Copilot Enterprise ($39/mo)"
-            value={simulatorConfig.licenseCountEnterprise}
-            onChange={(v) => setSimulatorConfig({ licenseCountEnterprise: v })}
-          />
-          <NumberField
-            label="Copilot Cloud Agent ($39/mo)"
-            value={simulatorConfig.licenseCountCloudAgent}
-            onChange={(v) => setSimulatorConfig({ licenseCountCloudAgent: v })}
-          />
-          <NumberField
-            label="Copilot Spark"
-            value={simulatorConfig.licenseCountSpark}
-            onChange={(v) => setSimulatorConfig({ licenseCountSpark: v })}
-          />
+          <NumberField label="Copilot Business ($19/mo)" name="licenseCountBusiness" register={register} onBlur={commitValidValues} error={errors.licenseCountBusiness} />
+          <NumberField label="Copilot Enterprise ($39/mo)" name="licenseCountEnterprise" register={register} onBlur={commitValidValues} error={errors.licenseCountEnterprise} />
+          <NumberField label="Copilot Cloud Agent ($39/mo)" name="licenseCountCloudAgent" register={register} onBlur={commitValidValues} error={errors.licenseCountCloudAgent} />
+          <NumberField label="Copilot Spark" name="licenseCountSpark" register={register} onBlur={commitValidValues} error={errors.licenseCountSpark} />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <label className="flex flex-col gap-1">
-            <span className="text-xs uppercase tracking-wide text-slate-400">
-              Billing Cycle Start Date
-            </span>
+            <span className="text-xs uppercase tracking-wide text-slate-400">Billing Cycle Start Date</span>
             <input
               type="date"
-              value={simulatorConfig.billingCycleStartDate}
-              onChange={(e) => setSimulatorConfig({ billingCycleStartDate: e.target.value })}
+              {...register('billingCycleStartDate', { onBlur: commitValidValues })}
+              aria-invalid={Boolean(errors.billingCycleStartDate)}
               className="bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-400"
             />
+            {errors.billingCycleStartDate && <span className="text-xs text-red-400">{errors.billingCycleStartDate.message}</span>}
           </label>
-          <NumberField
-            label="Current Day of Cycle"
-            value={simulatorConfig.currentDayOfCycle}
-            onChange={(v) => setSimulatorConfig({ currentDayOfCycle: v })}
-            min={1}
-          />
+          <NumberField label="Current Day of Cycle" name="currentDayOfCycle" register={register} onBlur={commitValidValues} error={errors.currentDayOfCycle} min={1} />
         </div>
-        <NumberField
-          label="Credits Consumed So Far"
-          value={simulatorConfig.creditsConsumedSoFar ?? 0}
-          onChange={(v) => setSimulatorConfig({ creditsConsumedSoFar: v })}
-        />
-      </div>
+        <NumberField label="Credits Consumed So Far" name="creditsConsumedSoFar" register={register} onBlur={commitValidValues} error={errors.creditsConsumedSoFar} />
+      </form>
 
       <div className="bg-slate-800 border border-slate-700 rounded-lg p-5 space-y-4">
         <h3 className="text-lg font-semibold text-slate-100">Calculated Projections</h3>
         <div className="grid grid-cols-2 gap-4">
           <Stat label="Total Included Pool" value={`${Math.round(pool).toLocaleString()} credits`} color="text-teal-400" />
-          <Stat
-            label="Daily Burn Rate"
-            value={`${Math.round(burnRate).toLocaleString()} credits/day`}
-            color="text-blue-500"
-          />
-          <Stat
-            label="Projected Exhaustion Day"
-            value={isFinite(exhaustionDay) ? `Day ${Math.round(exhaustionDay)}` : 'N/A'}
-            color="text-amber-400"
-          />
+          <Stat label="Daily Burn Rate" value={`${Math.round(burnRate).toLocaleString()} credits/day`} color="text-blue-500" />
+          <Stat label="Projected Exhaustion Day" value={isFinite(exhaustionDay) ? `Day ${Math.round(exhaustionDay)}` : 'N/A'} color="text-amber-400" />
           <Stat label="Estimated Exhaustion Date" value={exhaustionDate} color="text-amber-400" />
-          <Stat
-            label="Projected Overage"
-            value={`${Math.max(0, Math.round(projectedTotal - pool)).toLocaleString()} credits`}
-            color="text-red-500"
-          />
-          <Stat
-            label="Projected Overage Cost"
-            value={`$${projectedOverageCost.toFixed(2)}`}
-            color="text-red-500"
-          />
+          <Stat label="Projected Overage" value={`${Math.max(0, Math.round(projectedTotal - pool)).toLocaleString()} credits`} color="text-red-500" />
+          <Stat label="Projected Overage Cost" value={`$${projectedOverageCost.toFixed(2)}`} color="text-red-500" />
         </div>
       </div>
     </div>

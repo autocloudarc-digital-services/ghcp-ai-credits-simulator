@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Download, Plus, Trash2 } from 'lucide-react';
 import { useAppStore } from '../../store/appStore';
 import { runSimulation } from '../../engine/creditCalculationEngine';
 import { ScenarioConfig } from '../../types';
+import { scenarioFormSchema, ScenarioFormValues } from '../../schemas/forms';
 
 const SCENARIO_COLORS = ['#2dd4bf', '#3b82f6', '#fbbf24', '#ef4444'];
 
@@ -31,9 +33,18 @@ function toCsv(scenarios: ScenarioConfig[]): string {
 
 export default function WhatIfScenarioBuilder() {
   const { simulatorConfig, scenarios, addScenario, removeScenario } = useAppStore();
-  const [scenarioName, setScenarioName] = useState('');
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<ScenarioFormValues>({
+    resolver: zodResolver(scenarioFormSchema),
+    mode: 'onChange',
+    defaultValues: { scenarioName: '' },
+  });
 
-  const handleAddScenario = () => {
+  const handleAddScenario = ({ scenarioName }: ScenarioFormValues) => {
     if (scenarios.length >= 4) return;
     const name = scenarioName.trim() || `Scenario ${scenarios.length + 1}`;
     const result = runSimulation(simulatorConfig);
@@ -43,7 +54,7 @@ export default function WhatIfScenarioBuilder() {
       simulatorConfig: { ...simulatorConfig },
       result,
     });
-    setScenarioName('');
+    reset();
   };
 
   const handleExportCsv = () => {
@@ -80,29 +91,33 @@ export default function WhatIfScenarioBuilder() {
       <div className="bg-slate-800 border border-slate-700 rounded-lg p-5 space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <h3 className="text-lg font-semibold text-slate-100">What-If Scenarios</h3>
-          <div className="flex items-center gap-2">
+          <form onSubmit={handleSubmit(handleAddScenario)} noValidate className="flex items-start gap-2">
+            <label className="flex flex-col gap-1">
             <input
               type="text"
               placeholder="Scenario name"
-              value={scenarioName}
-              onChange={(e) => setScenarioName(e.target.value)}
+              {...register('scenarioName')}
+              aria-invalid={Boolean(errors.scenarioName)}
               className="bg-slate-900 border border-slate-700 rounded-md px-3 py-1.5 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-400"
             />
+            {errors.scenarioName && <span className="text-xs text-red-400">{errors.scenarioName.message}</span>}
+            </label>
             <button
-              onClick={handleAddScenario}
+              type="submit"
               disabled={scenarios.length >= 4}
               className="flex items-center gap-1 bg-teal-500 hover:bg-teal-400 disabled:bg-slate-600 disabled:cursor-not-allowed text-slate-900 font-medium text-sm px-3 py-1.5 rounded-md transition-colors"
             >
               <Plus className="w-4 h-4" /> Snapshot current config
             </button>
             <button
+              type="button"
               onClick={handleExportCsv}
               disabled={scenarios.length === 0}
               className="flex items-center gap-1 bg-slate-700 hover:bg-slate-600 disabled:opacity-50 disabled:cursor-not-allowed text-slate-100 text-sm px-3 py-1.5 rounded-md transition-colors"
             >
               <Download className="w-4 h-4" /> Export CSV
             </button>
-          </div>
+          </form>
         </div>
         <p className="text-xs text-slate-500">
           Snapshot up to 4 configurations of the current License &amp; Population settings to compare

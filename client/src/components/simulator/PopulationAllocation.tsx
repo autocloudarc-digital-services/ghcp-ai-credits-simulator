@@ -1,6 +1,12 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
 import { useAppStore } from '../../store/appStore';
 import { calculateGovernanceImpact } from '../../engine/creditCalculationEngine';
+import {
+  createPopulationAllocationFormSchema,
+  populationAllocationSchema,
+} from '../../schemas/forms';
 import BurnDownChart from './BurnDownChart';
 
 const TIERS: { key: 'universalUlb' | 'overageUsers' | 'abundantUsers' | 'exponentialUsers'; label: string; color: string; creditsPerUser: number }[] = [
@@ -10,7 +16,7 @@ const TIERS: { key: 'universalUlb' | 'overageUsers' | 'abundantUsers' | 'exponen
   { key: 'exponentialUsers', label: 'Exponential Users', color: 'bg-red-500', creditsPerUser: 8000 },
 ];
 
-export default function PopulationAllocation() {
+export default function PopulationAllocation({ onValidityChange }: { onValidityChange: (isValid: boolean) => void }) {
   const { simulatorConfig, setSimulatorConfig } = useAppStore();
 
   const totalUsers =
@@ -19,18 +25,35 @@ export default function PopulationAllocation() {
     simulatorConfig.licenseCountCloudAgent +
     simulatorConfig.licenseCountSpark;
 
-  const allocation = simulatorConfig.populationAllocation;
+  const allocationFormSchema = useMemo(
+    () => createPopulationAllocationFormSchema(totalUsers),
+    [totalUsers]
+  );
+  const {
+    register,
+    getValues,
+    watch,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(allocationFormSchema),
+    mode: 'onChange',
+    defaultValues: simulatorConfig.populationAllocation,
+  });
+  const allocation = watch();
   const allocatedTotal =
     allocation.universalUlb + allocation.overageUsers + allocation.abundantUsers + allocation.exponentialUsers;
 
-  const handleSlider = (key: (typeof TIERS)[number]['key'], value: number) => {
-    setSimulatorConfig({
-      populationAllocation: {
-        ...allocation,
-        [key]: value,
-      },
+  useEffect(() => {
+    onValidityChange(allocationFormSchema.safeParse(getValues()).success);
+    const subscription = watch((values) => {
+      onValidityChange(allocationFormSchema.safeParse(values).success);
+      const parsed = populationAllocationSchema.safeParse(values);
+      if (parsed.success) {
+        setSimulatorConfig({ populationAllocation: parsed.data });
+      }
     });
-  };
+    return () => subscription.unsubscribe();
+  }, [allocationFormSchema, getValues, onValidityChange, setSimulatorConfig, watch]);
 
   const governanceImpact = useMemo(
     () => calculateGovernanceImpact(simulatorConfig),
@@ -39,7 +62,7 @@ export default function PopulationAllocation() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-slate-800 border border-slate-700 rounded-lg p-5 space-y-5">
+      <form onSubmit={(event) => event.preventDefault()} noValidate className="bg-slate-800 border border-slate-700 rounded-lg p-5 space-y-5">
         <div className="flex items-center justify-between">
           <h3 className="text-lg font-semibold text-slate-100">Developer Population Allocation</h3>
           <span
@@ -50,9 +73,9 @@ export default function PopulationAllocation() {
             {allocatedTotal.toLocaleString()} / {totalUsers.toLocaleString()} users allocated
           </span>
         </div>
-        {allocatedTotal !== totalUsers && (
+        {errors.universalUlb?.message && (
           <p className="text-xs text-amber-400">
-            Allocation should sum to the total licensed user count ({totalUsers.toLocaleString()}).
+            {errors.universalUlb.message}
           </p>
         )}
         <div className="space-y-5">
@@ -66,8 +89,8 @@ export default function PopulationAllocation() {
                 type="range"
                 min={0}
                 max={totalUsers}
-                value={allocation[tier.key]}
-                onChange={(e) => handleSlider(tier.key, Number(e.target.value))}
+                {...register(tier.key, { valueAsNumber: true })}
+                aria-invalid={Boolean(errors[tier.key])}
                 className={`w-full accent-teal-400`}
               />
               <div className="w-full h-2 rounded-full bg-slate-900 overflow-hidden">
@@ -82,7 +105,7 @@ export default function PopulationAllocation() {
             </div>
           ))}
         </div>
-      </div>
+      </form>
 
       <BurnDownChart
         withGovernance={governanceImpact.withGovernance}
