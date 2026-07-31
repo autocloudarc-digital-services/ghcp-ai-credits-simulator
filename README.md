@@ -2,7 +2,7 @@
 title: GitHub Copilot AI Credits Simulator
 description: Simulate GitHub Copilot AI Credit consumption, assess enterprise usage, and generate governance recommendations and reports
 author: autocloudarc-digital-services
-ms.date: 2026-07-29
+ms.date: 2026-07-31
 ms.topic: overview
 keywords:
   - github copilot
@@ -283,8 +283,9 @@ organization access, enterprise access, and user billing permissions.
 
 Codespaces is the recommended path when local endpoint security or an internal
 npm proxy prevents access to packages from the public npm registry. This
-repository does not currently include a `.devcontainer` configuration, so a
-Codespace uses the default GitHub image and requires the manual steps below.
+repository includes a dev container based on Node.js 22. It installs locked npm
+dependencies, GitHub CLI, Docker with Compose, and the VS Code extensions used
+for TypeScript, GitHub Actions, pull requests, Markdown, and dependency work.
 
 ### Create the Codespace
 
@@ -293,13 +294,14 @@ Codespace uses the default GitHub image and requires the manual steps below.
 2. Open the repository or your fork on GitHub.
 3. Select **Code**, select **Codespaces**, and then select **Create codespace on
    main**.
-4. Wait for VS Code in the browser to finish loading.
-5. Verify the runtime and install dependencies from the repository root:
+4. Wait for VS Code and the `npm ci` post-create command to finish.
+5. Verify the runtime and development tools from the repository root:
 
 ```bash
 node --version
 npm --version
-npm install
+gh --version
+docker version
 ```
 
 > [!NOTE]
@@ -566,6 +568,7 @@ ghcp-ai-credits-simulator/
 │       ├── routes/                 Auth, assessment, and report routes
 │       └── services/               GitHub and PDF integration services
 ├── shared/                         Cross-workspace TypeScript contracts
+├── .devcontainer/                  Codespaces and VS Code container setup
 ├── .env.example                    Environment variable reference
 ├── package.json                    Root npm workspace scripts
 ├── tsconfig.json                   Shared TypeScript defaults
@@ -582,8 +585,6 @@ ghcp-ai-credits-simulator/
 * The repository does not currently include an automated test suite
 * Live assessment depends on GitHub API availability, permissions, and response
   compatibility
-* The default Codespaces image is used because no repository dev container is
-  defined
 * Development OAuth should use the Vite proxy callback on port `5173`; the
   `.env.example` callback currently reflects direct server access on port `3001`
 

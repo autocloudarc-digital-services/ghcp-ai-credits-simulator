@@ -1,0 +1,63 @@
+{
+    "name": "GHCP AI Credits Simulator",
+    "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
+    "features": {
+        "ghcr.io/devcontainers/features/github-cli:1": {},
+        "ghcr.io/devcontainers/features/docker-in-docker:2": {
+            "version": "latest",
+            "moby": true,
+            "dockerDashComposeVersion": "v2"
+        }
+    },
+    "forwardPorts": [
+        5173,
+        3001
+    ],
+    "portsAttributes": {
+        "5173": {
+            "label": "Vite application",
+            "protocol": "http",
+            "onAutoForward": "notify"
+        },
+        "3001": {
+            "label": "Express API",
+            "protocol": "http",
+            "onAutoForward": "silent"
+        }
+    },
+    "postCreateCommand": "npm ci",
+    "hostRequirements": {
+        "cpus": 4,
+        "memory": "8gb",
+        "storage": "32gb"
+    },
+    "mounts": [
+        "source=${devcontainerId}-npm-cache,target=/home/node/.npm,type=volume"
+    ],
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "dbaeumer.vscode-eslint",
+                "esbenp.prettier-vscode",
+                "github.vscode-github-actions",
+                "github.vscode-pull-request-github",
+                "davidanson.vscode-markdownlint",
+                "streetsidesoftware.code-spell-checker"
+            ],
+            "settings": {
+                "editor.codeActionsOnSave": {
+                    "source.fixAll.eslint": "explicit"
+                },
+                "js/ts.tsdk.path": "node_modules/typescript/lib",
+                "npm.packageManager": "npm",
+                "terminal.integrated.defaultProfile.linux": "zsh"
+            }
+        },
+        "codespaces": {
+            "openFiles": [
+                "README.md"
+            ]
+        }
+    },
+    "remoteUser": "node"
+}
