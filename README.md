@@ -1,6 +1,6 @@
 ---
 title: GitHub Copilot AI Credits Simulator
-description: Simulate GitHub Copilot AI Credit consumption, assess enterprise usage, and generate governance recommendations and reports
+description: Assess enterprise usage, simulate GitHub Copilot AI Credit consumption, and generate governance recommendations and reports
 author: autocloudarc-digital-services
 ms.date: 2026-07-31
 ms.topic: overview
@@ -17,11 +17,9 @@ estimated_reading_time: 12
 
 ## Overview
 
-The GitHub Copilot AI Credits Simulator is a self-service planning and
-assessment application for GitHub Enterprise customers managing GitHub Copilot
-AI Credits under usage-based billing. It combines scenario modeling, live
-enterprise assessment, governance recommendations, and PDF reporting in one
-React and Express workspace.
+The GitHub Copilot AI Credits Simulator is a self-service assessment and planning application for GitHub Enterprise customers.
+It is focused on managing GitHub Copilot AI Credits under usage-based billing. It combines scenario modeling, live
+enterprise assessment, governance recommendations, and PDF reporting in one React and Express workspace.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![React](https://img.shields.io/badge/React-18-149ECA?logo=react)](https://react.dev/)
