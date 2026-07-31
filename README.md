@@ -48,7 +48,7 @@ and an executive PDF report.
 | Area | Capability |
 | --- | --- |
 | Assessment | Retrieves authenticated GitHub billing, budget, and cost-center data for an enterprise |
-| Simulator | Models license pools, user populations, burn rates, and what-if scenarios |
+| Simulator | Models license pools, user populations, burn rates based on what-if scenarios |
 | Governance Insights | Summarizes projected credit posture, overage, population, and governance readiness |
 | Visualization | Shows AI Credit flow through an interactive React Three Fiber scene with a 2D fallback |
 | Recommendations | Produces governance actions based on simulated and assessed conditions |
@@ -151,7 +151,13 @@ Assessment and Report API flows.
 Pick the callback URL based on where you run the app:
 
 1. Local development: `http://localhost:5173/auth/github/callback`
-2. Codespaces: `https://<codespace-name>-5173.<forwarding-domain>/auth/github/callback`
+2. Codespaces: run this command in the Codespace and use its output:
+
+```bash
+printf 'https://%s-5173.%s/auth/github/callback\n' \
+  "${CODESPACE_NAME}" \
+  "${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}"
+```
 
 Use this exact local callback when running on your machine now:
 
@@ -174,12 +180,21 @@ origin is the Vite app, and Vite proxies `/auth` and `/api` to Express.
 
   If you are configuring this in your fork, use your fork URL instead.
 
-1. Set Callback URL to one of these values: local
-  `http://localhost:5173/auth/github/callback` or Codespaces
-  `https://<codespace-name>-5173.<forwarding-domain>/auth/github/callback`.
-  For your current local setup, use
-  `http://localhost:5173/auth/github/callback`.
+1. Set Callback URL to the local value
+  `http://localhost:5173/auth/github/callback` or the exact Codespaces value
+  printed by the command in Step 1.
 1. Disable webhooks for now because this app does not consume webhook events.
+1. Configure these least-privilege app permissions:
+
+| Permission category | Setting | Reason |
+| --- | --- | --- |
+| Repository permissions | No access | The backend does not call repository endpoints |
+| Organization permissions | Administration: Read-only | Required for organization AI Credit usage and usage-summary endpoints |
+| Account permissions | No access | The backend does not call user billing endpoints; Plan access is not required |
+
+Leave every other repository, organization, and account permission set to No
+access. The app only reads billing data and does not need write access.
+
 1. Create the app.
 
 ### Step 3: Enable user authorization and install the app
@@ -187,10 +202,36 @@ origin is the Vite app, and Vite proxies `/auth` and `/api` to Express.
 1. Ensure user authorization is enabled for the app.
 2. Install the app to the organization or account you will assess.
 3. Grant access to the target organization and enterprise resources.
-4. Use a GitHub user account with sufficient billing visibility.
+4. Authorize the app as a user who meets the role requirements for every API
+  used by the assessment:
+
+| Assessment data | Required role |
+| --- | --- |
+| Organization AI Credit usage and usage summary | Organization administrator |
+| Enterprise budgets | Enterprise administrator or billing manager |
+| Enterprise cost centers | Enterprise owner, billing manager, or organization owner |
+
+For a complete assessment, use an enterprise owner or administrator who also
+administers the target organization, or a billing manager who has the required
+organization access. App permissions never grant access that the authorizing
+user does not already have.
 
 This backend requests OAuth scopes `read:enterprise,read:org` and calls
-enterprise and organization billing endpoints.
+enterprise and organization billing endpoints. GitHub Apps use their
+registered fine-grained permissions rather than OAuth App scopes, so these
+legacy scope parameters do not replace the app permission and user-role
+requirements above.
+
+> [!NOTE]
+> GitHub's GitHub App permission reference maps the organization billing
+> endpoints to Organization Administration read-only access and supports user
+> access tokens. It does not currently publish a separate GitHub App permission
+> mapping for the enterprise budget and cost-center endpoints. GitHub's
+> enhanced-billing automation guidance also documents personal access tokens
+> (classic) and states that fine-grained personal access tokens are unsupported.
+> Validate GitHub App user-token support against your target enterprise and API
+> version. For a `403` response, inspect `X-Accepted-GitHub-Permissions` before
+> granting any broader access.
 
 ### Step 4: Collect credentials
 
