@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title description">
+  <title id="title">GitHub Copilot AI Credits Simulator logo</title>
+  <desc id="description">A glowing cloud surrounds an AI credit token, usage bars, and a governance check beneath an amber digital-services arc.</desc>
+  <defs>
+    <radialGradient id="background" cx="50%" cy="42%" r="64%">
+      <stop offset="0" stop-color="#0b3158" />
+      <stop offset="0.62" stop-color="#061a34" />
+      <stop offset="1" stop-color="#020914" />
+    </radialGradient>
+    <linearGradient id="cyan" x1="92" y1="154" x2="414" y2="388" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#20e6ff" />
+      <stop offset="0.5" stop-color="#00a8f4" />
+      <stop offset="1" stop-color="#1767df" />
+    </linearGradient>
+    <linearGradient id="token" x1="206" y1="196" x2="307" y2="304" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0fe3ff" />
+      <stop offset="0.48" stop-color="#078bdc" />
+      <stop offset="1" stop-color="#083d92" />
+    </linearGradient>
+    <linearGradient id="amber" x1="108" y1="70" x2="410" y2="433" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffd166" />
+      <stop offset="0.48" stop-color="#f6a623" />
+      <stop offset="1" stop-color="#ff8a00" />
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="6" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter id="softShadow" x="-25%" y="-25%" width="150%" height="150%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#000814" flood-opacity="0.7" />
+    </filter>
+    <clipPath id="badgeClip">
+      <circle cx="256" cy="256" r="248" />
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#badgeClip)">
+    <rect width="512" height="512" fill="#02060d" />
+    <circle cx="256" cy="256" r="244" fill="url(#background)" />
+    <path d="M80 235C90 139 160 72 256 64C352 72 422 139 432 235" fill="none" stroke="url(#amber)" stroke-width="9" stroke-linecap="round" />
+    <path d="M92 385C127 433 184 462 256 462C328 462 385 433 420 385" fill="none" stroke="url(#amber)" stroke-width="6" stroke-linecap="round" opacity="0.95" />
+
+    <g fill="none" stroke="#18dfff" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)">
+      <path d="M135 338C96 338 74 310 74 278C74 247 94 221 123 215C124 171 158 138 201 138C217 104 251 82 291 82C345 82 388 122 393 174C433 176 464 209 464 249C464 288 435 320 397 324" stroke="url(#cyan)" stroke-width="13" />
+      <path d="M133 338H398" stroke="#0bb9f4" stroke-width="7" opacity="0.88" />
+    </g>
+
+    <g opacity="0.85" stroke="#16ccff" stroke-width="3" fill="#1ae4ff" filter="url(#glow)">
+      <path d="M190 162L225 139L259 164L293 132L329 163" fill="none" />
+      <path d="M225 139L238 179L259 164L280 188L329 163" fill="none" />
+      <circle cx="190" cy="162" r="5" />
+      <circle cx="225" cy="139" r="5" />
+      <circle cx="238" cy="179" r="5" />
+      <circle cx="259" cy="164" r="5" />
+      <circle cx="280" cy="188" r="5" />
+      <circle cx="293" cy="132" r="5" />
+      <circle cx="329" cy="163" r="5" />
+    </g>
+
+    <g filter="url(#softShadow)">
+      <circle cx="256" cy="261" r="78" fill="#03152b" stroke="#e8fbff" stroke-width="8" />
+      <circle cx="256" cy="261" r="63" fill="url(#token)" stroke="#24e5ff" stroke-width="4" />
+      <path d="M219 276L242 230L263 276M227 261H255" fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M279 231V276" fill="none" stroke="#ffffff" stroke-width="9" stroke-linecap="round" />
+      <circle cx="301" cy="223" r="16" fill="url(#amber)" stroke="#fff4cf" stroke-width="4" />
+      <path d="M294 223L299 228L308 217" fill="none" stroke="#082342" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+    </g>
+
+    <g fill="none" stroke="#13d8ff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M91 279H132L153 258H180" />
+      <path d="M97 309H147L169 287H183" />
+      <circle cx="84" cy="279" r="7" fill="#061a34" />
+      <circle cx="90" cy="309" r="7" fill="#061a34" />
+    </g>
+
+    <g filter="url(#softShadow)">
+      <path d="M331 299H363V356H331Z" fill="#0b71d4" stroke="#20deff" stroke-width="4" />
+      <path d="M370 270H402V356H370Z" fill="#079ee8" stroke="#20deff" stroke-width="4" />
+      <path d="M409 236H441V356H409Z" fill="url(#cyan)" stroke="#dffcff" stroke-width="4" />
+      <path d="M326 287L377 250L424 210" fill="none" stroke="url(#amber)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
+      <path d="M413 208H426V221" fill="none" stroke="#ffc24b" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" />
+    </g>
+
+    <path d="M139 393C184 363 224 349 272 344C318 339 361 340 407 325" fill="none" stroke="#ffffff" stroke-width="12" stroke-linecap="round" opacity="0.95" />
+    <path d="M143 407C194 374 238 361 286 357C332 353 371 352 411 337" fill="none" stroke="#17bfff" stroke-width="5" stroke-linecap="round" />
+
+    <g fill="#f7a928">
+      <circle cx="215" cy="426" r="4" />
+      <circle cx="256" cy="426" r="4" />
+      <circle cx="297" cy="426" r="4" />
+    </g>
+  </g>
+  <circle cx="256" cy="256" r="244" fill="none" stroke="#0a274a" stroke-width="8" />
+</svg>

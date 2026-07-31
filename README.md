@@ -239,28 +239,54 @@ From the GitHub App settings:
 
 1. Copy the Client ID.
 2. Generate a new Client Secret.
-3. Copy and store the secret immediately.
+3. Copy the Client Secret immediately because GitHub displays it only once.
+4. Store both values in an approved secret manager or in GitHub Codespaces
+  secrets. Never commit either value to the repository or place it in
+  `.env.example`.
 
-Map them to:
+For Codespaces, do not use `GITHUB_APP_CLIENT_ID` or
+`GITHUB_APP_CLIENT_SECRET` as stored secret names. GitHub reserves the
+`GITHUB_` prefix and rejects Codespaces secrets that use it. Store the values
+under these aliases and map them to the runtime names after the Codespace
+starts:
 
-* `GITHUB_APP_CLIENT_ID`
-* `GITHUB_APP_CLIENT_SECRET`
+| GitHub App value | Codespaces secret name | Runtime variable |
+| --- | --- | --- |
+| Client ID | `GHCP_APP_CLIENT_ID` | `GITHUB_APP_CLIENT_ID` |
+| Client Secret | `GHCP_APP_CLIENT_SECRET` | `GITHUB_APP_CLIENT_SECRET` |
 
 ### Step 5: Set runtime environment variables
 
-Minimum required values:
+Use the following storage and runtime mapping. GitHub Actions secrets are not
+automatically available in Codespaces, so create Codespaces secrets in the
+location specified below.
 
-* `GITHUB_APP_CLIENT_ID`
-* `GITHUB_APP_CLIENT_SECRET`
-* `SESSION_SECRET`
-* `CALLBACK_URL`
-* `CLIENT_ORIGIN`
+| Runtime variable | Store in Codespaces as | How to provide it |
+| --- | --- | --- |
+| `GITHUB_APP_CLIENT_ID` | `GHCP_APP_CLIENT_ID` | Map the stored Client ID when the terminal starts |
+| `GITHUB_APP_CLIENT_SECRET` | `GHCP_APP_CLIENT_SECRET` | Map the stored Client Secret when the terminal starts |
+| `SESSION_SECRET` | `GHCP_SESSION_SECRET` | Generate once, store it, and map it when the terminal starts |
+| `CLIENT_ORIGIN` | Do not store | Derive it from the current Codespace name and forwarding domain |
+| `CALLBACK_URL` | Do not store | Derive it from `CLIENT_ORIGIN` |
 
-Generate a strong session secret:
+Generate a strong `GHCP_SESSION_SECRET` value on a trusted machine:
 
 ```bash
 openssl rand -hex 32
 ```
+
+Create the three stored values at **Repository Settings > Secrets and
+variables > Codespaces > New repository secret**:
+
+* `GHCP_APP_CLIENT_ID`
+* `GHCP_APP_CLIENT_SECRET`
+* `GHCP_SESSION_SECRET`
+
+For organization-managed access, an organization owner can instead create the
+same names at **Organization Settings > Codespaces > Secrets** and grant this
+repository access. Do not put these values in Actions secrets, repository
+variables, source files, or dev container configuration. Stop and restart an
+existing Codespace after adding or changing a Codespaces secret.
 
 ### Step 6: Configure for local or Codespaces
 
@@ -358,29 +384,26 @@ remaining workflow.
 
 ### Configure GitHub OAuth in Codespaces
 
-Use GitHub Codespaces secrets for long-lived sensitive values. Add these secret
-names to the repository or organization Codespaces settings before creating or
-rebuilding the Codespace:
-
-* `GITHUB_APP_CLIENT_ID`
-* `GITHUB_APP_CLIENT_SECRET`
-* `SESSION_SECRET`
-
-Generate `SESSION_SECRET` with a cryptographically secure value, for example:
-
-```bash
-openssl rand -hex 32
-```
+Before creating the Codespace, follow Steps 4 and 5 to create the repository or
+organization Codespaces secrets `GHCP_APP_CLIENT_ID`,
+`GHCP_APP_CLIENT_SECRET`, and `GHCP_SESSION_SECRET`. The aliases avoid GitHub's
+reserved `GITHUB_` secret-name prefix.
 
 The Codespace name and forwarding domain are available as environment
-variables. Configure the dynamic URLs in the Codespace terminal before starting
-the app:
+variables. In each new Codespace terminal, map the stored aliases to the names
+the server expects, derive the dynamic URLs, and then start the app:
 
 ```bash
+export GITHUB_APP_CLIENT_ID="${GHCP_APP_CLIENT_ID:?Missing Codespaces secret GHCP_APP_CLIENT_ID}"
+export GITHUB_APP_CLIENT_SECRET="${GHCP_APP_CLIENT_SECRET:?Missing Codespaces secret GHCP_APP_CLIENT_SECRET}"
+export SESSION_SECRET="${GHCP_SESSION_SECRET:?Missing Codespaces secret GHCP_SESSION_SECRET}"
 export CLIENT_ORIGIN="https://${CODESPACE_NAME}-5173.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}"
 export CALLBACK_URL="${CLIENT_ORIGIN}/auth/github/callback"
 npm run dev
 ```
+
+The parameter checks stop immediately with a clear message when a required
+Codespaces secret is unavailable. They do not print secret values.
 
 Use the value printed by the following command as the callback URL in the OAuth
 application settings:
@@ -483,15 +506,20 @@ Configure the OAuth application callback URL as
 
 ### Environment Variables
 
-| Variable | Required | Default | Description |
-| --- | --- | --- | --- |
-| `GITHUB_APP_CLIENT_ID` | For OAuth | Empty | Client ID used to start GitHub authorization |
-| `GITHUB_APP_CLIENT_SECRET` | For OAuth | Empty | Client secret used to exchange the authorization code |
-| `SESSION_SECRET` | Production and OAuth | Insecure development value | Signs session cookies and derives the OAuth token encryption key |
-| `CALLBACK_URL` | For OAuth | `http://localhost:3001/auth/github/callback` | OAuth redirect URI; use the port `5173` proxy URL during development |
-| `CLIENT_ORIGIN` | Recommended | `http://localhost:5173` | Allowed browser origin for CORS |
-| `PORT` | No | `3001` | Express server port |
-| `NODE_ENV` | No | Development | Enables secure cookies and static client serving in production |
+| Runtime variable | Codespaces stored name | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| `GITHUB_APP_CLIENT_ID` | `GHCP_APP_CLIENT_ID` | For OAuth | Empty | Client ID used to start GitHub authorization |
+| `GITHUB_APP_CLIENT_SECRET` | `GHCP_APP_CLIENT_SECRET` | For OAuth | Empty | Client secret used to exchange the authorization code |
+| `SESSION_SECRET` | `GHCP_SESSION_SECRET` | Production and OAuth | Insecure development value | Signs session cookies and derives the OAuth token encryption key |
+| `CALLBACK_URL` | Derived, not stored | For OAuth | `http://localhost:3001/auth/github/callback` | OAuth redirect URI; use the port `5173` proxy URL during development |
+| `CLIENT_ORIGIN` | Derived, not stored | Recommended | `http://localhost:5173` | Allowed browser origin for CORS |
+| `PORT` | Not stored | No | `3001` | Express server port |
+| `NODE_ENV` | Not stored | No | Development | Enables secure cookies and static client serving in production |
+
+The Codespaces stored-name column applies only to GitHub Codespaces. Local and
+production processes use the runtime variable names directly. Never expose the
+Client Secret or session secret through repository variables, client-side Vite
+variables, committed files, or command output.
 
 > [!WARNING]
 > The built-in `SESSION_SECRET` fallback is for development only. Always set a
@@ -635,8 +663,6 @@ ghcp-ai-credits-simulator/
 * The repository does not currently include an automated test suite
 * Live assessment depends on GitHub API availability, permissions, and response
   compatibility
-* Development OAuth should use the Vite proxy callback on port `5173`; the
-  `.env.example` callback currently reflects direct server access on port `3001`
 
 These constraints make the current implementation suitable for development,
 demonstration, and design exploration. Address them before multi-user or
