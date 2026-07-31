@@ -39,7 +39,7 @@ router.get('/github/callback', async (req, res) => {
   }
 
   req.session.enterprise = typeof enterprise === 'string' ? enterprise : 'connected-enterprise';
-  res.redirect('/assessment');
+  res.redirect('/');
 });
 
 // GET /auth/status - lets the client know (without ever exposing the token)

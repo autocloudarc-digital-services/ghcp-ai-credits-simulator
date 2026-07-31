@@ -10,6 +10,7 @@ declare module 'express-session' {
     tokenObtainedAt?: number;
     tokenExpiresIn?: number;
     refreshToken?: string;
+    assessmentCompleted?: boolean;
   }
 }
 

@@ -7,9 +7,10 @@ interface ApiConfigFormProps {
   enterpriseSlug: string;
   onSubmit: (config: AssessmentConfig) => void;
   isSubmitting: boolean;
+  disabled?: boolean;
 }
 
-export default function ApiConfigForm({ enterpriseSlug, onSubmit, isSubmitting }: ApiConfigFormProps) {
+export default function ApiConfigForm({ enterpriseSlug, onSubmit, isSubmitting, disabled = false }: ApiConfigFormProps) {
   const [organizations, setOrganizations] = useState('');
   const [period, setPeriod] = useState<'7' | '30' | 'custom'>('30');
   const [customDays, setCustomDays] = useState(14);
@@ -82,10 +83,10 @@ export default function ApiConfigForm({ enterpriseSlug, onSubmit, isSubmitting }
 
       <button
         type="submit"
-        disabled={isSubmitting}
+        disabled={isSubmitting || disabled}
         className="w-full bg-teal-500 hover:bg-teal-400 disabled:bg-slate-600 disabled:cursor-not-allowed text-slate-900 font-medium py-2 rounded-md transition-colors"
       >
-        {isSubmitting ? 'Assessing…' : 'Assess Now'}
+        {isSubmitting ? 'Assessing…' : disabled ? 'Connect to Run Assessment' : 'Assess Now'}
       </button>
     </form>
   );

@@ -18,24 +18,21 @@ estimated_reading_time: 12
 ## Overview
 
 The GitHub Copilot AI Credits Simulator is a self-service assessment and planning application for GitHub Enterprise customers.
-It is focused on managing GitHub Copilot AI Credits under usage-based billing. It combines scenario modeling, live
-enterprise assessment, governance recommendations, and PDF reporting in one React and Express workspace.
+It is focused on managing GitHub Copilot AI Credits under usage-based billing. It combines live enterprise assessment, scenario modeling, simulation, governance recommendations, and PDF reporting in one React and Express workspace.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![React](https://img.shields.io/badge/React-18-149ECA?logo=react)](https://react.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript)](https://www.typescriptlang.org/)
 [![Node.js](https://img.shields.io/badge/Node.js-LTS-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 
-The application supports two complementary paths:
+The application follows one assessment-led workflow. Every user connects
+through GitHub OAuth and completes a live enterprise assessment before the
+simulator, governance insights, recommendations, or report become available.
+Each operation unlocks the next step so downstream output always has the
+required assessed and modeled context.
 
-* Use the simulator without connecting a GitHub Enterprise account to model
-  license populations, included credit pools, consumption, and overage
-* Connect through GitHub OAuth to assess enterprise usage, budgets, cost
-  centers, consumption concentration, and governance gaps
-
-The resulting state drives tailored recommendations, a governance-readiness
-score, interactive charts, a 3D AI Credit flow visualization, and an executive
-PDF report.
+The resulting state drives tailored recommendations, a governance-readiness score, interactive charts, a 3D AI Credit flow visualization,
+and an executive PDF report.
 
 ![Contributor onboarding and architecture map](docs/images/contributor-onboarding-architecture.svg)
 
@@ -50,10 +47,10 @@ PDF report.
 
 | Area | Capability |
 | --- | --- |
-| Dashboard | Summarizes projected credit posture, overage, population, and governance readiness |
-| Simulator | Models license pools, user populations, burn rates, and what-if scenarios |
-| Visualization | Shows AI Credit flow through an interactive React Three Fiber scene with a 2D fallback |
 | Assessment | Retrieves authenticated GitHub billing, budget, and cost-center data for an enterprise |
+| Simulator | Models license pools, user populations, burn rates, and what-if scenarios |
+| Governance Insights | Summarizes projected credit posture, overage, population, and governance readiness |
+| Visualization | Shows AI Credit flow through an interactive React Three Fiber scene with a 2D fallback |
 | Recommendations | Produces governance actions based on simulated and assessed conditions |
 | Report | Previews and generates a downloadable PDF executive report |
 
@@ -70,7 +67,7 @@ flowchart LR
 
     subgraph Client[React client on port 5173]
         Vite[Vite development server]
-        Router[Dashboard, Simulator, Assessment, Recommendations, Report]
+        Router[Assessment, Simulator, Governance Insights, Recommendations, Report]
         Store[Zustand application state]
         Engine[Credit calculation engine]
         Visuals[Recharts and React Three Fiber]
@@ -128,8 +125,8 @@ flowchart LR
 | npm | Install and run the workspace packages |
 | Modern browser | Run the React UI and WebGL visualization |
 
-GitHub OAuth credentials are optional for client-only simulation. They are
-required for enterprise assessment and server-generated report downloads.
+GitHub OAuth credentials are required because a completed live assessment is
+the prerequisite for every downstream operation.
 
 ### Permissions and Access
 
@@ -243,10 +240,10 @@ callback URL.
 
 1. Start the app with `npm run dev`.
 2. Open the app in the browser.
-3. Go to the Assessment page.
-4. Trigger sign-in with GitHub.
+3. Confirm the application opens on the Assessment page.
+4. Select **Connect GitHub Enterprise**.
 5. Complete consent in GitHub.
-6. Confirm return to `/assessment`.
+6. Confirm return to `/` and that the connected enterprise is displayed.
 7. Verify API health with `GET /healthz`.
 
 ### Step 8: Validate assessment access
@@ -306,7 +303,7 @@ docker version
 > A new Codespace contains changes pushed to GitHub. It does not contain
 > uncommitted files from another computer.
 
-### Run Without GitHub OAuth
+### Start the Application
 
 Start both workspace applications:
 
@@ -314,9 +311,9 @@ Start both workspace applications:
 npm run dev
 ```
 
-When Codespaces detects port `5173`, select **Open in Browser**. You can use the
-dashboard, simulator, visualization, and recommendation workflow without OAuth.
-Assessment and PDF download endpoints require an authenticated session.
+When Codespaces detects port `5173`, select **Open in Browser**. The Assessment
+page is the entry point. Configure GitHub OAuth before attempting to unlock the
+remaining workflow.
 
 ### Configure GitHub OAuth in Codespaces
 
@@ -353,7 +350,7 @@ printf '%s\n' "${CALLBACK_URL}"
 
 The callback intentionally uses port `5173`. Vite proxies `/auth` to Express,
 which keeps the OAuth session cookie on the same browser origin and returns the
-user to the React `/assessment` route after authentication.
+user to the React `/` assessment route after authentication.
 
 In the Codespaces **Ports** panel:
 
@@ -402,14 +399,15 @@ npm install
 
 If you are working from a fork, replace the clone URL with your fork URL.
 
-### Run Locally Without GitHub OAuth
+### Start Locally
 
 ```bash
 npm run dev
 ```
 
 Open <http://localhost:5173>. The Express health endpoint is available at
-<http://localhost:3001/healthz>.
+<http://localhost:3001/healthz>. The application remains on the Assessment step
+until GitHub OAuth is configured and a live assessment succeeds.
 
 ### Configure GitHub OAuth Locally
 
@@ -460,17 +458,26 @@ Configure the OAuth application callback URL as
 
 ## Application Workflow
 
-1. Open the dashboard to review the current simulator state.
-2. Configure enterprise license pools and population allocations in the
-   simulator.
-3. Compare what-if scenarios and inspect projected burn-down behavior.
-4. Optionally connect GitHub and run an enterprise assessment.
-5. Review concentration risk, budgets, cost centers, and governance gaps.
-6. Open recommendations to review prioritized governance actions.
-7. Preview the report and, when authenticated, generate the executive PDF.
+1. Connect GitHub Enterprise and complete a live assessment of usage, budgets,
+  cost centers, concentration, and governance gaps.
+2. Review and confirm simulator assumptions for license counts and population
+  tiers. These values are not returned by the assessment APIs, so the form is
+  prefilled with planning assumptions that require explicit confirmation.
+3. Review Governance Insights for projected credit posture, overage,
+  visualizations, and governance readiness.
+4. Review prioritized recommendations mapped to the Budget Profile Classes.
+5. Preview and download the executive report.
 
-Simulator state is held in the browser through Zustand. Assessment jobs and
-generated reports are held in server memory.
+Locked steps remain visible in the navigation with their prerequisite. Direct
+navigation to a locked route redirects to the earliest incomplete step. Starting
+a new assessment invalidates simulator confirmation and all downstream output.
+Disconnecting resets the complete workflow.
+
+Zustand automatically saves assessed data, simulator configuration, and workflow
+progress in browser `sessionStorage`. A refresh in the same browser tab restores
+progress after the server validates the OAuth session. Closing the tab clears
+the browser copy. Assessment jobs, authenticated sessions, and generated reports
+remain in server memory.
 
 ## API Reference
 
@@ -485,8 +492,8 @@ generated reports are held in server memory.
 | `POST` | `/api/assessment/start` | Yes | Start an asynchronous enterprise assessment |
 | `GET` | `/api/assessment/status/:id` | Yes | Poll assessment status |
 | `GET` | `/api/assessment/results/:id` | Yes | Retrieve completed assessment results |
-| `POST` | `/api/report/generate` | Yes | Generate and stream an executive PDF |
-| `GET` | `/api/report/download/:id` | Yes | Download a cached report by identifier |
+| `POST` | `/api/report/generate` | Assessment session | Generate and stream an executive PDF |
+| `GET` | `/api/report/download/:id` | Owner session | Download a cached report by identifier |
 
 State-changing requests require the CSRF token returned by
 `/auth/csrf-token` in the `X-CSRF-Token` request header. The client configures
@@ -503,6 +510,8 @@ The current implementation includes these development-oriented controls:
 * CSRF protection for state-changing requests
 * CORS restricted to `CLIENT_ORIGIN`
 * Authentication middleware on assessment and report APIs
+* Session ownership checks on assessment jobs and generated reports
+* Completed-assessment requirement on report generation
 * Generic API error responses with stack details omitted from production output
 
 Secrets and OAuth tokens must never be committed. Review the security model,
@@ -578,6 +587,8 @@ ghcp-ai-credits-simulator/
 * Express uses its default in-memory session store
 * Assessment jobs and generated PDF buffers are process-local and disappear on
   restart
+* Browser workflow autosave uses per-tab `sessionStorage` and is not durable
+  across closed tabs or browsers
 * The application has no database, distributed cache, job queue, or durable
   report storage
 * The repository does not currently include an automated test suite

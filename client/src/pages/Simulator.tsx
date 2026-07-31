@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
 import { runSimulation } from '../engine/creditCalculationEngine';
 import LicensePoolConfig from '../components/simulator/LicensePoolConfig';
@@ -14,19 +16,22 @@ const TABS = [
 type TabId = (typeof TABS)[number]['id'];
 
 export default function Simulator() {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabId>('license');
-  const { simulatorConfig, setSimulatorResult } = useAppStore();
+  const { simulatorConfig, assessmentResult, confirmSimulation } = useAppStore();
 
-  useEffect(() => {
-    setSimulatorResult(runSimulation(simulatorConfig));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simulatorConfig]);
+  const handleConfirm = () => {
+    confirmSimulation(runSimulation(simulatorConfig));
+    navigate('/dashboard');
+  };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-slate-100">Simulator</h1>
-        <p className="text-sm text-slate-400">Model license pools, developer population, and what-if scenarios.</p>
+        <p className="text-sm text-slate-400">
+          Confirm license and population inputs to model the {assessmentResult?.totalCreditsConsumed.toLocaleString()} assessed credits.
+        </p>
       </div>
 
       <div className="flex gap-2 border-b border-slate-700">
@@ -48,6 +53,15 @@ export default function Simulator() {
       {activeTab === 'license' && <LicensePoolConfig />}
       {activeTab === 'population' && <PopulationAllocation />}
       {activeTab === 'whatif' && <WhatIfScenarioBuilder />}
+
+      <div className="flex justify-end border-t border-slate-700 pt-5">
+        <button
+          onClick={handleConfirm}
+          className="flex items-center gap-2 bg-teal-500 hover:bg-teal-400 text-slate-900 font-medium px-4 py-2 rounded-md text-sm transition-colors"
+        >
+          Confirm Inputs and View Dashboard <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 }

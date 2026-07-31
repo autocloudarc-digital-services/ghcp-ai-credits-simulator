@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
 import { Github, LogOut, ShieldCheck } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
 import ApiConfigForm from '../components/assessment/ApiConfigForm';
 import AssessmentResults from '../components/assessment/AssessmentResults';
@@ -8,6 +9,7 @@ import { calculateIncludedPool } from '../engine/creditCalculationEngine';
 import { AssessmentConfig } from '../types';
 
 export default function Assessment() {
+  const navigate = useNavigate();
   const {
     isConnected,
     connectedEnterprise,
@@ -15,24 +17,11 @@ export default function Assessment() {
     isAssessing,
     setIsAssessing,
     assessmentResult,
-    setAssessmentResult,
+    completeAssessment,
+    resetWorkflow,
     simulatorConfig,
   } = useAppStore();
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    axios
-      .get('/auth/status')
-      .then((res) => {
-        if (res.data.connected) {
-          setIsConnected(true, res.data.enterprise);
-        }
-      })
-      .catch(() => {
-        /* not connected; ignore */
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const handleConnect = () => {
     window.location.href = '/auth/github';
@@ -43,6 +32,8 @@ export default function Assessment() {
       await axios.post('/auth/logout');
     } finally {
       setIsConnected(false);
+      resetWorkflow();
+      navigate('/');
     }
   };
 
@@ -52,8 +43,7 @@ export default function Assessment() {
       const statusRes = await axios.get(`/api/assessment/status/${assessmentId}`);
       if (statusRes.data.status === 'complete') {
         const resultsRes = await axios.get(`/api/assessment/results/${assessmentId}`);
-        setAssessmentResult(resultsRes.data);
-        return;
+        return resultsRes.data;
       }
       if (statusRes.data.status === 'failed') {
         throw new Error(statusRes.data.error || 'Assessment failed');
@@ -66,9 +56,12 @@ export default function Assessment() {
   const handleAssess = async (config: AssessmentConfig) => {
     setIsAssessing(true);
     setError(null);
+    resetWorkflow();
     try {
       const startRes = await axios.post('/api/assessment/start', config);
-      await pollAssessment(startRes.data.assessmentId);
+      const result = await pollAssessment(startRes.data.assessmentId);
+      completeAssessment(result, connectedEnterprise ?? config.enterpriseSlug);
+      navigate('/simulator');
     } catch (err) {
       setError(
         axios.isAxiosError(err)
@@ -130,6 +123,7 @@ export default function Assessment() {
         enterpriseSlug={connectedEnterprise ?? simulatorConfig.enterpriseName}
         onSubmit={handleAssess}
         isSubmitting={isAssessing}
+        disabled={!isConnected}
       />
 
       {assessmentResult && (

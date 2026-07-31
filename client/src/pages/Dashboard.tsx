@@ -9,20 +9,14 @@ import AICFlowVisualizer from '../components/visualization/AICFlowVisualizer';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { simulatorConfig, simulatorResult, setSimulatorResult, assessmentResult, recommendations, setRecommendations } =
+  const { simulatorConfig, simulatorResult, assessmentResult, recommendations, setRecommendations, markDashboardReviewed } =
     useAppStore();
-
-  useEffect(() => {
-    if (!simulatorResult) {
-      setSimulatorResult(runSimulation(simulatorConfig));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const result = simulatorResult ?? runSimulation(simulatorConfig);
 
   useEffect(() => {
     setRecommendations(generateRecommendations(assessmentResult, simulatorConfig));
+    markDashboardReviewed();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assessmentResult, simulatorConfig]);
 
@@ -41,17 +35,17 @@ export default function Dashboard() {
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-100">Dashboard</h1>
+          <h1 className="text-2xl font-semibold text-slate-100">Governance Insights</h1>
           <p className="text-sm text-slate-400">
             {simulatorConfig.enterpriseName} · AI Credits governance at a glance
           </p>
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => navigate('/assessment')}
+            onClick={() => navigate('/')}
             className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-4 py-2 rounded-md text-sm transition-colors"
           >
-            <Search className="w-4 h-4" /> Run Assessment
+            <Search className="w-4 h-4" /> Run New Assessment
           </button>
           <button
             onClick={() => navigate('/simulator')}

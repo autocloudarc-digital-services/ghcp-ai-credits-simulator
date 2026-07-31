@@ -9,10 +9,11 @@ import BudgetHierarchyDiagram from '../components/recommendations/BudgetHierarch
 import GovernanceReadinessScore from '../components/dashboard/GovernanceReadinessScore';
 
 export default function Recommendations() {
-  const { assessmentResult, simulatorConfig, recommendations, setRecommendations } = useAppStore();
+  const { assessmentResult, simulatorConfig, recommendations, setRecommendations, markRecommendationsReviewed } = useAppStore();
 
   useEffect(() => {
     setRecommendations(generateRecommendations(assessmentResult, simulatorConfig));
+    markRecommendationsReviewed();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assessmentResult, simulatorConfig]);
 

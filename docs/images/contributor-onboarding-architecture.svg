@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1200" viewBox="0 0 1600 1200" role="img" aria-labelledby="title desc">
   <title id="title">GitHub Copilot AI Credits Simulator contributor onboarding and architecture</title>
-  <desc id="desc">A visual guide showing five setup steps, the React client and Express server architecture, GitHub integrations, security controls, in-memory state, contributor file landmarks, and the simulation and assessment workflows.</desc>
+  <desc id="desc">A visual guide showing five setup steps, the React client and Express server architecture, GitHub integrations, security controls, session state, contributor file landmarks, and the mandatory assessment-first workflow.</desc>
   <defs>
     <style>
       .bg { fill: #f7f9fc; }
@@ -84,9 +84,9 @@
   <g transform="translate(652,190)">
     <rect class="panel" width="272" height="112" rx="8" />
     <circle cx="28" cy="28" r="18" fill="#7c3aed" /><text x="28" y="29" class="step-number">3</text>
-    <text x="56" y="29" class="label">Choose capability</text>
-    <text x="20" y="61" class="body">Simulation: no OAuth required</text>
-    <text x="20" y="86" class="body">Assessment: configure secrets</text>
+    <text x="56" y="29" class="label">Configure OAuth</text>
+    <text x="20" y="61" class="body">Add app credentials + secret</text>
+    <text x="20" y="86" class="body">Assessment is the entry point</text>
   </g>
   <path d="M928 246 H952" class="arrow" />
   <g transform="translate(956,190)">
@@ -134,12 +134,12 @@
 
     <rect x="194" y="72" width="334" height="74" rx="8" class="node-client" />
     <text x="361" y="96" class="label center">Five route pages</text>
-    <text x="361" y="120" class="body center">Dashboard | Simulator | Assessment</text>
-    <text x="361" y="138" class="body center">Recommendations | Report</text>
+    <text x="361" y="120" class="body center">Assessment | Simulator | Governance Insights</text>
+    <text x="361" y="138" class="body center">Recommendations | Executive Report</text>
 
     <rect x="20" y="170" width="152" height="76" rx="8" class="node-client" />
     <text x="96" y="197" class="label center">Zustand store</text>
-    <text x="96" y="220" class="small center">Browser state</text>
+    <text x="96" y="220" class="small center">Session autosave + gates</text>
     <text x="96" y="237" class="code center">store/appStore.ts</text>
 
     <rect x="194" y="170" width="152" height="76" rx="8" class="node-client" />
@@ -184,14 +184,14 @@
 
     <rect x="181" y="148" width="138" height="96" rx="8" class="node-server" />
     <text x="250" y="175" class="label center">Assessment</text>
-    <text x="250" y="197" class="small center">Start + poll jobs</text>
+    <text x="250" y="197" class="small center">Owned async jobs</text>
     <text x="250" y="216" class="small center">Usage + governance</text>
     <text x="250" y="235" class="code center">routes/assessment.ts</text>
 
     <rect x="342" y="148" width="138" height="96" rx="8" class="node-server" />
     <text x="411" y="175" class="label center">Reports</text>
-    <text x="411" y="197" class="small center">Render + stream PDF</text>
-    <text x="411" y="216" class="small center">Cache for download</text>
+    <text x="411" y="197" class="small center">Assessment-gated PDF</text>
+    <text x="411" y="216" class="small center">Owner-only download</text>
     <text x="411" y="235" class="code center">routes/report.ts</text>
 
     <path d="M250 128 V144" class="arrow-blue" />
@@ -236,58 +236,50 @@
     <circle cx="30" cy="180" r="5" fill="#d97706" /><text x="44" y="185" class="body">Rate limiting</text>
   </g>
 
-  <text x="44" y="804" class="section">3. Follow either user journey, then contribute at the owning layer</text>
-  <text x="44" y="827" class="body">Both paths produce governance insight. Only live assessment and server PDF endpoints require authentication.</text>
+  <text x="44" y="804" class="section">3. Follow the gated user journey, then contribute at the owning layer</text>
+  <text x="44" y="827" class="body">Every user completes an OAuth-backed assessment before simulation, governance insight, recommendations, and reporting unlock.</text>
 
   <g transform="translate(44,852)">
     <rect class="panel" width="1512" height="224" rx="12" />
     <rect x="0" y="0" width="232" height="224" rx="10" fill="#f1f5f9" />
-    <text x="24" y="34" class="label">Choose a journey</text>
-    <text x="24" y="62" class="body">Start with simulation for</text>
-    <text x="24" y="82" class="body">UI and calculation work.</text>
-    <text x="24" y="114" class="body">Add OAuth for live GitHub</text>
-    <text x="24" y="134" class="body">assessment and PDF APIs.</text>
+    <text x="24" y="34" class="label">Complete in order</text>
+    <text x="24" y="62" class="body">Each completed operation</text>
+    <text x="24" y="82" class="body">unlocks the next step.</text>
+    <text x="24" y="114" class="body">Refresh restores progress</text>
+    <text x="24" y="134" class="body">after session validation.</text>
     <rect x="24" y="164" width="178" height="36" rx="18" fill="#0f172a" />
     <text x="113" y="187" class="label center" style="fill:#ffffff">localhost:5173</text>
 
-    <rect x="270" y="22" width="190" height="74" rx="8" class="client-panel" />
-    <text x="365" y="48" class="label center">Simulation path</text>
-    <text x="365" y="70" class="body center">Configure populations</text>
-    <text x="365" y="87" class="small center">No OAuth required</text>
-    <path d="M462 59 H502" class="arrow-teal" />
-    <rect x="506" y="22" width="190" height="74" rx="8" class="node-client" />
-    <text x="601" y="48" class="label center">Calculate</text>
-    <text x="601" y="70" class="body center">Pool, burn, overage</text>
-    <text x="601" y="87" class="small center">Credit engine</text>
-    <path d="M698 59 H738" class="arrow-teal" />
+    <rect x="270" y="52" width="190" height="118" rx="8" class="server-panel" />
+    <text x="365" y="80" class="label center">1. Assessment</text>
+    <text x="365" y="104" class="body center">OAuth + enterprise data</text>
+    <text x="365" y="124" class="body center">Usage and budgets</text>
+    <text x="365" y="144" class="small center">Owned async job</text>
+    <path d="M462 111 H502" class="arrow-blue" />
 
-    <rect x="270" y="126" width="190" height="74" rx="8" class="server-panel" />
-    <text x="365" y="152" class="label center">Assessment path</text>
-    <text x="365" y="174" class="body center">Connect enterprise</text>
-    <text x="365" y="191" class="small center">OAuth required</text>
-    <path d="M462 163 H502" class="arrow-blue" />
-    <rect x="506" y="126" width="190" height="74" rx="8" class="node-server" />
-    <text x="601" y="152" class="label center">Assess</text>
-    <text x="601" y="174" class="body center">Usage and budgets</text>
-    <text x="601" y="191" class="small center">Async job + polling</text>
-    <path d="M698 163 H738" class="arrow-blue" />
+    <rect x="506" y="52" width="190" height="118" rx="8" class="client-panel" />
+    <text x="601" y="80" class="label center">2. Simulator</text>
+    <text x="601" y="104" class="body center">Confirm assumptions</text>
+    <text x="601" y="124" class="body center">Pool, burn, overage</text>
+    <text x="601" y="144" class="small center">Credit engine</text>
+    <path d="M698 111 H738" class="arrow-teal" />
 
     <rect x="742" y="52" width="190" height="118" rx="8" class="shared-panel" />
-    <text x="837" y="80" class="label center">Governance insight</text>
+    <text x="837" y="80" class="label center">3. Governance Insights</text>
     <text x="837" y="104" class="body center">Readiness score</text>
     <text x="837" y="124" class="body center">Concentration risk</text>
     <text x="837" y="144" class="body center">Governance gaps</text>
     <path d="M934 111 H974" class="arrow-green" />
 
     <rect x="978" y="52" width="190" height="118" rx="8" class="success-panel" />
-    <text x="1073" y="80" class="label center">Recommendations</text>
+    <text x="1073" y="80" class="label center">4. Recommendations</text>
     <text x="1073" y="104" class="body center">Prioritized actions</text>
     <text x="1073" y="124" class="body center">Budget hierarchy</text>
     <text x="1073" y="144" class="body center">Executive preview</text>
     <path d="M1170 111 H1210" class="arrow-green" />
 
     <rect x="1214" y="52" width="266" height="118" rx="8" class="success-panel" />
-    <text x="1347" y="80" class="label center">Executive PDF</text>
+    <text x="1347" y="80" class="label center">5. Executive Report</text>
     <text x="1347" y="104" class="body center">React PDF Renderer</text>
     <text x="1347" y="124" class="body center">Authenticated generate/download</text>
     <text x="1347" y="146" class="small center">Stored in memory until restart</text>

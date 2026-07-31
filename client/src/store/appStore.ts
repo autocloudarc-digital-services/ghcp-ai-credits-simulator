@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
 import {
   AssessmentResult,
   Recommendation,
@@ -38,6 +39,11 @@ interface AppState {
   isConnected: boolean;
   connectedEnterprise: string | null;
 
+  // Workflow
+  hasConfirmedSimulation: boolean;
+  hasReviewedDashboard: boolean;
+  hasReviewedRecommendations: boolean;
+
   // Recommendations
   recommendations: Recommendation[];
 
@@ -54,10 +60,15 @@ interface AppState {
   setIsAssessing: (val: boolean) => void;
   setIsConnected: (val: boolean, enterprise?: string) => void;
   setRecommendations: (recs: Recommendation[]) => void;
+  completeAssessment: (result: AssessmentResult, enterpriseName: string) => void;
+  confirmSimulation: (result: SimulatorResult) => void;
+  markDashboardReviewed: () => void;
+  markRecommendationsReviewed: () => void;
+  resetWorkflow: () => void;
   toggle3DVisualizer: () => void;
 }
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>()(persist((set) => ({
   simulatorConfig: defaultSimulatorConfig,
   simulatorResult: null,
   scenarios: [],
@@ -66,6 +77,10 @@ export const useAppStore = create<AppState>((set) => ({
   isAssessing: false,
   isConnected: false,
   connectedEnterprise: null,
+
+  hasConfirmedSimulation: false,
+  hasReviewedDashboard: false,
+  hasReviewedRecommendations: false,
 
   recommendations: [],
 
@@ -81,6 +96,11 @@ export const useAppStore = create<AppState>((set) => ({
           ...(config.populationAllocation ?? {}),
         },
       },
+      simulatorResult: null,
+      hasConfirmedSimulation: false,
+      hasReviewedDashboard: false,
+      hasReviewedRecommendations: false,
+      recommendations: [],
     })),
 
   setSimulatorResult: (result) => set({ simulatorResult: result }),
@@ -101,5 +121,54 @@ export const useAppStore = create<AppState>((set) => ({
   setIsConnected: (val, enterprise) =>
     set({ isConnected: val, connectedEnterprise: enterprise ?? null }),
   setRecommendations: (recs) => set({ recommendations: recs }),
+  completeAssessment: (result, enterpriseName) =>
+    set((state) => ({
+      assessmentResult: result,
+      simulatorConfig: {
+        ...state.simulatorConfig,
+        enterpriseName,
+        creditsConsumedSoFar: result.totalCreditsConsumed,
+      },
+      simulatorResult: null,
+      scenarios: [],
+      recommendations: [],
+      hasConfirmedSimulation: false,
+      hasReviewedDashboard: false,
+      hasReviewedRecommendations: false,
+    })),
+  confirmSimulation: (result) =>
+    set({
+      simulatorResult: result,
+      recommendations: [],
+      hasConfirmedSimulation: true,
+      hasReviewedDashboard: false,
+      hasReviewedRecommendations: false,
+    }),
+  markDashboardReviewed: () => set({ hasReviewedDashboard: true }),
+  markRecommendationsReviewed: () => set({ hasReviewedRecommendations: true }),
+  resetWorkflow: () =>
+    set({
+      assessmentResult: null,
+      simulatorResult: null,
+      scenarios: [],
+      recommendations: [],
+      hasConfirmedSimulation: false,
+      hasReviewedDashboard: false,
+      hasReviewedRecommendations: false,
+    }),
   toggle3DVisualizer: () => set((state) => ({ use3DVisualizer: !state.use3DVisualizer })),
+}), {
+  name: 'ghcp-ai-credits-workflow',
+  storage: createJSONStorage(() => sessionStorage),
+  partialize: (state) => ({
+    simulatorConfig: state.simulatorConfig,
+    simulatorResult: state.simulatorResult,
+    scenarios: state.scenarios,
+    assessmentResult: state.assessmentResult,
+    recommendations: state.recommendations,
+    hasConfirmedSimulation: state.hasConfirmedSimulation,
+    hasReviewedDashboard: state.hasReviewedDashboard,
+    hasReviewedRecommendations: state.hasReviewedRecommendations,
+    use3DVisualizer: state.use3DVisualizer,
+  }),
 }));

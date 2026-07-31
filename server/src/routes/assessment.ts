@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { Router } from 'express';
-import { Session } from 'express-session';
+import { Session, SessionData } from 'express-session';
 import {
   getAICreditUsage,
   getCostCenters,
@@ -13,6 +13,7 @@ import { AssessmentResult, DailyBurnPoint, UserConsumption } from '../types';
 const router = Router();
 
 interface AssessmentJob {
+  ownerSessionId: string;
   status: 'pending' | 'complete' | 'failed';
   result?: AssessmentResult;
   error?: string;
@@ -50,7 +51,7 @@ async function runAssessment(
   enterpriseSlug: string,
   organizations: string[],
   periodDays: number,
-  session: Session
+  session: Session & Partial<SessionData>
 ) {
   const job = jobs.get(jobId);
   if (!job) return;
@@ -120,10 +121,14 @@ async function runAssessment(
       existingCostCenters,
     };
 
-    jobs.set(jobId, { status: 'complete', result });
+    session.assessmentCompleted = true;
+    await new Promise<void>((resolve, reject) => {
+      session.save((error) => (error ? reject(error) : resolve()));
+    });
+    jobs.set(jobId, { ownerSessionId: job.ownerSessionId, status: 'complete', result });
   } catch (err) {
     const message = err instanceof GitHubBillingServiceError ? err.message : 'Assessment failed unexpectedly.';
-    jobs.set(jobId, { status: 'failed', error: message });
+    jobs.set(jobId, { ownerSessionId: job.ownerSessionId, status: 'failed', error: message });
   }
 }
 
@@ -137,7 +142,8 @@ router.post('/start', (req, res) => {
   }
 
   const jobId = randomUUID();
-  jobs.set(jobId, { status: 'pending' });
+  req.session.assessmentCompleted = false;
+  jobs.set(jobId, { ownerSessionId: req.sessionID, status: 'pending' });
 
   const resolvedEnterprise = enterpriseSlug || req.session.enterprise || '';
   const orgs = Array.isArray(organizations) ? organizations : [];
@@ -152,7 +158,7 @@ router.post('/start', (req, res) => {
 // GET /api/assessment/status/:id - check assessment job status.
 router.get('/status/:id', (req, res) => {
   const job = jobs.get(req.params.id);
-  if (!job) {
+  if (!job || job.ownerSessionId !== req.sessionID) {
     res.status(404).json({ message: 'Assessment not found.' });
     return;
   }
@@ -162,7 +168,7 @@ router.get('/status/:id', (req, res) => {
 // GET /api/assessment/results/:id - fetch completed assessment results.
 router.get('/results/:id', (req, res) => {
   const job = jobs.get(req.params.id);
-  if (!job) {
+  if (!job || job.ownerSessionId !== req.sessionID) {
     res.status(404).json({ message: 'Assessment not found.' });
     return;
   }

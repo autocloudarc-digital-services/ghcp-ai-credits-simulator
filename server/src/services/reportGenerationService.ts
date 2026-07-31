@@ -1,23 +1,6 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet, renderToBuffer } from '@react-pdf/renderer';
 import { AssessmentResult, Recommendation, SimulatorConfig } from '../types';
 import { budgetProfileClasses } from '../data/budgetProfileClassesServer';
-
-const styles = StyleSheet.create({
-  page: { padding: 36, fontSize: 10, fontFamily: 'Helvetica', color: '#0f172a' },
-  title: { fontSize: 20, marginBottom: 4, color: '#0f172a', fontFamily: 'Helvetica-Bold' },
-  subtitle: { fontSize: 10, marginBottom: 16, color: '#475569' },
-  sectionTitle: { fontSize: 13, marginTop: 16, marginBottom: 6, color: '#0d9488', fontFamily: 'Helvetica-Bold' },
-  paragraph: { fontSize: 10, lineHeight: 1.5, marginBottom: 6 },
-  tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingVertical: 3 },
-  tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#0f172a', paddingVertical: 4 },
-  colSmall: { width: '10%', fontSize: 9 },
-  colMedium: { width: '30%', fontSize: 9 },
-  colLarge: { width: '40%', fontSize: 9 },
-  headerCell: { fontSize: 9, fontFamily: 'Helvetica-Bold' },
-  bullet: { fontSize: 10, marginBottom: 4 },
-  footer: { position: 'absolute', bottom: 20, left: 36, right: 36, fontSize: 8, color: '#94a3b8', textAlign: 'center' },
-});
 
 export interface ReportInput {
   simulatorConfig: SimulatorConfig;
@@ -25,7 +8,30 @@ export interface ReportInput {
   recommendations: Recommendation[];
 }
 
-function buildDocument({ simulatorConfig, assessmentResult, recommendations }: ReportInput) {
+async function loadPdfRenderer() {
+  return import('@react-pdf/renderer');
+}
+
+function buildDocument(
+  renderer: Awaited<ReturnType<typeof loadPdfRenderer>>,
+  { simulatorConfig, assessmentResult, recommendations }: ReportInput
+) {
+  const { Document, Page, Text, View, StyleSheet } = renderer;
+  const styles = StyleSheet.create({
+    page: { padding: 36, fontSize: 10, fontFamily: 'Helvetica', color: '#0f172a' },
+    title: { fontSize: 20, marginBottom: 4, color: '#0f172a', fontFamily: 'Helvetica-Bold' },
+    subtitle: { fontSize: 10, marginBottom: 16, color: '#475569' },
+    sectionTitle: { fontSize: 13, marginTop: 16, marginBottom: 6, color: '#0d9488', fontFamily: 'Helvetica-Bold' },
+    paragraph: { fontSize: 10, lineHeight: 1.5, marginBottom: 6 },
+    tableRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', paddingVertical: 3 },
+    tableHeaderRow: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#0f172a', paddingVertical: 4 },
+    colSmall: { width: '10%', fontSize: 9 },
+    colMedium: { width: '30%', fontSize: 9 },
+    colLarge: { width: '40%', fontSize: 9 },
+    headerCell: { fontSize: 9, fontFamily: 'Helvetica-Bold' },
+    bullet: { fontSize: 10, marginBottom: 4 },
+    footer: { position: 'absolute', bottom: 20, left: 36, right: 36, fontSize: 8, color: '#94a3b8', textAlign: 'center' },
+  });
   const totalUsers =
     simulatorConfig.licenseCountBusiness +
     simulatorConfig.licenseCountEnterprise +
@@ -178,6 +184,7 @@ function buildDocument({ simulatorConfig, assessmentResult, recommendations }: R
  * the client via the /api/report/download endpoint.
  */
 export async function generateReportPdf(input: ReportInput): Promise<Buffer> {
-  const document = buildDocument(input);
-  return renderToBuffer(document as any);
+  const renderer = await loadPdfRenderer();
+  const document = buildDocument(renderer, input);
+  return renderer.renderToBuffer(document as any);
 }
