@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import axios from 'axios';
 import { Session } from 'express-session';
+import { getGitHubAppCredentials, getSessionSecret } from '../config';
 
 declare module 'express-session' {
   interface SessionData {
@@ -19,21 +20,13 @@ const GITHUB_OAUTH_TOKEN_URL = 'https://github.com/login/oauth/access_token';
 const GITHUB_API_BASE_URL = 'https://api.github.com';
 const OAUTH_SCOPE = 'read:enterprise,read:org';
 
-function getClientCredentials() {
-  const clientId = process.env.GITHUB_APP_CLIENT_ID ?? '';
-  const clientSecret = process.env.GITHUB_APP_CLIENT_SECRET ?? '';
-  const callbackUrl = process.env.CALLBACK_URL ?? 'http://localhost:3001/auth/github/callback';
-  return { clientId, clientSecret, callbackUrl };
-}
-
 /**
  * Derives a stable 32-byte AES key from the SESSION_SECRET environment
  * variable so OAuth access tokens can be encrypted at rest within the
  * server-side session store.
  */
 function getEncryptionKey(): Buffer {
-  const secret = process.env.SESSION_SECRET ?? 'insecure-development-secret-change-me';
-  return crypto.createHash('sha256').update(secret).digest();
+  return crypto.createHash('sha256').update(getSessionSecret()).digest();
 }
 
 function encryptToken(token: string): { iv: string; authTag: string; data: string } {
@@ -64,7 +57,17 @@ function decryptToken(payload: { iv: string; authTag: string; data: string }): s
  * callback before an authorization code is exchanged for a token.
  */
 export function getAuthorizationUrl(session: Session): string {
-  const { clientId, callbackUrl } = getClientCredentials();
+  const { clientId, clientSecret, callbackUrl } = getGitHubAppCredentials();
+  if (!clientId || !clientSecret) {
+    const missingVariables = [
+      !clientId && 'GITHUB_APP_CLIENT_ID (or GHCP_APP_CLIENT_ID)',
+      !clientSecret && 'GITHUB_APP_CLIENT_SECRET (or GHCP_APP_CLIENT_SECRET)',
+    ].filter(Boolean);
+    const error = new Error(`GitHub OAuth is not configured. Missing ${missingVariables.join(' and ')}.`);
+    Object.assign(error, { status: 503 });
+    throw error;
+  }
+
   const state = crypto.randomBytes(32).toString('hex');
   (session as any).oauthState = state;
 
@@ -93,7 +96,7 @@ export async function exchangeCodeForToken(
     return { success: false, error: 'Invalid or missing OAuth state parameter (possible CSRF attempt).' };
   }
 
-  const { clientId, clientSecret, callbackUrl } = getClientCredentials();
+  const { clientId, clientSecret, callbackUrl } = getGitHubAppCredentials();
 
   try {
     const response = await axios.post(
@@ -161,7 +164,7 @@ export async function refreshTokenIfNeeded(
   const bufferMs = 5 * 60 * 1000;
   if (Date.now() < expiresAt - bufferMs) return;
 
-  const { clientId, clientSecret } = getClientCredentials();
+  const { clientId, clientSecret } = getGitHubAppCredentials();
   try {
     const response = await axios.post(
       GITHUB_OAUTH_TOKEN_URL,
@@ -192,7 +195,7 @@ export async function refreshTokenIfNeeded(
  */
 export async function revokeToken(session: Session): Promise<void> {
   const token = getTokenFromSession(session);
-  const { clientId, clientSecret } = getClientCredentials();
+  const { clientId, clientSecret } = getGitHubAppCredentials();
 
   if (token && clientId && clientSecret) {
     try {

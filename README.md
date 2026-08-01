@@ -247,10 +247,9 @@ From the GitHub App settings:
 For Codespaces, do not use `GITHUB_APP_CLIENT_ID` or
 `GITHUB_APP_CLIENT_SECRET` as stored secret names. GitHub reserves the
 `GITHUB_` prefix and rejects Codespaces secrets that use it. Store the values
-under these aliases and map them to the runtime names after the Codespace
-starts:
+under these aliases. The server reads the aliases directly in Codespaces:
 
-| GitHub App value | Codespaces secret name | Runtime variable |
+| GitHub App value | Codespaces secret name | Local and production variable |
 | --- | --- | --- |
 | Client ID | `GHCP_APP_CLIENT_ID` | `GITHUB_APP_CLIENT_ID` |
 | Client Secret | `GHCP_APP_CLIENT_SECRET` | `GITHUB_APP_CLIENT_SECRET` |
@@ -263,11 +262,11 @@ location specified below.
 
 | Runtime variable | Store in Codespaces as | How to provide it |
 | --- | --- | --- |
-| `GITHUB_APP_CLIENT_ID` | `GHCP_APP_CLIENT_ID` | Map the stored Client ID when the terminal starts |
-| `GITHUB_APP_CLIENT_SECRET` | `GHCP_APP_CLIENT_SECRET` | Map the stored Client Secret when the terminal starts |
-| `SESSION_SECRET` | `GHCP_SESSION_SECRET` | Generate once, store it, and map it when the terminal starts |
-| `CLIENT_ORIGIN` | Do not store | Derive it from the current Codespace name and forwarding domain |
-| `CALLBACK_URL` | Do not store | Derive it from `CLIENT_ORIGIN` |
+| `GITHUB_APP_CLIENT_ID` | `GHCP_APP_CLIENT_ID` | Read directly by the server |
+| `GITHUB_APP_CLIENT_SECRET` | `GHCP_APP_CLIENT_SECRET` | Read directly by the server |
+| `SESSION_SECRET` | `GHCP_SESSION_SECRET` | Generate once and read directly by the server |
+| `CLIENT_ORIGIN` | Do not store | Derived automatically from Codespaces metadata |
+| `CALLBACK_URL` | Do not store | Derived automatically from `CLIENT_ORIGIN` |
 
 Generate a strong `GHCP_SESSION_SECRET` value on a trusted machine:
 
@@ -290,15 +289,10 @@ existing Codespace after adding or changing a Codespaces secret.
 
 ### Step 6: Configure for local or Codespaces
 
-Local callback and origin values:
-
-* `CLIENT_ORIGIN=http://localhost:5173`
-* `CALLBACK_URL=http://localhost:5173/auth/github/callback`
-
-Codespaces callback and origin values:
-
-* `CLIENT_ORIGIN=https://${CODESPACE_NAME}-5173.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}`
-* `CALLBACK_URL=${CLIENT_ORIGIN}/auth/github/callback`
+The server defaults to `http://localhost:5173` for local development. In
+Codespaces, it derives the forwarded port `5173` origin and callback from
+`CODESPACE_NAME` and `GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN`. Set
+`CLIENT_ORIGIN` or `CALLBACK_URL` only when you need to override these defaults.
 
 In Codespaces, set port `5173` visibility to Public so GitHub can reach the
 callback URL.
@@ -390,26 +384,19 @@ organization Codespaces secrets `GHCP_APP_CLIENT_ID`,
 reserved `GITHUB_` secret-name prefix.
 
 The Codespace name and forwarding domain are available as environment
-variables. In each new Codespace terminal, map the stored aliases to the names
-the server expects, derive the dynamic URLs, and then start the app:
+variables. The server reads the stored aliases and derives the dynamic URLs
+automatically. Start the app without mapping the variables manually:
 
 ```bash
-export GITHUB_APP_CLIENT_ID="${GHCP_APP_CLIENT_ID:?Missing Codespaces secret GHCP_APP_CLIENT_ID}"
-export GITHUB_APP_CLIENT_SECRET="${GHCP_APP_CLIENT_SECRET:?Missing Codespaces secret GHCP_APP_CLIENT_SECRET}"
-export SESSION_SECRET="${GHCP_SESSION_SECRET:?Missing Codespaces secret GHCP_SESSION_SECRET}"
-export CLIENT_ORIGIN="https://${CODESPACE_NAME}-5173.${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}"
-export CALLBACK_URL="${CLIENT_ORIGIN}/auth/github/callback"
 npm run dev
 ```
 
-The parameter checks stop immediately with a clear message when a required
-Codespaces secret is unavailable. They do not print secret values.
-
-Use the value printed by the following command as the callback URL in the OAuth
-application settings:
+Use the value printed by this command as the callback URL in the GitHub App
+settings:
 
 ```bash
-printf '%s\n' "${CALLBACK_URL}"
+printf 'https://%s-5173.%s/auth/github/callback\n' \
+  "${CODESPACE_NAME}" "${GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN}"
 ```
 
 The callback intentionally uses port `5173`. Vite proxies `/auth` to Express,
@@ -485,8 +472,6 @@ For Bash:
 export GITHUB_APP_CLIENT_ID="your-client-id"
 export GITHUB_APP_CLIENT_SECRET="your-client-secret"
 export SESSION_SECRET="$(openssl rand -hex 32)"
-export CLIENT_ORIGIN="http://localhost:5173"
-export CALLBACK_URL="http://localhost:5173/auth/github/callback"
 npm run dev
 ```
 
@@ -496,13 +481,12 @@ For PowerShell 7:
 $env:GITHUB_APP_CLIENT_ID = "your-client-id"
 $env:GITHUB_APP_CLIENT_SECRET = "your-client-secret"
 $env:SESSION_SECRET = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
-$env:CLIENT_ORIGIN = "http://localhost:5173"
-$env:CALLBACK_URL = "http://localhost:5173/auth/github/callback"
 npm run dev
 ```
 
 Configure the OAuth application callback URL as
 `http://localhost:5173/auth/github/callback` for local development.
+Set `CLIENT_ORIGIN` or `CALLBACK_URL` only to override the local defaults.
 
 ### Environment Variables
 
@@ -511,15 +495,16 @@ Configure the OAuth application callback URL as
 | `GITHUB_APP_CLIENT_ID` | `GHCP_APP_CLIENT_ID` | For OAuth | Empty | Client ID used to start GitHub authorization |
 | `GITHUB_APP_CLIENT_SECRET` | `GHCP_APP_CLIENT_SECRET` | For OAuth | Empty | Client secret used to exchange the authorization code |
 | `SESSION_SECRET` | `GHCP_SESSION_SECRET` | Production and OAuth | Insecure development value | Signs session cookies and derives the OAuth token encryption key |
-| `CALLBACK_URL` | Derived, not stored | For OAuth | `http://localhost:3001/auth/github/callback` | OAuth redirect URI; use the port `5173` proxy URL during development |
-| `CLIENT_ORIGIN` | Derived, not stored | Recommended | `http://localhost:5173` | Allowed browser origin for CORS |
+| `CALLBACK_URL` | Derived, not stored | No | `{CLIENT_ORIGIN}/auth/github/callback` | OAuth redirect URI through the Vite proxy |
+| `CLIENT_ORIGIN` | Derived, not stored | No | Localhost or Codespaces port `5173` origin | Allowed browser origin for CORS |
 | `PORT` | Not stored | No | `3001` | Express server port |
 | `NODE_ENV` | Not stored | No | Development | Enables secure cookies and static client serving in production |
 
-The Codespaces stored-name column applies only to GitHub Codespaces. Local and
-production processes use the runtime variable names directly. Never expose the
-Client Secret or session secret through repository variables, client-side Vite
-variables, committed files, or command output.
+The Codespaces stored-name column applies only to GitHub Codespaces, where the
+server reads the aliases directly. Local and production processes use the
+runtime variable names. Never expose the Client Secret or session secret
+through repository variables, client-side Vite variables, committed files, or
+command output.
 
 > [!WARNING]
 > The built-in `SESSION_SECRET` fallback is for development only. Always set a

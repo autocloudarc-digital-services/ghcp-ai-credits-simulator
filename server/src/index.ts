@@ -8,10 +8,11 @@ import authRoutes from './routes/auth';
 import assessmentRoutes from './routes/assessment';
 import reportRoutes from './routes/report';
 import { requireAuth } from './middleware/requireAuth';
+import { getClientOrigin, getSessionSecret } from './config';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+const CLIENT_ORIGIN = getClientOrigin();
 
 app.use(
   cors({
@@ -23,7 +24,7 @@ app.use(express.json());
 
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || 'insecure-development-secret-change-me',
+    secret: getSessionSecret(),
     resave: false,
     saveUninitialized: false,
     cookie: {
