@@ -61,7 +61,6 @@ export default function Assessment() {
       const startRes = await axios.post('/api/assessment/start', config);
       const result = await pollAssessment(startRes.data.assessmentId);
       completeAssessment(result, connectedEnterprise ?? config.enterpriseSlug);
-      navigate('/simulator');
     } catch (err) {
       setError(
         axios.isAxiosError(err)

@@ -122,6 +122,27 @@ export interface UsageSummary {
   byModel: Record<string, number>;
 }
 
+interface GitHubBudgetResponse {
+  id: string;
+  budget_entity_name?: string;
+  budget_scope: string;
+  budget_product_sku: string;
+  budget_amount: number;
+  consumed_amount?: number;
+  effective_budget?: {
+    consumed_amount?: number;
+  };
+}
+
+interface GitHubCostCenterResponse {
+  id: string;
+  name: string;
+  resources?: Array<{
+    type: string;
+    name: string;
+  }>;
+}
+
 /**
  * Retrieves the aggregated usage summary for an organization.
  * GET /organizations/{org}/settings/billing/usage/summary
@@ -157,14 +178,20 @@ export async function getCostCenters(
     );
   }
 
-  const data = await authenticatedGet<{ costCenters?: GitHubCostCenter[] }>(
+  const data = await authenticatedGet<{ costCenters?: GitHubCostCenterResponse[] }>(
     session,
     enterprise,
     (validatedEnterprise) => `/enterprises/${validatedEnterprise}/settings/billing/cost-centers`,
     undefined,
     enterpriseBillingToken
   );
-  return data.costCenters ?? [];
+  return (data.costCenters ?? []).map((costCenter) => ({
+    id: costCenter.id,
+    name: costCenter.name,
+    resources: (costCenter.resources ?? []).map(
+      (resource) => `${resource.type}:${resource.name}`
+    ),
+  }));
 }
 
 /**
@@ -183,12 +210,22 @@ export async function getExistingBudgets(
     );
   }
 
-  const data = await authenticatedGet<{ budgets?: GitHubBudget[] }>(
+  const data = await authenticatedGet<{ budgets?: GitHubBudgetResponse[] }>(
     session,
     enterprise,
     (validatedEnterprise) => `/enterprises/${validatedEnterprise}/settings/billing/budgets`,
     undefined,
     enterpriseBillingToken
   );
-  return data.budgets ?? [];
+  return (data.budgets ?? []).map((budget) => ({
+    id: budget.id,
+    name:
+      budget.budget_entity_name ||
+      `${budget.budget_scope}: ${budget.budget_product_sku}`,
+    limit: budget.budget_amount,
+    used:
+      budget.effective_budget?.consumed_amount ??
+      budget.consumed_amount ??
+      0,
+  }));
 }
