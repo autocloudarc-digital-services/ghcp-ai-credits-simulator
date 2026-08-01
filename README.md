@@ -737,8 +737,11 @@ the public port ACL still produces an empty tunnel-cluster `404`, the failure is
 in the Codespaces forwarding service rather than this application. Preserve and
 push all work before creating a replacement Codespace. A replacement receives a
 new hostname, so update the GitHub App callback URL and restart OAuth from the
-Assessment page. Alternatively, open a GitHub Support case with the Codespace
-name, tunnel cluster, affected port, response status, and reproduction time.
+Assessment page. The dev container includes an SSH server so maintainers can
+inspect a replacement with `gh codespace ssh -c <codespace-name>`; rebuild any
+Codespace created before that feature was added. Alternatively, open a GitHub
+Support case with the Codespace name, tunnel cluster, affected port, response
+status, and reproduction time.
 Never include tunnel access tokens, GitHub tokens, OAuth secrets, session
 secrets, or unredacted VS Code logs in support evidence.
 
