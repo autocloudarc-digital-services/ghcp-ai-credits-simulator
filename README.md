@@ -270,13 +270,11 @@ the token owner's GitHub role in addition to the token scope.
 | Copilot (`manage_billing:copilot`) | Reserved | Enterprise and organization Copilot seat and policy management |
 | `manage_billing:enterprise` | Active | Enterprise budgets and cost centers |
 | `read:org` | Reserved | Organization membership, teams, and read-only Copilot seat details |
-| `scim:enterprise` | Reserved | Enterprise Managed Users SCIM provisioning through `/scim/v2/enterprises/{enterprise}` |
 | `user` | Reserved | Authenticated user profile, email, and follow data |
 
 The current server sends this credential only to GitHub API URLs assembled from
 fixed enterprise billing paths. Future features must add explicit endpoint
-methods before they can exercise the reserved scopes. SCIM requests also
-require an Enterprise Managed Users setup-user token, while Copilot management
+methods before they can exercise the reserved scopes. Copilot management
 requests require the owner roles documented by each endpoint.
 
 ### Step 5: Set runtime environment variables
