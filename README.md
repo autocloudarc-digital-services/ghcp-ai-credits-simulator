@@ -321,6 +321,13 @@ organization access, enterprise access, and user billing permissions.
 
 * Authentication failure at callback: callback URL mismatch between app settings
   and `CALLBACK_URL`
+* GitHub reports that the Client ID or Client Secret is incorrect: verify that
+  `GHCP_APP_CLIENT_ID` matches the Client ID on the same GitHub App, generate a
+  new Client Secret on that app, replace `GHCP_APP_CLIENT_SECRET`, and restart
+  the Codespace so the updated secrets enter the environment
+* Callback reports invalid or missing OAuth state: do not refresh or reuse the
+  callback URL; return to the Assessment page and start a new connection after
+  the development server has restarted
 * Redirect lands on wrong host or port: `CLIENT_ORIGIN` mismatch
 * Assessment APIs return unauthorized or forbidden: app not installed to target
   org or enterprise, or user lacks required visibility

@@ -17,14 +17,20 @@ router.get('/csrf-token', (_req, res) => {
 });
 
 // GET /auth/github - redirect to GitHub OAuth authorization page.
-router.get('/github', (req, res) => {
+router.get('/github', (req, res, next) => {
   const url = getAuthorizationUrl(req.session);
-  res.redirect(url);
+  req.session.save((error) => {
+    if (error) {
+      next(error);
+      return;
+    }
+    res.redirect(url);
+  });
 });
 
 // GET /auth/github/callback - handle the OAuth callback and exchange the
 // authorization code for an access token, stored encrypted server-side.
-router.get('/github/callback', async (req, res) => {
+router.get('/github/callback', async (req, res, next) => {
   const { code, state, enterprise } = req.query;
 
   if (typeof code !== 'string' || typeof state !== 'string') {
@@ -39,7 +45,13 @@ router.get('/github/callback', async (req, res) => {
   }
 
   req.session.enterprise = typeof enterprise === 'string' ? enterprise : 'connected-enterprise';
-  res.redirect('/');
+  req.session.save((error) => {
+    if (error) {
+      next(error);
+      return;
+    }
+    res.redirect('/');
+  });
 });
 
 // GET /auth/status - lets the client know (without ever exposing the token)
