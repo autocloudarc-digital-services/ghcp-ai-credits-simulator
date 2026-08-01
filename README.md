@@ -435,7 +435,10 @@ In the Codespaces **Ports** panel:
 > [!CAUTION]
 > Public port visibility makes the development UI reachable by anyone who has
 > its URL while the Codespace is running. Stop the Codespace when you finish and
-> never print client secrets or session secrets in terminal output.
+> never print client secrets or session secrets in terminal output. VS Code
+> remote-agent diagnostics can include injected environment values. Redact
+> secrets before sharing logs and rotate any credential exposed in diagnostic
+> output.
 
 ### Validate the Codespace
 
@@ -726,8 +729,18 @@ HTML page, and the port record should use the expected forwarded URL. Port
 `5173` must be Public for GitHub OAuth callbacks, while port `3001` remains
 Private. If these checks pass but the forwarded URL still returns an empty
 `404`, stop and restart the Codespace to recreate its tunnel host connection,
-then restart `npm run dev`. Do not delete and recreate the Codespace because
-that changes its hostname and requires a new GitHub App callback URL.
+then restart `npm run dev`.
+
+If local IPv4 and IPv6 requests return `200`, Vite accepts the forwarded Host
+header, the tunnel reports a connected host and a port record, and recreating
+the public port ACL still produces an empty tunnel-cluster `404`, the failure is
+in the Codespaces forwarding service rather than this application. Preserve and
+push all work before creating a replacement Codespace. A replacement receives a
+new hostname, so update the GitHub App callback URL and restart OAuth from the
+Assessment page. Alternatively, open a GitHub Support case with the Codespace
+name, tunnel cluster, affected port, response status, and reproduction time.
+Never include tunnel access tokens, GitHub tokens, OAuth secrets, session
+secrets, or unredacted VS Code logs in support evidence.
 
 ### The 3D Visualization Is Unavailable
 
