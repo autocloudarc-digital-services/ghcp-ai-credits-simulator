@@ -17,6 +17,9 @@ interface AssessmentResultsProps {
 }
 
 export default function AssessmentResults({ result, totalIncludedPool }: AssessmentResultsProps) {
+  const governanceDataWarnings = result.governanceDataWarnings ?? [];
+  const budgetsWarning = governanceDataWarnings.find((warning) => warning.source === 'budgets');
+  const costCentersWarning = governanceDataWarnings.find((warning) => warning.source === 'costCenters');
   const poolUtilization =
     totalIncludedPool > 0 ? Math.min(999, (result.totalCreditsConsumed / totalIncludedPool) * 100) : 0;
 
@@ -83,6 +86,21 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
 
       <ConcentrationRiskChart topUsers={result.topUsers} />
 
+      {governanceDataWarnings.length > 0 && (
+        <div className="bg-amber-400/10 border border-amber-400/40 text-amber-200 rounded-md px-4 py-3">
+          <div className="flex items-center gap-2 text-sm font-semibold">
+            <AlertTriangle className="w-4 h-4" /> Some enterprise governance data is unavailable
+          </div>
+          <ul className="mt-2 space-y-1">
+            {governanceDataWarnings.map((warning) => (
+              <li key={warning.source} className="text-xs break-words">
+                {warning.message}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
         <h4 className="text-sm font-semibold text-slate-200 mb-2">Daily Consumption Trend</h4>
         <ResponsiveContainer width="100%" height={260}>
@@ -122,7 +140,9 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
           <h4 className="text-sm font-semibold text-slate-200 mb-3">Existing Budgets</h4>
-          {result.existingBudgets.length === 0 ? (
+          {budgetsWarning ? (
+            <p className="text-sm text-amber-300">Budget data unavailable.</p>
+          ) : result.existingBudgets.length === 0 ? (
             <p className="text-sm text-slate-500">No budgets currently configured.</p>
           ) : (
             <div className="space-y-2">
@@ -139,7 +159,9 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
         </div>
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
           <h4 className="text-sm font-semibold text-slate-200 mb-3">Existing Cost Centers</h4>
-          {result.existingCostCenters.length === 0 ? (
+          {costCentersWarning ? (
+            <p className="text-sm text-amber-300">Cost-center data unavailable.</p>
+          ) : result.existingCostCenters.length === 0 ? (
             <p className="text-sm text-slate-500">No cost centers currently configured.</p>
           ) : (
             <div className="space-y-2">

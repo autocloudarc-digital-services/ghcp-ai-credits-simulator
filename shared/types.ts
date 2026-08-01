@@ -90,8 +90,14 @@ export interface AssessmentResult {
   dailyTrend: DailyBurnPoint[];
   concentrationRiskScore: number;
   governanceGaps: string[];
+  governanceDataWarnings: GovernanceDataWarning[];
   existingBudgets: GitHubBudget[];
   existingCostCenters: GitHubCostCenter[];
+}
+
+export interface GovernanceDataWarning {
+  source: 'budgets' | 'costCenters';
+  message: string;
 }
 
 export interface GitHubBudget {

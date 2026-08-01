@@ -66,7 +66,9 @@ export default function Assessment() {
       setError(
         axios.isAxiosError(err)
           ? err.response?.data?.message || 'Failed to start assessment.'
-          : 'Failed to start assessment.'
+          : err instanceof Error
+            ? err.message
+            : 'Failed to start assessment.'
       );
     } finally {
       setIsAssessing(false);
@@ -87,7 +89,7 @@ export default function Assessment() {
         {isConnected ? (
           <div className="flex items-center gap-3">
             <span className="flex items-center gap-1.5 text-sm text-green-400">
-              <ShieldCheck className="w-4 h-4" /> Connected: {connectedEnterprise}
+              <ShieldCheck className="w-4 h-4" /> GitHub authenticated
             </span>
             <button
               onClick={handleLogout}
@@ -120,7 +122,6 @@ export default function Assessment() {
       )}
 
       <ApiConfigForm
-        enterpriseSlug={connectedEnterprise ?? simulatorConfig.enterpriseName}
         onSubmit={handleAssess}
         isSubmitting={isAssessing}
         disabled={!isConnected}

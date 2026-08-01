@@ -4,15 +4,19 @@ const githubSlugPattern = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/;
 
 export const assessmentFormSchema = z
   .object({
-    organizations: z.string().refine(
-      (value) =>
-        value
-          .split(',')
-          .map((organization) => organization.trim())
-          .filter(Boolean)
-          .every((organization) => githubSlugPattern.test(organization)),
-      'Enter comma-separated GitHub organization slugs.'
-    ),
+    enterpriseSlug: z.string().trim().regex(githubSlugPattern, 'Enter a valid GitHub enterprise slug.'),
+    organizations: z
+      .string()
+      .trim()
+      .min(1, 'Enter at least one GitHub organization slug.')
+      .refine(
+        (value) =>
+          value
+            .split(',')
+            .map((organization) => organization.trim())
+            .every((organization) => githubSlugPattern.test(organization)),
+        'Enter comma-separated GitHub organization slugs.'
+      ),
     period: z.enum(['7', '30', 'custom']),
     customDays: z.coerce.number().int().min(1, 'Use at least 1 day.').max(90, 'Use no more than 90 days.'),
   })

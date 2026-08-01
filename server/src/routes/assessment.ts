@@ -31,13 +31,15 @@ function scoreConcentrationRisk(topUsers: UserConsumption[], totalConsumption: n
 function buildGovernanceGaps(
   existingBudgets: AssessmentResult['existingBudgets'],
   existingCostCenters: AssessmentResult['existingCostCenters'],
-  concentrationRiskScore: number
+  concentrationRiskScore: number,
+  budgetsAvailable: boolean,
+  costCentersAvailable: boolean
 ): string[] {
   const gaps: string[] = [];
-  if (existingBudgets.length === 0) {
+  if (budgetsAvailable && existingBudgets.length === 0) {
     gaps.push('No Enterprise Spending Limit or Universal ULB budgets are currently configured.');
   }
-  if (existingCostCenters.length === 0) {
+  if (costCentersAvailable && existingCostCenters.length === 0) {
     gaps.push('No cost centers exist to segment overage, abundant, and exponential user tiers.');
   }
   if (concentrationRiskScore > 40) {
@@ -102,12 +104,41 @@ async function runAssessment(
 
     const concentrationRiskScore = scoreConcentrationRisk(topUsers, totalCreditsConsumed);
 
-    const [existingBudgets, existingCostCenters] = await Promise.all([
+    const [budgetsResult, costCentersResult] = await Promise.allSettled([
       getExistingBudgets(enterpriseSlug, session),
       getCostCenters(enterpriseSlug, session),
     ]);
 
-    const governanceGaps = buildGovernanceGaps(existingBudgets, existingCostCenters, concentrationRiskScore);
+    const budgetsAvailable = budgetsResult.status === 'fulfilled';
+    const costCentersAvailable = costCentersResult.status === 'fulfilled';
+    const existingBudgets = budgetsAvailable ? budgetsResult.value : [];
+    const existingCostCenters = costCentersAvailable ? costCentersResult.value : [];
+    const governanceDataWarnings: AssessmentResult['governanceDataWarnings'] = [];
+
+    if (!budgetsAvailable) {
+      governanceDataWarnings.push({
+        source: 'budgets',
+        message: budgetsResult.reason instanceof Error
+          ? budgetsResult.reason.message
+          : 'Enterprise budget data is unavailable.',
+      });
+    }
+    if (!costCentersAvailable) {
+      governanceDataWarnings.push({
+        source: 'costCenters',
+        message: costCentersResult.reason instanceof Error
+          ? costCentersResult.reason.message
+          : 'Enterprise cost-center data is unavailable.',
+      });
+    }
+
+    const governanceGaps = buildGovernanceGaps(
+      existingBudgets,
+      existingCostCenters,
+      concentrationRiskScore,
+      budgetsAvailable,
+      costCentersAvailable
+    );
 
     const result: AssessmentResult = {
       totalCreditsConsumed,
@@ -117,6 +148,7 @@ async function runAssessment(
       dailyTrend,
       concentrationRiskScore,
       governanceGaps,
+      governanceDataWarnings,
       existingBudgets,
       existingCostCenters,
     };
@@ -136,8 +168,12 @@ async function runAssessment(
 router.post('/start', (req, res) => {
   const { enterpriseSlug, organizations, periodDays } = req.body ?? {};
 
-  if (typeof enterpriseSlug !== 'string' && typeof req.session.enterprise !== 'string') {
+  if (typeof enterpriseSlug !== 'string' || enterpriseSlug.trim().length === 0) {
     res.status(400).json({ message: 'enterpriseSlug is required.' });
+    return;
+  }
+  if (!Array.isArray(organizations) || organizations.length === 0) {
+    res.status(400).json({ message: 'At least one organization slug is required.' });
     return;
   }
 
@@ -145,8 +181,8 @@ router.post('/start', (req, res) => {
   req.session.assessmentCompleted = false;
   jobs.set(jobId, { ownerSessionId: req.sessionID, status: 'pending' });
 
-  const resolvedEnterprise = enterpriseSlug || req.session.enterprise || '';
-  const orgs = Array.isArray(organizations) ? organizations : [];
+  const resolvedEnterprise = enterpriseSlug.trim();
+  const orgs = organizations;
   const days = typeof periodDays === 'number' && periodDays > 0 ? periodDays : 30;
 
   // Fire and forget; client polls /status/:id and /results/:id.

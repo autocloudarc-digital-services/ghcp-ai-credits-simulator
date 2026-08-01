@@ -31,7 +31,7 @@ router.get('/github', (req, res, next) => {
 // GET /auth/github/callback - handle the OAuth callback and exchange the
 // authorization code for an access token, stored encrypted server-side.
 router.get('/github/callback', async (req, res, next) => {
-  const { code, state, enterprise } = req.query;
+  const { code, state } = req.query;
 
   if (typeof code !== 'string' || typeof state !== 'string') {
     res.status(400).send('Missing OAuth code or state parameter.');
@@ -44,7 +44,6 @@ router.get('/github/callback', async (req, res, next) => {
     return;
   }
 
-  req.session.enterprise = typeof enterprise === 'string' ? enterprise : 'connected-enterprise';
   req.session.save((error) => {
     if (error) {
       next(error);

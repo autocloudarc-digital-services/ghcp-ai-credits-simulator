@@ -331,8 +331,16 @@ organization access, enterprise access, and user billing permissions.
 * Redirect lands on wrong host or port: `CLIENT_ORIGIN` mismatch
 * Assessment APIs return unauthorized or forbidden: app not installed to target
   org or enterprise, or user lacks required visibility
+* Enterprise budget or cost-center APIs return `404`: use the enterprise account
+  slug from `https://github.com/enterprises/{slug}`, then verify that the
+  authorizing user can view enterprise billing; GitHub can return `404` when a
+  resource exists but is hidden from the token
 * Codespaces sign-in worked earlier but now fails: Codespace name changed and
   callback URL was not updated
+
+Organization usage can still complete when enterprise budget or cost-center
+data is unavailable. The assessment marks those governance sources unavailable
+and does not interpret them as empty.
 
 ## Choose Your Setup Path
 

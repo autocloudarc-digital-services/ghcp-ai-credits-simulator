@@ -9,13 +9,12 @@ import {
 const API_VERSION = '2026-03-10';
 
 interface ApiConfigFormProps {
-  enterpriseSlug: string;
   onSubmit: (config: AssessmentConfig) => void;
   isSubmitting: boolean;
   disabled?: boolean;
 }
 
-export default function ApiConfigForm({ enterpriseSlug, onSubmit, isSubmitting, disabled = false }: ApiConfigFormProps) {
+export default function ApiConfigForm({ onSubmit, isSubmitting, disabled = false }: ApiConfigFormProps) {
   const {
     register,
     handleSubmit,
@@ -25,6 +24,7 @@ export default function ApiConfigForm({ enterpriseSlug, onSubmit, isSubmitting, 
   } = useForm<AssessmentFormValues>({
     resolver: zodResolver(assessmentFormSchema),
     defaultValues: {
+      enterpriseSlug: '',
       organizations: '',
       period: '30',
       customDays: 14,
@@ -34,7 +34,7 @@ export default function ApiConfigForm({ enterpriseSlug, onSubmit, isSubmitting, 
 
   const submitAssessment = (values: AssessmentFormValues) => {
     onSubmit({
-      enterpriseSlug,
+      enterpriseSlug: values.enterpriseSlug,
       organizations: values.organizations
         .split(',')
         .map((o) => o.trim())
@@ -49,8 +49,19 @@ export default function ApiConfigForm({ enterpriseSlug, onSubmit, isSubmitting, 
     <form onSubmit={handleSubmit(submitAssessment)} noValidate className="bg-slate-800 border border-slate-700 rounded-lg p-5 space-y-4">
       <h3 className="text-lg font-semibold text-slate-100">Assessment Configuration</h3>
       <label className="flex flex-col gap-1">
+        <span className="text-xs uppercase tracking-wide text-slate-400">Enterprise slug</span>
+        <input
+          type="text"
+          {...register('enterpriseSlug')}
+          placeholder="autocloudarc"
+          aria-invalid={Boolean(errors.enterpriseSlug)}
+          className="bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-400"
+        />
+        {errors.enterpriseSlug && <span className="text-xs text-red-400">{errors.enterpriseSlug.message}</span>}
+      </label>
+      <label className="flex flex-col gap-1">
         <span className="text-xs uppercase tracking-wide text-slate-400">
-          Organizations (comma separated, blank = all)
+          Organizations (comma separated)
         </span>
         <input
           type="text"
