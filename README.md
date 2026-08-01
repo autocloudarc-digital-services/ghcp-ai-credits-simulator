@@ -418,6 +418,13 @@ The callback intentionally uses port `5173`. Vite proxies `/auth` to Express,
 which keeps the OAuth session cookie on the same browser origin and returns the
 user to the React `/` assessment route after authentication.
 
+> [!IMPORTANT]
+> Codespaces forwarding requires Vite to remain on port `5173`, accept the
+> generated `*.app.github.dev` hostname, and support the relay's IPv6 localhost
+> path. The checked-in Vite configuration enforces port `5173`, listens on `::`,
+> and adds only this Codespace's derived forwarding hostname to `allowedHosts`.
+> Do not replace these settings with an unrestricted host allowlist.
+
 In the Codespaces **Ports** panel:
 
 1. Find port `5173`.
@@ -701,6 +708,26 @@ http://localhost:5173/auth/github/callback
 
 In Codespaces, use the forwarded port `5173` URL with the same callback path.
 The production callback should use the public production origin.
+
+### Codespaces Port 5173 Returns an Empty 404
+
+An empty `404` from the forwarded `*.app.github.dev` URL can come from the
+Codespaces tunnel before the request reaches Vite. Confirm the application
+first:
+
+```bash
+netstat -lntp | grep ':5173'
+curl --ipv6 http://[::1]:5173/
+gh codespace ports -c "${CODESPACE_NAME}"
+```
+
+The listener should show `:::5173`, the local request should return the Vite
+HTML page, and the port record should use the expected forwarded URL. Port
+`5173` must be Public for GitHub OAuth callbacks, while port `3001` remains
+Private. If these checks pass but the forwarded URL still returns an empty
+`404`, stop and restart the Codespace to recreate its tunnel host connection,
+then restart `npm run dev`. Do not delete and recreate the Codespace because
+that changes its hostname and requires a new GitHub App callback URL.
 
 ### The 3D Visualization Is Unavailable
 
