@@ -254,6 +254,31 @@ under these aliases. The server reads the aliases directly in Codespaces:
 | Client ID | `GHCP_APP_CLIENT_ID` | `GITHUB_APP_CLIENT_ID` |
 | Client Secret | `GHCP_APP_CLIENT_SECRET` | `GITHUB_APP_CLIENT_SECRET` |
 
+Enterprise budgets and cost centers require a separate personal access token
+(classic) with the `manage_billing:enterprise` scope. Create it as an
+enterprise owner or billing manager, set an expiration, and store it as
+`GHCP_ENTERPRISE_BILLING_TOKEN`. The server uses this token only for enterprise
+budget and cost-center requests.
+
+The credential can retain the broader scopes configured for planned features.
+No additional environment variables are required because a PAT carries all of
+its granted scopes in the same bearer credential. Each endpoint still enforces
+the token owner's GitHub role in addition to the token scope.
+
+| Configured capability | Current use | Planned endpoint family |
+| --- | --- | --- |
+| Copilot (`manage_billing:copilot`) | Reserved | Enterprise and organization Copilot seat and policy management |
+| `manage_billing:enterprise` | Active | Enterprise budgets and cost centers |
+| `read:org` | Reserved | Organization membership, teams, and read-only Copilot seat details |
+| `scim:enterprise` | Reserved | Enterprise Managed Users SCIM provisioning through `/scim/v2/enterprises/{enterprise}` |
+| `user` | Reserved | Authenticated user profile, email, and follow data |
+
+The current server sends this credential only to GitHub API URLs assembled from
+fixed enterprise billing paths. Future features must add explicit endpoint
+methods before they can exercise the reserved scopes. SCIM requests also
+require an Enterprise Managed Users setup-user token, while Copilot management
+requests require the owner roles documented by each endpoint.
+
 ### Step 5: Set runtime environment variables
 
 Use the following storage and runtime mapping. GitHub Actions secrets are not
@@ -264,6 +289,7 @@ location specified below.
 | --- | --- | --- |
 | `GITHUB_APP_CLIENT_ID` | `GHCP_APP_CLIENT_ID` | Read directly by the server |
 | `GITHUB_APP_CLIENT_SECRET` | `GHCP_APP_CLIENT_SECRET` | Read directly by the server |
+| `GHCP_ENTERPRISE_BILLING_TOKEN` | `GHCP_ENTERPRISE_BILLING_TOKEN` | Read directly by the server |
 | `SESSION_SECRET` | `GHCP_SESSION_SECRET` | Generate once and read directly by the server |
 | `CLIENT_ORIGIN` | Do not store | Derived automatically from Codespaces metadata |
 | `CALLBACK_URL` | Do not store | Derived automatically from `CLIENT_ORIGIN` |
@@ -274,11 +300,12 @@ Generate a strong `GHCP_SESSION_SECRET` value on a trusted machine:
 openssl rand -hex 32
 ```
 
-Create the three stored values at **Repository Settings > Secrets and
+Create the four stored values at **Repository Settings > Secrets and
 variables > Codespaces > New repository secret**:
 
 * `GHCP_APP_CLIENT_ID`
 * `GHCP_APP_CLIENT_SECRET`
+* `GHCP_ENTERPRISE_BILLING_TOKEN`
 * `GHCP_SESSION_SECRET`
 
 For organization-managed access, an organization owner can instead create the
@@ -395,8 +422,9 @@ remaining workflow.
 
 Before creating the Codespace, follow Steps 4 and 5 to create the repository or
 organization Codespaces secrets `GHCP_APP_CLIENT_ID`,
-`GHCP_APP_CLIENT_SECRET`, and `GHCP_SESSION_SECRET`. The aliases avoid GitHub's
-reserved `GITHUB_` secret-name prefix.
+`GHCP_APP_CLIENT_SECRET`, `GHCP_ENTERPRISE_BILLING_TOKEN`, and
+`GHCP_SESSION_SECRET`. The aliases avoid GitHub's reserved `GITHUB_` secret-name
+prefix.
 
 The Codespace name and forwarding domain are available as environment
 variables. The server reads the stored aliases and derives the dynamic URLs
@@ -496,6 +524,7 @@ For Bash:
 ```bash
 export GITHUB_APP_CLIENT_ID="your-client-id"
 export GITHUB_APP_CLIENT_SECRET="your-client-secret"
+export GHCP_ENTERPRISE_BILLING_TOKEN="your-classic-pat"
 export SESSION_SECRET="$(openssl rand -hex 32)"
 npm run dev
 ```
@@ -505,6 +534,7 @@ For PowerShell 7:
 ```powershell
 $env:GITHUB_APP_CLIENT_ID = "your-client-id"
 $env:GITHUB_APP_CLIENT_SECRET = "your-client-secret"
+$env:GHCP_ENTERPRISE_BILLING_TOKEN = "your-classic-pat"
 $env:SESSION_SECRET = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
 npm run dev
 ```
@@ -519,6 +549,7 @@ Set `CLIENT_ORIGIN` or `CALLBACK_URL` only to override the local defaults.
 | --- | --- | --- | --- | --- |
 | `GITHUB_APP_CLIENT_ID` | `GHCP_APP_CLIENT_ID` | For OAuth | Empty | Client ID used to start GitHub authorization |
 | `GITHUB_APP_CLIENT_SECRET` | `GHCP_APP_CLIENT_SECRET` | For OAuth | Empty | Client secret used to exchange the authorization code |
+| `GHCP_ENTERPRISE_BILLING_TOKEN` | `GHCP_ENTERPRISE_BILLING_TOKEN` | Enterprise governance data | Empty | Classic PAT with `manage_billing:enterprise`, used only for budgets and cost centers |
 | `SESSION_SECRET` | `GHCP_SESSION_SECRET` | Production and OAuth | Insecure development value | Signs session cookies and derives the OAuth token encryption key |
 | `CALLBACK_URL` | Derived, not stored | No | `{CLIENT_ORIGIN}/auth/github/callback` | OAuth redirect URI through the Vite proxy |
 | `CLIENT_ORIGIN` | Derived, not stored | No | Localhost or Codespaces port `5173` origin | Allowed browser origin for CORS |
@@ -527,9 +558,9 @@ Set `CLIENT_ORIGIN` or `CALLBACK_URL` only to override the local defaults.
 
 The Codespaces stored-name column applies only to GitHub Codespaces, where the
 server reads the aliases directly. Local and production processes use the
-runtime variable names. Never expose the Client Secret or session secret
-through repository variables, client-side Vite variables, committed files, or
-command output.
+runtime variable names. Never expose the Client Secret, enterprise billing
+token, or session secret through repository variables, client-side Vite
+variables, committed files, or command output.
 
 > [!WARNING]
 > The built-in `SESSION_SECRET` fallback is for development only. Always set a
@@ -612,6 +643,7 @@ export NODE_ENV="production"
 export SESSION_SECRET="your-production-secret"
 export GITHUB_APP_CLIENT_ID="your-client-id"
 export GITHUB_APP_CLIENT_SECRET="your-client-secret"
+export GHCP_ENTERPRISE_BILLING_TOKEN="your-classic-pat"
 export CALLBACK_URL="https://your-host.example/auth/github/callback"
 export CLIENT_ORIGIN="https://your-host.example"
 npm run start --workspace=server

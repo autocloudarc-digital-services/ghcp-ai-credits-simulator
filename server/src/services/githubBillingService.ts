@@ -1,5 +1,6 @@
 import axios, { AxiosError } from 'axios';
 import { Session } from 'express-session';
+import { getEnterpriseBillingToken } from '../config';
 import { GitHubBudget, GitHubCostCenter } from '../types';
 import { getTokenFromSession } from './githubAuthService';
 
@@ -31,9 +32,10 @@ const GITHUB_SLUG_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,38}$/;
 
 /**
  * Performs an authenticated GET request against the GitHub REST API using
- * the OAuth token stored server-side in the session. Never exposes the
- * token outside this module. Retries with exponential backoff on 429/503
- * responses, up to MAX_RETRIES attempts.
+ * either an endpoint-specific server credential or the OAuth token stored
+ * server-side in the session. Never exposes either token outside this module.
+ * Retries with exponential backoff on 429/503 responses, up to MAX_RETRIES
+ * attempts.
  *
  * `slug` is the single caller-supplied path segment (an organization or
  * enterprise name) that `buildPath` interpolates into the request path;
@@ -45,13 +47,14 @@ async function authenticatedGet<T>(
   session: Session,
   slug: string,
   buildPath: (validatedSlug: string) => string,
-  params?: Record<string, string | number | undefined>
+  params?: Record<string, string | number | undefined>,
+  credential?: string
 ): Promise<T> {
   if (!GITHUB_SLUG_PATTERN.test(slug)) {
     throw new GitHubBillingServiceError(`Invalid GitHub organization/enterprise slug: "${slug}"`, 400);
   }
 
-  const token = getTokenFromSession(session);
+  const token = credential ?? getTokenFromSession(session);
   if (!token) {
     throw new GitHubBillingServiceError('No authenticated GitHub session found.', 401);
   }
@@ -146,10 +149,20 @@ export async function getCostCenters(
   enterprise: string,
   session: Session
 ): Promise<GitHubCostCenter[]> {
+  const enterpriseBillingToken = getEnterpriseBillingToken();
+  if (!enterpriseBillingToken) {
+    throw new GitHubBillingServiceError(
+      'Enterprise cost-center data requires GHCP_ENTERPRISE_BILLING_TOKEN.',
+      503
+    );
+  }
+
   const data = await authenticatedGet<{ costCenters?: GitHubCostCenter[] }>(
     session,
     enterprise,
-    (validatedEnterprise) => `/enterprises/${validatedEnterprise}/settings/billing/cost-centers`
+    (validatedEnterprise) => `/enterprises/${validatedEnterprise}/settings/billing/cost-centers`,
+    undefined,
+    enterpriseBillingToken
   );
   return data.costCenters ?? [];
 }
@@ -162,10 +175,20 @@ export async function getExistingBudgets(
   enterprise: string,
   session: Session
 ): Promise<GitHubBudget[]> {
+  const enterpriseBillingToken = getEnterpriseBillingToken();
+  if (!enterpriseBillingToken) {
+    throw new GitHubBillingServiceError(
+      'Enterprise budget data requires GHCP_ENTERPRISE_BILLING_TOKEN.',
+      503
+    );
+  }
+
   const data = await authenticatedGet<{ budgets?: GitHubBudget[] }>(
     session,
     enterprise,
-    (validatedEnterprise) => `/enterprises/${validatedEnterprise}/settings/billing/budgets`
+    (validatedEnterprise) => `/enterprises/${validatedEnterprise}/settings/billing/budgets`,
+    undefined,
+    enterpriseBillingToken
   );
   return data.budgets ?? [];
 }

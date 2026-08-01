@@ -29,3 +29,7 @@ export function getSessionSecret(): string {
     'insecure-development-secret-change-me'
   );
 }
+
+export function getEnterpriseBillingToken(): string {
+  return process.env.GHCP_ENTERPRISE_BILLING_TOKEN?.trim() ?? '';
+}
