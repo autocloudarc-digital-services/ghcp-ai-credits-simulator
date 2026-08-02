@@ -38,9 +38,19 @@
     ],
     "customizations": {
         "vscode": {
+            "mcp": {
+                "servers": {
+                    "github": {
+                        "type": "http",
+                        "url": "https://api.githubcopilot.com/mcp/"
+                    }
+                }
+            },
             "extensions": [
                 "dbaeumer.vscode-eslint",
                 "esbenp.prettier-vscode",
+                "ms-azuretools.vscode-azure-mcp-server",
+                "fabric.vscode-fabric-mcp-server",
                 "github.vscode-github-actions",
                 "github.vscode-pull-request-github",
                 "davidanson.vscode-markdownlint",

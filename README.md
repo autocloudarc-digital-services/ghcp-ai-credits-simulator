@@ -2,7 +2,7 @@
 title: GitHub Copilot AI Credits Simulator
 description: Assess enterprise usage, simulate GitHub Copilot AI Credit consumption, and generate governance recommendations and reports
 author: autocloudarc-digital-services
-ms.date: 2026-07-31
+ms.date: 2026-08-02
 ms.topic: overview
 keywords:
   - github copilot
@@ -12,7 +12,7 @@ keywords:
   - react
   - express
   - codespaces
-estimated_reading_time: 12
+estimated_reading_time: 14
 ---
 
 ## Overview
@@ -124,6 +124,10 @@ flowchart LR
 | Node.js 20 or 22 LTS | Run the client and server toolchains |
 | npm | Install and run the workspace packages |
 | Modern browser | Run the React UI and WebGL visualization |
+| VS Code 1.101 or later | Load the configured MCP servers and extension providers |
+| GitHub Copilot access | Use GitHub, Azure, and Fabric MCP tools in Copilot Chat agent mode |
+| Azure account with an active subscription | Authenticate Azure MCP and access Azure resources |
+| Microsoft Fabric access | Use live Fabric and OneLake operations when tenant access is required |
 
 GitHub OAuth credentials are required because a completed live assessment is
 the prerequisite for every downstream operation.
@@ -135,11 +139,93 @@ the prerequisite for every downstream operation.
 | Use GitHub Codespaces | Codespaces must be enabled for your account or organization |
 | Create a fork | Permission to fork into a personal or approved organization account |
 | Run a live assessment | GitHub OAuth credentials and access to the target enterprise data |
+| Use the GitHub MCP server | GitHub account authorization and an organization policy that permits MCP |
+| Use the Azure MCP server | Microsoft Entra authentication and least-privilege Azure RBAC assignments |
+| Use live Fabric MCP operations | Fabric tenant access and permissions for the target workspace and items |
 | Push changes | Write access to your fork or the source repository |
 
 If organization policy restricts Codespaces, public forwarded ports, OAuth
 applications, or third-party npm packages, confirm access with an administrator
 before setup.
+
+## GitHub MCP Server Setup
+
+The Dev Container configures GitHub's official hosted MCP server at
+`https://api.githubcopilot.com/mcp/`. The server gives Copilot Chat access to
+GitHub repositories, issues, pull requests, and other capabilities allowed by
+your GitHub account and organization policies.
+
+Complete these steps after cloning the repository or opening a Codespace:
+
+1. Use VS Code 1.101 or later and confirm that GitHub Copilot is available.
+1. Create the Dev Container. For an existing container or Codespace, run
+  **Dev Containers: Rebuild Container** from the Command Palette so VS Code
+  applies the MCP configuration.
+1. Open Copilot Chat and switch to agent mode.
+1. Run **MCP: List Servers** from the Command Palette and select `github`.
+1. Start the server, review its URL, and confirm that you trust the
+  configuration.
+1. Complete the GitHub OAuth prompt with the account whose repositories and
+  organizations you need to access.
+1. Open **Configure Tools** in Copilot Chat and enable the required `github`
+  tools.
+1. Verify the connection with a read-only request, such as listing open issues
+  for this repository.
+
+> [!IMPORTANT]
+> GitHub MCP authentication is separate from the application's GitHub App and
+> `GHCP_ENTERPRISE_BILLING_TOKEN`. Do not add a personal access token to
+> `devcontainer.json`. The hosted server uses VS Code's OAuth flow and applies
+> the signed-in account's permissions.
+
+If the server does not appear, rebuild the container and run **MCP: List
+Servers** again. If authentication or tools are blocked, confirm that your
+organization enables MCP servers and that your GitHub account has access to the
+requested resources.
+
+## Azure and Fabric MCP Server Setup
+
+The Dev Container installs Microsoft's official Azure MCP Server and Microsoft
+Fabric MCP Server extensions:
+
+| Server | VS Code extension | Configuration model |
+| --- | --- | --- |
+| Azure MCP Server | `ms-azuretools.vscode-azure-mcp-server` | Extension-managed local MCP server with Microsoft Entra authentication |
+| Microsoft Fabric MCP Server | `fabric.vscode-fabric-mcp-server` | Extension-managed local MCP server with Fabric settings and automatic updates |
+
+Extensions are used for Azure and Fabric because Microsoft recommends their VS
+Code extensions and distributes server updates and settings through them. The
+GitHub MCP server remains in `customizations.vscode.mcp` because GitHub provides
+an official hosted OAuth endpoint rather than a companion VS Code extension.
+
+Complete these steps after creating or rebuilding the Dev Container:
+
+1. Open the Extensions view and confirm that **Azure MCP Server** and
+  **Microsoft Fabric MCP Server** are installed in the Dev Container.
+1. For Azure access, run **Azure: Sign In** from the Command Palette. You can
+  alternatively run `az login` if the Azure CLI is installed.
+1. Run **MCP: List Servers**, select **Azure MCP Server ext**, and start the
+  server.
+1. Verify Azure access with a read-only prompt such as `List my Azure resource
+  groups`.
+1. Run **MCP: List Servers**, select **Fabric MCP Server**, and start the
+  server.
+1. Verify the Fabric server with a context-only prompt such as `What Fabric
+  workload types are available?`.
+1. Before using live OneLake or Fabric operations, sign in with the required
+  Microsoft Entra account and confirm access to the target Fabric workspace,
+  items, and capacity.
+
+> [!CAUTION]
+> Azure and Fabric MCP tools can expose write operations. Use least-privilege
+> Azure RBAC and Fabric workspace roles, review each requested tool invocation,
+> and test with read-only prompts before allowing changes. Do not store Azure or
+> Fabric credentials in `devcontainer.json`.
+
+VS Code 1.103 or later can automatically start extension-managed MCP servers.
+Set `chat.mcp.autostart` to `newAndOutdated`, or start each server manually from
+**MCP: List Servers**. If a server is missing after an extension update, rebuild
+the Dev Container and check the MCP server output channel for startup errors.
 
 ## GitHub App Setup
 
