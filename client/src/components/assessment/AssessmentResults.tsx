@@ -149,7 +149,7 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="space-y-6">
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
           <h4 className="text-sm font-semibold text-slate-200 mb-3">Existing Budgets</h4>
           {budgetsWarning ? (
@@ -157,15 +157,59 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
           ) : result.existingBudgets.length === 0 ? (
             <p className="text-sm text-slate-500">No budgets currently configured.</p>
           ) : (
-            <div className="space-y-2">
-              {result.existingBudgets.map((b) => (
-                <div key={b.id} className="flex items-center justify-between text-sm">
-                  <span className="text-slate-300">{b.name}</span>
-                  <span className="font-numeric text-slate-400">
-                    {b.used.toLocaleString()} / {b.limit.toLocaleString()}
-                  </span>
-                </div>
-              ))}
+            <div className="overflow-x-auto rounded-md border border-slate-700">
+              <table className="min-w-[1180px] w-full text-left text-xs">
+                <caption className="sr-only">Normalized enterprise budget configuration records</caption>
+                <thead className="bg-slate-900/70 text-slate-400">
+                  <tr>
+                    <th className="px-3 py-2 font-medium">SKU</th>
+                    <th className="px-3 py-2 font-medium">Scope</th>
+                    <th className="px-3 py-2 font-medium">Scope target</th>
+                    <th className="px-3 py-2 font-medium">Exclude cost center usage</th>
+                    <th className="px-3 py-2 text-right font-medium">Budget amount</th>
+                    <th className="px-3 py-2 text-right font-medium">Used</th>
+                    <th className="px-3 py-2 font-medium">Stop at limit</th>
+                    <th className="px-3 py-2 font-medium">Threshold alerts</th>
+                    <th className="px-3 py-2 font-medium">Alert recipients</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700 text-slate-300">
+                  {result.existingBudgets.map((budget) => (
+                    <tr key={budget.id}>
+                      <td className="px-3 py-3">
+                        {budget.skus.length === 0
+                          ? 'Not reported'
+                          : budget.skus.map(formatBudgetSku).join(', ')}
+                      </td>
+                      <td className="px-3 py-3 capitalize">{formatBudgetScope(budget.scope)}</td>
+                      <td className="max-w-48 break-words px-3 py-3">{budget.scopeTarget}</td>
+                      <td className="px-3 py-3">
+                        <ReadOnlyCheckbox
+                          checked={budget.excludeCostCenterUsage === true}
+                          label={budget.excludeCostCenterUsage === null ? 'Not reported' : undefined}
+                        />
+                      </td>
+                      <td className="px-3 py-3 text-right font-numeric">
+                        ${budget.limit.toLocaleString()}
+                      </td>
+                      <td className="px-3 py-3 text-right font-numeric">
+                        ${budget.used.toLocaleString()}
+                      </td>
+                      <td className="px-3 py-3">
+                        <ReadOnlyCheckbox checked={budget.preventFurtherUsage} />
+                      </td>
+                      <td className="px-3 py-3">
+                        <ReadOnlyCheckbox checked={budget.alertsEnabled} />
+                      </td>
+                      <td className="max-w-56 break-words px-3 py-3">
+                        {budget.alertRecipients.length > 0
+                          ? budget.alertRecipients.join(', ')
+                          : 'Default enterprise recipients'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
@@ -306,5 +350,24 @@ function StatCard({ label, value, color }: { label: string; value: string; color
       <div className="text-xs uppercase tracking-wide text-slate-400 mb-1">{label}</div>
       <div className={`font-numeric text-xl font-semibold ${color}`}>{value}</div>
     </div>
+  );
+}
+
+function formatBudgetSku(sku: string): string {
+  return sku === 'ai_credits'
+    ? 'All AI Credit SKUs'
+    : sku.replace(/_/g, ' ').replace(/\b\w/g, (character: string) => character.toUpperCase());
+}
+
+function formatBudgetScope(scope: string): string {
+  return scope.replace(/_/g, ' ');
+}
+
+function ReadOnlyCheckbox({ checked, label }: { checked: boolean; label?: string }) {
+  return (
+    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+      <input type="checkbox" checked={checked} disabled className="h-4 w-4 accent-teal-500" />
+      <span className="text-slate-500">{label ?? (checked ? 'Yes' : 'No')}</span>
+    </span>
   );
 }

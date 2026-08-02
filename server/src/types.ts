@@ -110,8 +110,16 @@ export interface GovernanceDataWarning {
 export interface GitHubBudget {
   id: string;
   name: string;
+  budgetType: string;
+  skus: string[];
+  scope: string;
+  scopeTarget: string;
+  excludeCostCenterUsage: boolean | null;
   limit: number;
   used: number;
+  preventFurtherUsage: boolean;
+  alertsEnabled: boolean;
+  alertRecipients: string[];
 }
 
 export interface GitHubCostCenter {

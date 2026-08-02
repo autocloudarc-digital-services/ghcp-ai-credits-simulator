@@ -125,9 +125,17 @@ export interface UsageSummary {
 interface GitHubBudgetResponse {
   id: string;
   budget_entity_name?: string;
+  user?: string;
+  budget_type: string;
   budget_scope: string;
-  budget_product_sku: string;
+  budget_product_sku?: string;
+  budget_product_skus?: string[];
   budget_amount: number;
+  prevent_further_usage: boolean;
+  budget_alerting: {
+    will_alert: boolean;
+    alert_recipients: string[];
+  };
   consumed_amount?: number;
   effective_budget?: {
     consumed_amount?: number;
@@ -235,11 +243,19 @@ export async function getExistingBudgets(
     id: budget.id,
     name:
       budget.budget_entity_name ||
-      `${budget.budget_scope}: ${budget.budget_product_sku}`,
+      `${budget.budget_scope}: ${budget.budget_product_sku ?? budget.budget_product_skus?.join(', ') ?? 'unknown'}`,
+    budgetType: budget.budget_type,
+    skus: budget.budget_product_skus ?? (budget.budget_product_sku ? [budget.budget_product_sku] : []),
+    scope: budget.budget_scope,
+    scopeTarget: budget.budget_entity_name || budget.user || enterprise,
+    excludeCostCenterUsage: null,
     limit: budget.budget_amount,
     used:
       budget.effective_budget?.consumed_amount ??
       budget.consumed_amount ??
       0,
+    preventFurtherUsage: budget.prevent_further_usage,
+    alertsEnabled: budget.budget_alerting.will_alert,
+    alertRecipients: budget.budget_alerting.alert_recipients,
   }));
 }
