@@ -164,11 +164,51 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
           ) : result.existingCostCenters.length === 0 ? (
             <p className="text-sm text-slate-500">No cost centers currently configured.</p>
           ) : (
-            <div className="space-y-2">
+            <div className="divide-y divide-slate-700">
               {result.existingCostCenters.map((c) => (
-                <div key={c.id} className="text-sm text-slate-300">
-                  {c.name}{' '}
-                  <span className="text-slate-500">({c.resources.length} resources)</span>
+                <div key={c.id} className="py-4 first:pt-0 last:pb-0">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <span className="min-w-0 truncate text-sm font-medium text-slate-200">
+                      {c.name}
+                    </span>
+                    <span
+                      className={`shrink-0 text-xs font-medium ${
+                        c.state === 'active' ? 'text-green-400' : 'text-slate-500'
+                      }`}
+                    >
+                      {c.state === 'active' ? 'Active' : 'Deleted'}
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto rounded-md border border-slate-700">
+                    <table className="w-full table-fixed text-left text-xs">
+                      <thead className="bg-slate-900/70 text-slate-400">
+                        <tr>
+                          <th className="w-1/3 px-3 py-2 font-medium">Resource type</th>
+                          <th className="px-3 py-2 font-medium">Resource</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-700">
+                        {c.resources.length === 0 ? (
+                          <tr>
+                            <td colSpan={2} className="px-3 py-3 text-slate-500">
+                              No resources assigned
+                            </td>
+                          </tr>
+                        ) : (
+                          c.resources.map((resource, index) => (
+                            <tr key={`${resource.type}:${resource.name}:${index}`}>
+                              <td className="break-words px-3 py-2 text-slate-400">
+                                {resource.type}
+                              </td>
+                              <td className="break-words px-3 py-2 text-slate-300">
+                                {resource.name}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               ))}
             </div>

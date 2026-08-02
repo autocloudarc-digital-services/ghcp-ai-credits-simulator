@@ -116,7 +116,13 @@ export interface GitHubBudget {
 export interface GitHubCostCenter {
   id: string;
   name: string;
-  resources: string[];
+  state: 'active' | 'deleted';
+  resources: GitHubCostCenterResource[];
+}
+
+export interface GitHubCostCenterResource {
+  type: string;
+  name: string;
 }
 
 export interface Recommendation {

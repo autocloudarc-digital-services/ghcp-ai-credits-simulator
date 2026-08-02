@@ -137,6 +137,7 @@ interface GitHubBudgetResponse {
 interface GitHubCostCenterResponse {
   id: string;
   name: string;
+  state?: 'active' | 'deleted';
   resources?: Array<{
     type: string;
     name: string;
@@ -188,9 +189,8 @@ export async function getCostCenters(
   return (data.costCenters ?? []).map((costCenter) => ({
     id: costCenter.id,
     name: costCenter.name,
-    resources: (costCenter.resources ?? []).map(
-      (resource) => `${resource.type}:${resource.name}`
-    ),
+    state: costCenter.state ?? 'active',
+    resources: costCenter.resources ?? [],
   }));
 }
 
