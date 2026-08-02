@@ -276,7 +276,7 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
                             type="checkbox"
                             checked={c.aiCreditPoolEnabled === true}
                             disabled
-                            className="h-4 w-4 accent-teal-500"
+                            className="h-4 w-4 accent-green-500 disabled:opacity-100"
                           />
                           <span>AI credit included usage cap</span>
                         </label>
@@ -366,7 +366,12 @@ function formatBudgetScope(scope: string): string {
 function ReadOnlyCheckbox({ checked, label }: { checked: boolean; label?: string }) {
   return (
     <span className="inline-flex items-center gap-2 whitespace-nowrap">
-      <input type="checkbox" checked={checked} disabled className="h-4 w-4 accent-teal-500" />
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled
+        className="h-4 w-4 accent-green-500 disabled:opacity-100"
+      />
       <span className="text-slate-500">{label ?? (checked ? 'Yes' : 'No')}</span>
     </span>
   );
