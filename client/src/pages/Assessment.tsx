@@ -8,6 +8,15 @@ import AssessmentResults from '../components/assessment/AssessmentResults';
 import { calculateIncludedPool } from '../engine/creditCalculationEngine';
 import { AssessmentConfig } from '../types';
 
+async function startAssessment(config: AssessmentConfig): Promise<string> {
+  try {
+    const response = await axios.post('/api/assessment/start', config);
+    return response.data.assessmentId;
+  } finally {
+    delete config.enterpriseBillingToken;
+  }
+}
+
 export default function Assessment() {
   const navigate = useNavigate();
   const {
@@ -54,13 +63,14 @@ export default function Assessment() {
   };
 
   const handleAssess = async (config: AssessmentConfig) => {
+    const enterpriseSlug = config.enterpriseSlug;
     setIsAssessing(true);
     setError(null);
     resetWorkflow();
     try {
-      const startRes = await axios.post('/api/assessment/start', config);
-      const result = await pollAssessment(startRes.data.assessmentId);
-      completeAssessment(result, connectedEnterprise ?? config.enterpriseSlug);
+      const assessmentId = await startAssessment(config);
+      const result = await pollAssessment(assessmentId);
+      completeAssessment(result, connectedEnterprise ?? enterpriseSlug);
     } catch (err) {
       setError(
         axios.isAxiosError(err)

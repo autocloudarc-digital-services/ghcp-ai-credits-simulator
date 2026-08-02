@@ -17,6 +17,10 @@ export const assessmentFormSchema = z
             .every((organization) => githubSlugPattern.test(organization)),
         'Enter comma-separated GitHub organization slugs.'
       ),
+    enterpriseBillingToken: z
+      .string()
+      .trim()
+      .max(512, 'Use 512 characters or fewer.'),
     period: z.enum(['7', '30', 'custom']),
     customDays: z.coerce.number().int().min(1, 'Use at least 1 day.').max(90, 'Use no more than 90 days.'),
   })

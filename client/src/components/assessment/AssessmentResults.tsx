@@ -7,7 +7,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { AlertTriangle } from 'lucide-react';
+import { useState } from 'react';
+import { AlertTriangle, ArrowUpDown, Filter } from 'lucide-react';
 import { AssessmentResult } from '../../types';
 import ConcentrationRiskChart from './ConcentrationRiskChart';
 
@@ -17,6 +18,10 @@ interface AssessmentResultsProps {
 }
 
 export default function AssessmentResults({ result, totalIncludedPool }: AssessmentResultsProps) {
+  const [costCenterStatusFilter, setCostCenterStatusFilter] =
+    useState<'all' | 'active' | 'deleted'>('all');
+  const [costCenterStatusSort, setCostCenterStatusSort] =
+    useState<'active-first' | 'deleted-first'>('active-first');
   const governanceDataWarnings = result.governanceDataWarnings ?? [];
   const budgetsWarning = governanceDataWarnings.find((warning) => warning.source === 'budgets');
   const costCentersWarning = governanceDataWarnings.find((warning) => warning.source === 'costCenters');
@@ -27,6 +32,13 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
   const modelTotal = modelEntries.reduce((s, [, v]) => s + v, 0);
 
   const orgEntries = Object.entries(result.byOrganization).sort((a, b) => b[1] - a[1]);
+  const visibleCostCenters = result.existingCostCenters
+    .filter((costCenter) => costCenterStatusFilter === 'all' || costCenter.state === costCenterStatusFilter)
+    .sort((first, second) => {
+      if (first.state === second.state) return first.name.localeCompare(second.name);
+      const activeFirst = costCenterStatusSort === 'active-first';
+      return first.state === 'active' ? (activeFirst ? -1 : 1) : activeFirst ? 1 : -1;
+    });
 
   const riskColor =
     result.concentrationRiskScore > 66
@@ -158,63 +170,129 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
           )}
         </div>
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
-          <h4 className="text-sm font-semibold text-slate-200 mb-3">Existing Cost Centers</h4>
+          <h4 className="text-sm font-semibold text-slate-200 mb-3">Cost Centers</h4>
           {costCentersWarning ? (
             <p className="text-sm text-amber-300">Cost-center data unavailable.</p>
           ) : result.existingCostCenters.length === 0 ? (
             <p className="text-sm text-slate-500">No cost centers currently configured.</p>
           ) : (
-            <div className="divide-y divide-slate-700">
-              {result.existingCostCenters.map((c) => (
-                <div key={c.id} className="py-4 first:pt-0 last:pb-0">
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <span className="min-w-0 truncate text-sm font-medium text-slate-200">
-                      {c.name}
-                    </span>
-                    <span
-                      className={`shrink-0 text-xs font-medium ${
-                        c.state === 'active' ? 'text-green-400' : 'text-slate-500'
-                      }`}
-                    >
-                      {c.state === 'active' ? 'Active' : 'Deleted'}
-                    </span>
-                  </div>
-                  <div className="overflow-x-auto rounded-md border border-slate-700">
-                    <table className="w-full table-fixed text-left text-xs">
-                      <caption className="sr-only">
-                        Resources assigned to {c.name} as key and value pairs
-                      </caption>
-                      <thead className="bg-slate-900/70 text-slate-400">
-                        <tr>
-                          <th className="w-1/3 px-3 py-2 font-medium">Key</th>
-                          <th className="px-3 py-2 font-medium">Value</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-700">
-                        {c.resources.length === 0 ? (
-                          <tr>
-                            <td colSpan={2} className="px-3 py-3 text-slate-500">
-                              No resources assigned
-                            </td>
-                          </tr>
-                        ) : (
-                          c.resources.map((resource, index) => (
-                            <tr key={`${resource.type}:${resource.name}:${index}`}>
-                              <td className="break-words px-3 py-2 text-slate-400">
-                                {resource.type}
-                              </td>
-                              <td className="break-words px-3 py-2 text-slate-300">
-                                {resource.name}
-                              </td>
-                            </tr>
-                          ))
+            <>
+              <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <label className="flex items-center gap-2 text-xs text-slate-400">
+                  <Filter className="h-4 w-4 shrink-0" />
+                  <span className="sr-only">Filter by status</span>
+                  <select
+                    value={costCenterStatusFilter}
+                    onChange={(event) =>
+                      setCostCenterStatusFilter(event.target.value as 'all' | 'active' | 'deleted')
+                    }
+                    className="min-w-0 flex-1 rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-slate-200"
+                  >
+                    <option value="all">All statuses</option>
+                    <option value="active">Active</option>
+                    <option value="deleted">Deleted</option>
+                  </select>
+                </label>
+                <label className="flex items-center gap-2 text-xs text-slate-400">
+                  <ArrowUpDown className="h-4 w-4 shrink-0" />
+                  <span className="sr-only">Sort by status</span>
+                  <select
+                    value={costCenterStatusSort}
+                    onChange={(event) =>
+                      setCostCenterStatusSort(event.target.value as 'active-first' | 'deleted-first')
+                    }
+                    className="min-w-0 flex-1 rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-slate-200"
+                  >
+                    <option value="active-first">Active first</option>
+                    <option value="deleted-first">Deleted first</option>
+                  </select>
+                </label>
+              </div>
+              {visibleCostCenters.length === 0 ? (
+                <p className="text-sm text-slate-500">No cost centers match this status.</p>
+              ) : (
+                <div className="divide-y divide-slate-700">
+                  {visibleCostCenters.map((c) => (
+                    <div key={c.id} className="py-4 first:pt-0 last:pb-0">
+                      <div className="mb-2 flex items-center justify-between gap-3">
+                        <span className="min-w-0 truncate text-sm font-medium text-slate-200">
+                          {c.name}
+                        </span>
+                        <span
+                          className={`shrink-0 text-xs font-medium ${
+                            c.state === 'active' ? 'text-green-400' : 'text-slate-500'
+                          }`}
+                        >
+                          {c.state === 'active' ? 'Active' : 'Deleted'}
+                        </span>
+                      </div>
+                      <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                        <label className="flex items-center gap-2 text-slate-400">
+                          <input
+                            type="checkbox"
+                            checked={c.aiCreditPoolEnabled === true}
+                            disabled
+                            className="h-4 w-4 accent-teal-500"
+                          />
+                          <span>AI credit included usage cap</span>
+                        </label>
+                        <span className="text-slate-500">
+                          {c.aiCreditPoolEnabled === undefined
+                            ? 'Not reported'
+                            : c.aiCreditPoolEnabled
+                              ? 'Enabled'
+                              : 'Disabled'}
+                        </span>
+                        {c.aiCreditPoolEnabled && c.aiCreditPoolState && (
+                          <span className="basis-full text-slate-500">
+                            {c.aiCreditPoolState.currentAmount === null
+                              ? 'Current usage pending'
+                              : `${c.aiCreditPoolState.currentAmount.toLocaleString()} credits used`}
+                            {' / '}
+                            {c.aiCreditPoolState.targetAmount === null
+                              ? 'cap pending'
+                              : `${c.aiCreditPoolState.targetAmount.toLocaleString()} credit cap`}
+                          </span>
                         )}
-                      </tbody>
-                    </table>
-                  </div>
+                      </div>
+                      <div className="overflow-x-auto rounded-md border border-slate-700">
+                        <table className="w-full table-fixed text-left text-xs">
+                          <caption className="sr-only">
+                            Resource types and names assigned to {c.name}
+                          </caption>
+                          <thead className="bg-slate-900/70 text-slate-400">
+                            <tr>
+                              <th className="w-1/3 px-3 py-2 font-medium">resource-type</th>
+                              <th className="px-3 py-2 font-medium">resource-name</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-700">
+                            {c.resources.length === 0 ? (
+                              <tr>
+                                <td colSpan={2} className="px-3 py-3 text-slate-500">
+                                  No resources assigned
+                                </td>
+                              </tr>
+                            ) : (
+                              c.resources.map((resource, index) => (
+                                <tr key={`${resource.type}:${resource.name}:${index}`}>
+                                  <td className="break-words px-3 py-2 text-slate-400">
+                                    {resource.type}
+                                  </td>
+                                  <td className="break-words px-3 py-2 text-slate-300">
+                                    {resource.name}
+                                  </td>
+                                </tr>
+                              ))
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </div>
       </div>

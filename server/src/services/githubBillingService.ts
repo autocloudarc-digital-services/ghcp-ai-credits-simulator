@@ -138,6 +138,11 @@ interface GitHubCostCenterResponse {
   id: string;
   name: string;
   state?: 'active' | 'deleted';
+  ai_credit_pool_enabled?: boolean;
+  ai_credit_pool_state?: {
+    target_amount: number | null;
+    current_amount: number | null;
+  };
   resources?: Array<{
     type: string;
     name: string;
@@ -169,9 +174,10 @@ export async function getUsageSummary(
  */
 export async function getCostCenters(
   enterprise: string,
-  session: Session
+  session: Session,
+  suppliedBillingToken?: string
 ): Promise<GitHubCostCenter[]> {
-  const enterpriseBillingToken = getEnterpriseBillingToken();
+  const enterpriseBillingToken = suppliedBillingToken?.trim() || getEnterpriseBillingToken();
   if (!enterpriseBillingToken) {
     throw new GitHubBillingServiceError(
       'Enterprise cost-center data requires GHCP_ENTERPRISE_BILLING_TOKEN.',
@@ -190,6 +196,13 @@ export async function getCostCenters(
     id: costCenter.id,
     name: costCenter.name,
     state: costCenter.state ?? 'active',
+    aiCreditPoolEnabled: costCenter.ai_credit_pool_enabled,
+    aiCreditPoolState: costCenter.ai_credit_pool_state
+      ? {
+          targetAmount: costCenter.ai_credit_pool_state.target_amount,
+          currentAmount: costCenter.ai_credit_pool_state.current_amount,
+        }
+      : undefined,
     resources: costCenter.resources ?? [],
   }));
 }
@@ -200,9 +213,10 @@ export async function getCostCenters(
  */
 export async function getExistingBudgets(
   enterprise: string,
-  session: Session
+  session: Session,
+  suppliedBillingToken?: string
 ): Promise<GitHubBudget[]> {
-  const enterpriseBillingToken = getEnterpriseBillingToken();
+  const enterpriseBillingToken = suppliedBillingToken?.trim() || getEnterpriseBillingToken();
   if (!enterpriseBillingToken) {
     throw new GitHubBillingServiceError(
       'Enterprise budget data requires GHCP_ENTERPRISE_BILLING_TOKEN.',

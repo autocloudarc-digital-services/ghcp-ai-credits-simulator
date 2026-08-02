@@ -53,7 +53,8 @@ async function runAssessment(
   enterpriseSlug: string,
   organizations: string[],
   periodDays: number,
-  session: Session & Partial<SessionData>
+  session: Session & Partial<SessionData>,
+  enterpriseBillingToken?: string
 ) {
   const job = jobs.get(jobId);
   if (!job) return;
@@ -105,8 +106,8 @@ async function runAssessment(
     const concentrationRiskScore = scoreConcentrationRisk(topUsers, totalCreditsConsumed);
 
     const [budgetsResult, costCentersResult] = await Promise.allSettled([
-      getExistingBudgets(enterpriseSlug, session),
-      getCostCenters(enterpriseSlug, session),
+      getExistingBudgets(enterpriseSlug, session, enterpriseBillingToken),
+      getCostCenters(enterpriseSlug, session, enterpriseBillingToken),
     ]);
 
     const budgetsAvailable = budgetsResult.status === 'fulfilled';
@@ -166,7 +167,7 @@ async function runAssessment(
 
 // POST /api/assessment/start - begin an assessment for the given enterprise/orgs.
 router.post('/start', (req, res) => {
-  const { enterpriseSlug, organizations, periodDays } = req.body ?? {};
+  const { enterpriseSlug, organizations, periodDays, enterpriseBillingToken } = req.body ?? {};
 
   if (typeof enterpriseSlug !== 'string' || enterpriseSlug.trim().length === 0) {
     res.status(400).json({ message: 'enterpriseSlug is required.' });
@@ -176,6 +177,17 @@ router.post('/start', (req, res) => {
     res.status(400).json({ message: 'At least one organization slug is required.' });
     return;
   }
+  if (enterpriseBillingToken !== undefined && typeof enterpriseBillingToken !== 'string') {
+    res.status(400).json({ message: 'enterpriseBillingToken must be a string.' });
+    return;
+  }
+
+  const suppliedBillingToken = enterpriseBillingToken?.trim();
+  if (suppliedBillingToken && suppliedBillingToken.length > 512) {
+    res.status(400).json({ message: 'enterpriseBillingToken must be 512 characters or fewer.' });
+    return;
+  }
+  delete req.body.enterpriseBillingToken;
 
   const jobId = randomUUID();
   req.session.assessmentCompleted = false;
@@ -186,7 +198,7 @@ router.post('/start', (req, res) => {
   const days = typeof periodDays === 'number' && periodDays > 0 ? periodDays : 30;
 
   // Fire and forget; client polls /status/:id and /results/:id.
-  void runAssessment(jobId, resolvedEnterprise, orgs, days, req.session);
+  void runAssessment(jobId, resolvedEnterprise, orgs, days, req.session, suppliedBillingToken || undefined);
 
   res.status(202).json({ assessmentId: jobId });
 });

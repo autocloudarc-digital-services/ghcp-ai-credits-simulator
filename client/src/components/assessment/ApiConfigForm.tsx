@@ -26,6 +26,7 @@ export default function ApiConfigForm({ onSubmit, isSubmitting, disabled = false
     defaultValues: {
       enterpriseSlug: '',
       organizations: '',
+      enterpriseBillingToken: '',
       period: '30',
       customDays: 14,
     },
@@ -33,16 +34,19 @@ export default function ApiConfigForm({ onSubmit, isSubmitting, disabled = false
   const period = watch('period');
 
   const submitAssessment = (values: AssessmentFormValues) => {
+    const enterpriseBillingToken = values.enterpriseBillingToken.trim();
     onSubmit({
       enterpriseSlug: values.enterpriseSlug,
       organizations: values.organizations
         .split(',')
         .map((o) => o.trim())
         .filter(Boolean),
+      enterpriseBillingToken: enterpriseBillingToken || undefined,
       sessionId: '',
       apiVersion: API_VERSION,
       periodDays: values.period === 'custom' ? values.customDays : Number(values.period),
     });
+    setValue('enterpriseBillingToken', '');
   };
 
   return (
@@ -71,6 +75,29 @@ export default function ApiConfigForm({ onSubmit, isSubmitting, disabled = false
           className="bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-400"
         />
         {errors.organizations && <span className="text-xs text-red-400">{errors.organizations.message}</span>}
+      </label>
+      <label className="flex flex-col gap-1">
+        <span className="text-xs uppercase tracking-wide text-slate-400">
+          GHCP_ENTERPRISE_BILLING_TOKEN
+        </span>
+        <input
+          type="password"
+          {...register('enterpriseBillingToken')}
+          autoComplete="new-password"
+          spellCheck={false}
+          placeholder="github_pat_..."
+          aria-describedby="enterprise-billing-token-note"
+          aria-invalid={Boolean(errors.enterpriseBillingToken)}
+          className="bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-400"
+        />
+        <span id="enterprise-billing-token-note" className="text-xs leading-relaxed text-slate-500">
+          Used to retrieve enterprise billing, budget, and cost center information. The token is sent only
+          when this assessment starts, is not saved by the app, and is cleared from this field after submission.
+          Leave it blank to use the token configured on the server.
+        </span>
+        {errors.enterpriseBillingToken && (
+          <span className="text-xs text-red-400">{errors.enterpriseBillingToken.message}</span>
+        )}
       </label>
 
       <div className="flex flex-col gap-2">

@@ -77,6 +77,7 @@ export interface UserConsumption {
 export interface AssessmentConfig {
   enterpriseSlug: string;
   organizations: string[];
+  enterpriseBillingToken?: string;
   sessionId: string;
   apiVersion: string;
   periodDays: number;
@@ -111,6 +112,11 @@ export interface GitHubCostCenter {
   id: string;
   name: string;
   state: 'active' | 'deleted';
+  aiCreditPoolEnabled?: boolean;
+  aiCreditPoolState?: {
+    targetAmount: number | null;
+    currentAmount: number | null;
+  };
   resources: GitHubCostCenterResource[];
 }
 
