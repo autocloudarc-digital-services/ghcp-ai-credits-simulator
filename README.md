@@ -294,6 +294,8 @@ access. The app only reads billing data and does not need write access.
 | Assessment data | Required role |
 | --- | --- |
 | Organization AI Credit usage and usage summary | Organization administrator |
+| Organization Copilot license inventory | Organization owner |
+| Enterprise-direct Copilot license billing usage | Enterprise administrator or billing manager |
 | Enterprise budgets | Enterprise administrator or billing manager |
 | Enterprise cost centers | Enterprise owner, billing manager, or organization owner |
 
@@ -351,17 +353,19 @@ No additional environment variables are required because a PAT carries all of
 its granted scopes in the same bearer credential. Each endpoint still enforces
 the token owner's GitHub role in addition to the token scope.
 
-| Configured capability | Current use | Planned endpoint family |
+| Configured capability | Current use | Endpoint family |
 | --- | --- | --- |
 | Copilot (`manage_billing:copilot`) | Reserved | Enterprise and organization Copilot seat and policy management |
-| `manage_billing:enterprise` | Active | Enterprise budgets and cost centers |
-| `read:org` | Reserved | Organization membership, teams, and read-only Copilot seat details |
+| `manage_billing:enterprise` | Active | Enterprise budgets, cost centers, and direct-license billing usage |
+| OAuth `read:org` | Active | Read-only organization Copilot seat details |
 | `user` | Reserved | Authenticated user profile, email, and follow data |
 
 The current server sends this credential only to GitHub API URLs assembled from
 fixed enterprise billing paths. Future features must add explicit endpoint
-methods before they can exercise the reserved scopes. Copilot management
-requests require the owner roles documented by each endpoint.
+methods before they can exercise the reserved scopes. The server uses the OAuth
+session token for current organization Copilot license inventory and the
+enterprise billing token for the latest daily enterprise-direct license usage.
+Copilot requests require the owner roles documented by each endpoint.
 
 ### Step 5: Set runtime environment variables
 
@@ -653,10 +657,13 @@ variables, committed files, or command output.
 ## Application Workflow
 
 1. Connect GitHub Enterprise and complete a live assessment of usage, budgets,
-  cost centers, concentration, and governance gaps.
+  enterprise-direct and organization Copilot licenses, cost centers,
+  concentration, and governance gaps.
 2. Review and confirm simulator assumptions for license counts and population
-  tiers. These values are not returned by the assessment APIs, so the form is
-  prefilled with planning assumptions that require explicit confirmation.
+  tiers. Product-specific license totals beyond the reported Copilot Business
+  and Copilot Enterprise counts are not returned by the assessment APIs, so
+  the form is prefilled with planning assumptions that require explicit
+  confirmation.
 3. Review Governance Insights for projected credit posture, overage,
   visualizations, and governance readiness.
 4. Review prioritized recommendations mapped to the Budget Profile Classes.

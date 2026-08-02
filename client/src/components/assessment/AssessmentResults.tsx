@@ -9,7 +9,7 @@ import {
 } from 'recharts';
 import { useState } from 'react';
 import { AlertTriangle, ArrowUpDown, Check, Filter } from 'lucide-react';
-import { AssessmentResult } from '../../types';
+import { AssessmentResult, GitHubBudget } from '../../types';
 import ConcentrationRiskChart from './ConcentrationRiskChart';
 
 interface AssessmentResultsProps {
@@ -158,11 +158,12 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
             <p className="text-sm text-slate-500">No budgets currently configured.</p>
           ) : (
             <div className="overflow-x-auto rounded-md border border-slate-700">
-              <table className="min-w-[1180px] w-full text-left text-sm">
+              <table className="min-w-[1260px] w-full text-left text-sm">
                 <caption className="sr-only">Normalized enterprise budget configuration records</caption>
                 <thead className="bg-slate-900/70 text-slate-200">
                   <tr>
                     <th className="px-3 py-2 font-semibold">SKU</th>
+                    <th className="px-3 py-2 text-right font-semibold">Licenses</th>
                     <th className="px-3 py-2 font-semibold">Scope</th>
                     <th className="px-3 py-2 font-semibold">Scope target</th>
                     <th className="py-2 pl-3 pr-8 text-right font-semibold">Budget amount</th>
@@ -176,6 +177,7 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
                 <tbody className="divide-y divide-slate-700 text-slate-200">
                   {result.existingBudgets.map((budget) => {
                     const percentUsed = budget.limit > 0 ? (budget.used / budget.limit) * 100 : 0;
+                    const licenses = formatBudgetLicenses(budget);
 
                     return (
                     <tr key={budget.id}>
@@ -183,6 +185,13 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
                         {budget.skus.length === 0
                           ? 'Not reported'
                           : budget.skus.map(formatBudgetSku).join(', ')}
+                      </td>
+                      <td
+                        className="px-3 py-3 text-right font-numeric"
+                        title={licenses.description}
+                        aria-label={licenses.description}
+                      >
+                        {licenses.label}
                       </td>
                       <td className="px-3 py-3 capitalize">{formatBudgetScope(budget.scope)}</td>
                       <td className="max-w-48 break-words px-3 py-3">{budget.scopeTarget}</td>
@@ -377,6 +386,40 @@ function formatBudgetSku(sku: string): string {
 
 function formatBudgetScope(scope: string): string {
   return scope.replace(/_/g, ' ');
+}
+
+function formatBudgetLicenses(budget: GitHubBudget): { label: string; description: string } {
+  const enterpriseCount = budget.enterpriseLicenseCount;
+  const organizationCount = budget.organizationLicenseCount;
+  if (enterpriseCount === null && organizationCount === null) {
+    return { label: 'Not reported', description: 'License inventory not reported' };
+  }
+
+  const enterpriseTotal = enterpriseCount ?? 0;
+  const organizationTotal = organizationCount ?? 0;
+  const total = enterpriseTotal + organizationTotal;
+  if (enterpriseTotal > 0 && organizationTotal > 0) {
+    return {
+      label: `${total.toLocaleString()}(e+o)`,
+      description: `${total.toLocaleString()} licenses: ${enterpriseTotal.toLocaleString()} enterprise-assigned and ${organizationTotal.toLocaleString()} organization-assigned`,
+    };
+  }
+  if (enterpriseTotal > 0) {
+    return {
+      label: `${enterpriseTotal.toLocaleString()}(ent)`,
+      description: `${enterpriseTotal.toLocaleString()} enterprise-assigned licenses`,
+    };
+  }
+  if (organizationTotal > 0 || organizationCount !== null) {
+    return {
+      label: `${organizationTotal.toLocaleString()}(org)`,
+      description: `${organizationTotal.toLocaleString()} organization-assigned licenses`,
+    };
+  }
+  return {
+    label: `${enterpriseTotal.toLocaleString()}(ent)`,
+    description: `${enterpriseTotal.toLocaleString()} enterprise-assigned licenses`,
+  };
 }
 
 function ReadOnlyCheckbox({ checked, label }: { checked: boolean; label?: string }) {

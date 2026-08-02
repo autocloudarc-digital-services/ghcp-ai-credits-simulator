@@ -3,7 +3,9 @@ import { Router } from 'express';
 import { Session, SessionData } from 'express-session';
 import {
   getAICreditUsage,
+  getCopilotLicenseInventory,
   getCostCenters,
+  getEnterpriseCopilotLicenseCounts,
   getExistingBudgets,
   getUsageSummary,
   GitHubBillingServiceError,
@@ -26,6 +28,14 @@ function scoreConcentrationRisk(topUsers: UserConsumption[], totalConsumption: n
   const topCount = Math.max(1, Math.ceil(topUsers.length * 0.1));
   const top10 = topUsers.slice(0, topCount).reduce((s, u) => s + u.creditsConsumed, 0);
   return Math.min(100, Math.round((top10 / totalConsumption) * 160));
+}
+
+function getCopilotSkuKey(sku: string): string | null {
+  const normalizedSku = sku.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!normalizedSku.includes('copilot')) return null;
+  if (normalizedSku.includes('business')) return 'copilot-business';
+  if (normalizedSku.includes('enterprise')) return 'copilot-enterprise';
+  return null;
 }
 
 function buildGovernanceGaps(
@@ -105,14 +115,78 @@ async function runAssessment(
 
     const concentrationRiskScore = scoreConcentrationRisk(topUsers, totalCreditsConsumed);
 
-    const [budgetsResult, costCentersResult] = await Promise.allSettled([
-      getExistingBudgets(enterpriseSlug, session, enterpriseBillingToken),
-      getCostCenters(enterpriseSlug, session, enterpriseBillingToken),
+    const [governanceResults, licenseInventoryResults, enterpriseLicenseResults] = await Promise.all([
+      Promise.allSettled([
+        getExistingBudgets(enterpriseSlug, session, enterpriseBillingToken),
+        getCostCenters(enterpriseSlug, session, enterpriseBillingToken),
+      ]),
+      Promise.allSettled(
+        orgsToAssess.map((org) => getCopilotLicenseInventory(org, session))
+      ),
+      Promise.allSettled([
+        getEnterpriseCopilotLicenseCounts(
+          enterpriseSlug,
+          session,
+          year,
+          month,
+          enterpriseBillingToken
+        ),
+      ]),
     ]);
+    const [budgetsResult, costCentersResult] = governanceResults;
+    const enterpriseLicenseResult = enterpriseLicenseResults[0];
 
     const budgetsAvailable = budgetsResult.status === 'fulfilled';
     const costCentersAvailable = costCentersResult.status === 'fulfilled';
-    const existingBudgets = budgetsAvailable ? budgetsResult.value : [];
+    const licenseCountsByOrganization = new Map<string, Map<string, number>>();
+    const unavailableLicenseOrganizations: string[] = [];
+    licenseInventoryResults.forEach((licenseResult, index) => {
+      const organization = orgsToAssess[index];
+      if (licenseResult.status === 'fulfilled') {
+        const skuKey = getCopilotSkuKey(licenseResult.value.sku);
+        licenseCountsByOrganization.set(
+          organization.toLowerCase(),
+          skuKey ? new Map([[skuKey, licenseResult.value.count]]) : new Map()
+        );
+      } else {
+        unavailableLicenseOrganizations.push(organization);
+      }
+    });
+    const enterpriseLicenseCounts = new Map<string, number>();
+    if (enterpriseLicenseResult?.status === 'fulfilled') {
+      for (const [sku, count] of Object.entries(enterpriseLicenseResult.value)) {
+        const skuKey = getCopilotSkuKey(sku);
+        if (skuKey) enterpriseLicenseCounts.set(skuKey, count);
+      }
+    }
+
+    const existingBudgets = budgetsAvailable
+      ? budgetsResult.value.map((budget) => {
+          const skuKey = budget.skus
+            .map(getCopilotSkuKey)
+            .find((key): key is string => key !== null);
+          const isOrganizationScope = budget.scope.toLowerCase() === 'organization';
+          const isEnterpriseScope = budget.scope.toLowerCase() === 'enterprise';
+          let organizationLicenseCount: number | null = null;
+          if (skuKey && isOrganizationScope) {
+            organizationLicenseCount =
+              licenseCountsByOrganization.get(budget.scopeTarget.toLowerCase())?.get(skuKey) ??
+              (licenseCountsByOrganization.has(budget.scopeTarget.toLowerCase()) ? 0 : null);
+          } else if (skuKey && isEnterpriseScope && unavailableLicenseOrganizations.length === 0) {
+            organizationLicenseCount = Array.from(licenseCountsByOrganization.values())
+              .reduce((total, countsBySku) => total + (countsBySku.get(skuKey) ?? 0), 0);
+          }
+
+          return {
+            ...budget,
+            enterpriseLicenseCount:
+              skuKey && enterpriseLicenseResult?.status === 'fulfilled'
+                ? enterpriseLicenseCounts.get(skuKey) ?? 0
+                : null,
+            organizationLicenseCount,
+          };
+        })
+      : [];
     const existingCostCenters = costCentersAvailable ? costCentersResult.value : [];
     const governanceDataWarnings: AssessmentResult['governanceDataWarnings'] = [];
 
@@ -130,6 +204,21 @@ async function runAssessment(
         message: costCentersResult.reason instanceof Error
           ? costCentersResult.reason.message
           : 'Enterprise cost-center data is unavailable.',
+      });
+    }
+    const licenseWarnings: string[] = [];
+    if (unavailableLicenseOrganizations.length > 0) {
+      licenseWarnings.push(
+        `organization inventory is unavailable for ${unavailableLicenseOrganizations.join(', ')}`
+      );
+    }
+    if (!enterpriseLicenseResult || enterpriseLicenseResult.status === 'rejected') {
+      licenseWarnings.push('enterprise-assigned inventory is unavailable');
+    }
+    if (licenseWarnings.length > 0) {
+      governanceDataWarnings.push({
+        source: 'licenses',
+        message: `Copilot license inventory is incomplete: ${licenseWarnings.join('; ')}.`,
       });
     }
 

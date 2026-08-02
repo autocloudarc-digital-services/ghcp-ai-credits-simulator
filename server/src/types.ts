@@ -103,7 +103,7 @@ export interface AssessmentResult {
 }
 
 export interface GovernanceDataWarning {
-  source: 'budgets' | 'costCenters';
+  source: 'budgets' | 'costCenters' | 'licenses';
   message: string;
 }
 
@@ -114,6 +114,8 @@ export interface GitHubBudget {
   skus: string[];
   scope: string;
   scopeTarget: string;
+  enterpriseLicenseCount: number | null;
+  organizationLicenseCount: number | null;
   excludeCostCenterUsage: boolean | null;
   limit: number;
   used: number;

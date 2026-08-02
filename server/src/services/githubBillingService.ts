@@ -157,6 +157,109 @@ interface GitHubCostCenterResponse {
   }>;
 }
 
+interface GitHubCopilotBillingResponse {
+  seat_breakdown: {
+    total: number;
+  };
+  plan_type?: 'business' | 'enterprise';
+}
+
+interface GitHubBillingUsageItem {
+  date: string;
+  product: string;
+  sku: string;
+  quantity: number;
+  unitType: string;
+  organizationName?: string;
+}
+
+export interface CopilotLicenseInventory {
+  count: number;
+  sku: string;
+}
+
+/**
+ * Retrieves the number of billed Copilot seats for an organization.
+ * GET /orgs/{org}/copilot/billing
+ */
+export async function getCopilotLicenseInventory(
+  org: string,
+  session: Session
+): Promise<CopilotLicenseInventory> {
+  const data = await authenticatedGet<GitHubCopilotBillingResponse>(
+    session,
+    org,
+    (validatedOrg) => `/orgs/${validatedOrg}/copilot/billing`
+  );
+  if (!data.plan_type) {
+    throw new GitHubBillingServiceError(
+      `GitHub did not report the Copilot plan type for organization ${org}.`
+    );
+  }
+  return {
+    count: data.seat_breakdown.total,
+    sku: `Copilot ${data.plan_type}`,
+  };
+}
+
+/**
+ * Retrieves enterprise billing usage and converts the latest daily, directly
+ * assigned Copilot UserMonths into current seat counts by SKU.
+ * GET /enterprises/{enterprise}/settings/billing/usage
+ */
+export async function getEnterpriseCopilotLicenseCounts(
+  enterprise: string,
+  session: Session,
+  year: number,
+  month: number,
+  suppliedBillingToken?: string
+): Promise<Record<string, number>> {
+  const enterpriseBillingToken = suppliedBillingToken?.trim() || getEnterpriseBillingToken();
+  if (!enterpriseBillingToken) {
+    throw new GitHubBillingServiceError(
+      'Enterprise Copilot license data requires GHCP_ENTERPRISE_BILLING_TOKEN.',
+      503
+    );
+  }
+
+  const data = await authenticatedGet<{ usageItems?: GitHubBillingUsageItem[] }>(
+    session,
+    enterprise,
+    (validatedEnterprise) => `/enterprises/${validatedEnterprise}/settings/billing/usage`,
+    { year, month },
+    enterpriseBillingToken
+  );
+  const directCopilotItems = (data.usageItems ?? []).filter(
+    (item) =>
+      item.sku.toLowerCase().includes('copilot') &&
+      item.unitType.toLowerCase() === 'usermonths' &&
+      !item.organizationName?.trim()
+  );
+  const latestDateBySku = new Map<string, string>();
+  for (const item of directCopilotItems) {
+    const date = item.date.slice(0, 10);
+    const latestDate = latestDateBySku.get(item.sku);
+    if (!latestDate || date > latestDate) latestDateBySku.set(item.sku, date);
+  }
+
+  const normalizedDailyQuantityBySku = new Map<string, number>();
+  for (const item of directCopilotItems) {
+    if (item.date.slice(0, 10) !== latestDateBySku.get(item.sku)) continue;
+    normalizedDailyQuantityBySku.set(
+      item.sku,
+      (normalizedDailyQuantityBySku.get(item.sku) ?? 0) + item.quantity
+    );
+  }
+
+  const daysInMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  return Object.fromEntries(
+    Array.from(normalizedDailyQuantityBySku, ([sku, quantity]) => [
+      sku,
+      Math.round(quantity * daysInMonth),
+    ])
+  );
+}
+
 /**
  * Retrieves the aggregated usage summary for an organization.
  * GET /organizations/{org}/settings/billing/usage/summary
@@ -248,6 +351,8 @@ export async function getExistingBudgets(
     skus: budget.budget_product_skus ?? (budget.budget_product_sku ? [budget.budget_product_sku] : []),
     scope: budget.budget_scope,
     scopeTarget: budget.budget_entity_name || budget.user || enterprise,
+    enterpriseLicenseCount: null,
+    organizationLicenseCount: null,
     excludeCostCenterUsage: null,
     limit: budget.budget_amount,
     used:
