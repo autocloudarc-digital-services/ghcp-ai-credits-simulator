@@ -181,10 +181,13 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
                   </div>
                   <div className="overflow-x-auto rounded-md border border-slate-700">
                     <table className="w-full table-fixed text-left text-xs">
+                      <caption className="sr-only">
+                        Resources assigned to {c.name} as key and value pairs
+                      </caption>
                       <thead className="bg-slate-900/70 text-slate-400">
                         <tr>
-                          <th className="w-1/3 px-3 py-2 font-medium">Resource type</th>
-                          <th className="px-3 py-2 font-medium">Resource</th>
+                          <th className="w-1/3 px-3 py-2 font-medium">Key</th>
+                          <th className="px-3 py-2 font-medium">Value</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-700">
