@@ -165,16 +165,19 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
                     <th className="px-3 py-2 font-semibold">SKU</th>
                     <th className="px-3 py-2 font-semibold">Scope</th>
                     <th className="px-3 py-2 font-semibold">Scope target</th>
-                    <th className="px-3 py-2 font-semibold">Exclude cost center usage</th>
-                    <th className="px-3 py-2 text-right font-semibold">Budget amount</th>
+                    <th className="py-2 pl-3 pr-8 text-right font-semibold">Budget amount</th>
                     <th className="px-3 py-2 text-right font-semibold">Used</th>
+                    <th className="w-48 px-3 py-2 font-semibold">Percent</th>
                     <th className="px-3 py-2 font-semibold">Stop at limit</th>
                     <th className="px-3 py-2 font-semibold">Threshold alerts</th>
                     <th className="px-3 py-2 font-semibold">Alert recipients</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700 text-slate-200">
-                  {result.existingBudgets.map((budget) => (
+                  {result.existingBudgets.map((budget) => {
+                    const percentUsed = budget.limit > 0 ? (budget.used / budget.limit) * 100 : 0;
+
+                    return (
                     <tr key={budget.id}>
                       <td className="px-3 py-3">
                         {budget.skus.length === 0
@@ -183,17 +186,31 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
                       </td>
                       <td className="px-3 py-3 capitalize">{formatBudgetScope(budget.scope)}</td>
                       <td className="max-w-48 break-words px-3 py-3">{budget.scopeTarget}</td>
-                      <td className="px-3 py-3">
-                        <ReadOnlyCheckbox
-                          checked={budget.excludeCostCenterUsage === true}
-                          label={budget.excludeCostCenterUsage === null ? 'Not reported' : undefined}
-                        />
-                      </td>
-                      <td className="px-3 py-3 text-right font-numeric">
+                      <td className="py-3 pl-3 pr-8 text-right font-numeric">
                         ${budget.limit.toLocaleString()}
                       </td>
                       <td className="px-3 py-3 text-right font-numeric">
                         ${budget.used.toLocaleString()}
+                      </td>
+                      <td className="w-48 px-3 py-3">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="h-2 w-28 shrink-0 overflow-hidden rounded-full bg-slate-700"
+                            role="progressbar"
+                            aria-label={`${formatBudgetSku(budget.skus[0] ?? 'budget')} budget used`}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={Math.min(100, percentUsed)}
+                          >
+                            <div
+                              className="h-full rounded-full bg-teal-400"
+                              style={{ width: `${Math.min(100, percentUsed)}%` }}
+                            />
+                          </div>
+                          <span className="min-w-12 text-right font-numeric font-semibold text-teal-300">
+                            {percentUsed.toFixed(1)}%
+                          </span>
+                        </div>
                       </td>
                       <td className="px-3 py-3">
                         <ReadOnlyCheckbox checked={budget.preventFurtherUsage} />
@@ -207,7 +224,8 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
                           : 'Default enterprise recipients'}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
