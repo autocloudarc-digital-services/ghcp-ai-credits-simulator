@@ -8,7 +8,7 @@ import {
   YAxis,
 } from 'recharts';
 import { useState } from 'react';
-import { AlertTriangle, ArrowUpDown, Filter } from 'lucide-react';
+import { AlertTriangle, ArrowUpDown, Check, Filter } from 'lucide-react';
 import { AssessmentResult } from '../../types';
 import ConcentrationRiskChart from './ConcentrationRiskChart';
 
@@ -151,29 +151,29 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
 
       <div className="space-y-6">
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
-          <h4 className="text-sm font-semibold text-slate-200 mb-3">Existing Budgets</h4>
+          <h4 className="text-sm font-semibold text-slate-200 mb-3">Budgets</h4>
           {budgetsWarning ? (
             <p className="text-sm text-amber-300">Budget data unavailable.</p>
           ) : result.existingBudgets.length === 0 ? (
             <p className="text-sm text-slate-500">No budgets currently configured.</p>
           ) : (
             <div className="overflow-x-auto rounded-md border border-slate-700">
-              <table className="min-w-[1180px] w-full text-left text-xs">
+              <table className="min-w-[1180px] w-full text-left text-sm">
                 <caption className="sr-only">Normalized enterprise budget configuration records</caption>
-                <thead className="bg-slate-900/70 text-slate-400">
+                <thead className="bg-slate-900/70 text-slate-200">
                   <tr>
-                    <th className="px-3 py-2 font-medium">SKU</th>
-                    <th className="px-3 py-2 font-medium">Scope</th>
-                    <th className="px-3 py-2 font-medium">Scope target</th>
-                    <th className="px-3 py-2 font-medium">Exclude cost center usage</th>
-                    <th className="px-3 py-2 text-right font-medium">Budget amount</th>
-                    <th className="px-3 py-2 text-right font-medium">Used</th>
-                    <th className="px-3 py-2 font-medium">Stop at limit</th>
-                    <th className="px-3 py-2 font-medium">Threshold alerts</th>
-                    <th className="px-3 py-2 font-medium">Alert recipients</th>
+                    <th className="px-3 py-2 font-semibold">SKU</th>
+                    <th className="px-3 py-2 font-semibold">Scope</th>
+                    <th className="px-3 py-2 font-semibold">Scope target</th>
+                    <th className="px-3 py-2 font-semibold">Exclude cost center usage</th>
+                    <th className="px-3 py-2 text-right font-semibold">Budget amount</th>
+                    <th className="px-3 py-2 text-right font-semibold">Used</th>
+                    <th className="px-3 py-2 font-semibold">Stop at limit</th>
+                    <th className="px-3 py-2 font-semibold">Threshold alerts</th>
+                    <th className="px-3 py-2 font-semibold">Alert recipients</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-700 text-slate-300">
+                <tbody className="divide-y divide-slate-700 text-slate-200">
                   {result.existingBudgets.map((budget) => (
                     <tr key={budget.id}>
                       <td className="px-3 py-3">
@@ -272,11 +272,9 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
                       </div>
                       <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
                         <label className="flex items-center gap-2 text-slate-400">
-                          <input
-                            type="checkbox"
+                          <CheckboxMark
                             checked={c.aiCreditPoolEnabled === true}
-                            disabled
-                            className="h-4 w-4 accent-green-500 disabled:opacity-100"
+                            ariaLabel="AI credit included usage cap"
                           />
                           <span>AI credit included usage cap</span>
                         </label>
@@ -366,13 +364,30 @@ function formatBudgetScope(scope: string): string {
 function ReadOnlyCheckbox({ checked, label }: { checked: boolean; label?: string }) {
   return (
     <span className="inline-flex items-center gap-2 whitespace-nowrap">
+      <CheckboxMark checked={checked} ariaLabel={label ?? (checked ? 'Yes' : 'No')} />
+      <span className="text-slate-500">{label ?? (checked ? 'Yes' : 'No')}</span>
+    </span>
+  );
+}
+
+function CheckboxMark({ checked, ariaLabel }: { checked: boolean; ariaLabel: string }) {
+  return (
+    <span className="relative inline-flex h-4 w-4 shrink-0 items-center justify-center">
       <input
         type="checkbox"
         checked={checked}
         disabled
-        className="h-4 w-4 accent-green-500 disabled:opacity-100"
+        aria-label={ariaLabel}
+        className="sr-only"
       />
-      <span className="text-slate-500">{label ?? (checked ? 'Yes' : 'No')}</span>
+      <span
+        aria-hidden="true"
+        className={`flex h-4 w-4 items-center justify-center rounded border ${
+          checked ? 'border-green-400 bg-green-500/15' : 'border-slate-600 bg-slate-900'
+        }`}
+      >
+        {checked && <Check className="h-3.5 w-3.5 text-green-400" strokeWidth={4} />}
+      </span>
     </span>
   );
 }
