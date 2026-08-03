@@ -172,14 +172,14 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
 
       <div className="space-y-6">
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
-          <h4 className="text-sm font-semibold text-slate-200 mb-3">Budgets</h4>
+          <h4 className="text-sm font-semibold text-slate-200 mb-3">Budgets (monthly)</h4>
           {budgetsWarning ? (
             <p className="text-sm text-amber-300">Budget data unavailable.</p>
           ) : result.existingBudgets.length === 0 ? (
             <p className="text-sm text-slate-500">No budgets currently configured.</p>
           ) : (
             <div className="overflow-x-auto rounded-md border border-slate-700">
-              <table className="min-w-[1260px] w-full text-left text-sm">
+              <table className="min-w-[1360px] w-full text-left text-sm">
                 <caption className="sr-only">Normalized enterprise budget configuration records</caption>
                 <thead className="bg-slate-900/70 text-slate-200">
                   <tr>
@@ -202,8 +202,9 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
                       activeSort={budgetSort}
                       onSort={toggleBudgetSort}
                     />
+                    <th className="px-3 py-2 font-semibold">Coverage</th>
                     <SortableBudgetHeader
-                      label="Budget amount"
+                      label="Amount"
                       sortKey="budgetAmount"
                       activeSort={budgetSort}
                       onSort={toggleBudgetSort}
@@ -249,6 +250,7 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
                       </td>
                       <td className="px-3 py-3 capitalize">{formatBudgetScope(budget.scope)}</td>
                       <td className="max-w-48 break-words px-3 py-3">{budget.scopeTarget}</td>
+                      <td className="whitespace-nowrap px-3 py-3">{resolveBudgetType(budget)}</td>
                       <td className="py-3 pl-3 pr-8 text-right font-numeric">
                         ${budget.limit.toLocaleString()}
                       </td>
@@ -438,6 +440,21 @@ function formatBudgetSku(sku: string): string {
 
 function formatBudgetScope(scope: string): string {
   return scope.replace(/_/g, ' ');
+}
+
+function resolveBudgetType(budget: GitHubBudget): string {
+  const hasAllAiCreditSkus = budget.skus.some(
+    (sku) => sku.toLowerCase().replace(/[^a-z0-9]/g, '') === 'aicredits'
+  );
+  if (!hasAllAiCreditSkus) return budget.budgetType || 'Not reported';
+
+  const normalizedScope = budget.scope.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (normalizedScope === 'enterprise') return 'additional';
+  if (normalizedScope === 'multiusercostcenter') return 'included+additional';
+  if (normalizedScope === 'organization' || normalizedScope === 'organizational') {
+    return 'included';
+  }
+  return budget.budgetType || 'Not reported';
 }
 
 const budgetSortCollator = new Intl.Collator(undefined, {
