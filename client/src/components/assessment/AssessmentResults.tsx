@@ -8,7 +8,7 @@ import {
   YAxis,
 } from 'recharts';
 import { useState } from 'react';
-import { AlertTriangle, ArrowUpDown, Check, Filter } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Check, Filter } from 'lucide-react';
 import { AssessmentResult, GitHubBudget } from '../../types';
 import ConcentrationRiskChart from './ConcentrationRiskChart';
 
@@ -17,7 +17,17 @@ interface AssessmentResultsProps {
   totalIncludedPool: number;
 }
 
+type BudgetSortKey =
+  | 'sku'
+  | 'scope'
+  | 'scopeTarget'
+  | 'budgetAmount'
+  | 'percent'
+  | 'alertRecipients';
+type BudgetSort = { key: BudgetSortKey; direction: 'ascending' | 'descending' };
+
 export default function AssessmentResults({ result, totalIncludedPool }: AssessmentResultsProps) {
+  const [budgetSort, setBudgetSort] = useState<BudgetSort | null>(null);
   const [costCenterStatusFilter, setCostCenterStatusFilter] =
     useState<'all' | 'active' | 'deleted'>('all');
   const [costCenterStatusSort, setCostCenterStatusSort] =
@@ -32,6 +42,7 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
   const modelTotal = modelEntries.reduce((s, [, v]) => s + v, 0);
 
   const orgEntries = Object.entries(result.byOrganization).sort((a, b) => b[1] - a[1]);
+  const visibleBudgets = sortBudgets(result.existingBudgets, budgetSort);
   const visibleCostCenters = result.existingCostCenters
     .filter((costCenter) => costCenterStatusFilter === 'all' || costCenter.state === costCenterStatusFilter)
     .sort((first, second) => {
@@ -46,6 +57,16 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
       : result.concentrationRiskScore > 33
       ? 'text-amber-400'
       : 'text-green-400';
+
+  const toggleBudgetSort = (key: BudgetSortKey) => {
+    setBudgetSort((currentSort) => ({
+      key,
+      direction:
+        currentSort?.key === key && currentSort.direction === 'ascending'
+          ? 'descending'
+          : 'ascending',
+    }));
+  };
 
   return (
     <div className="space-y-6">
@@ -162,20 +183,53 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
                 <caption className="sr-only">Normalized enterprise budget configuration records</caption>
                 <thead className="bg-slate-900/70 text-slate-200">
                   <tr>
-                    <th className="px-3 py-2 font-semibold">SKU</th>
+                    <SortableBudgetHeader
+                      label="SKU"
+                      sortKey="sku"
+                      activeSort={budgetSort}
+                      onSort={toggleBudgetSort}
+                    />
                     <th className="px-3 py-2 text-right font-semibold">Licenses</th>
-                    <th className="px-3 py-2 font-semibold">Scope</th>
-                    <th className="px-3 py-2 font-semibold">Scope target</th>
-                    <th className="py-2 pl-3 pr-8 text-right font-semibold">Budget amount</th>
+                    <SortableBudgetHeader
+                      label="Scope"
+                      sortKey="scope"
+                      activeSort={budgetSort}
+                      onSort={toggleBudgetSort}
+                    />
+                    <SortableBudgetHeader
+                      label="Scope target"
+                      sortKey="scopeTarget"
+                      activeSort={budgetSort}
+                      onSort={toggleBudgetSort}
+                    />
+                    <SortableBudgetHeader
+                      label="Budget amount"
+                      sortKey="budgetAmount"
+                      activeSort={budgetSort}
+                      onSort={toggleBudgetSort}
+                      align="right"
+                      className="pr-8"
+                    />
                     <th className="px-3 py-2 text-right font-semibold">Used</th>
-                    <th className="w-48 px-3 py-2 font-semibold">Percent</th>
+                    <SortableBudgetHeader
+                      label="Percent"
+                      sortKey="percent"
+                      activeSort={budgetSort}
+                      onSort={toggleBudgetSort}
+                      className="w-48"
+                    />
                     <th className="px-3 py-2 font-semibold">Stop at limit</th>
                     <th className="px-3 py-2 font-semibold">Threshold alerts</th>
-                    <th className="px-3 py-2 font-semibold">Alert recipients</th>
+                    <SortableBudgetHeader
+                      label="Alert recipients"
+                      sortKey="alertRecipients"
+                      activeSort={budgetSort}
+                      onSort={toggleBudgetSort}
+                    />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700 text-slate-200">
-                  {result.existingBudgets.map((budget) => {
+                  {visibleBudgets.map((budget) => {
                     const percentUsed = budget.limit > 0 ? (budget.used / budget.limit) * 100 : 0;
                     const licenses = formatBudgetLicenses(budget);
 
@@ -228,9 +282,7 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
                         <ReadOnlyCheckbox checked={budget.alertsEnabled} />
                       </td>
                       <td className="max-w-56 break-words px-3 py-3">
-                        {budget.alertRecipients.length > 0
-                          ? budget.alertRecipients.join(', ')
-                          : 'Default enterprise recipients'}
+                        {formatAlertRecipients(budget)}
                       </td>
                     </tr>
                     );
@@ -386,6 +438,97 @@ function formatBudgetSku(sku: string): string {
 
 function formatBudgetScope(scope: string): string {
   return scope.replace(/_/g, ' ');
+}
+
+const budgetSortCollator = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: 'base',
+});
+
+function sortBudgets(budgets: GitHubBudget[], sort: BudgetSort | null): GitHubBudget[] {
+  if (!sort) return budgets;
+
+  return budgets
+    .map((budget, index) => ({ budget, index }))
+    .sort((first, second) => {
+      const firstValue = getBudgetSortValue(first.budget, sort.key);
+      const secondValue = getBudgetSortValue(second.budget, sort.key);
+      const comparison =
+        typeof firstValue === 'number' && typeof secondValue === 'number'
+          ? firstValue - secondValue
+          : budgetSortCollator.compare(String(firstValue), String(secondValue));
+      if (comparison === 0) return first.index - second.index;
+      return sort.direction === 'ascending' ? comparison : -comparison;
+    })
+    .map(({ budget }) => budget);
+}
+
+function getBudgetSortValue(budget: GitHubBudget, key: BudgetSortKey): string | number {
+  switch (key) {
+    case 'sku':
+      return budget.skus.length === 0
+        ? 'Not reported'
+        : budget.skus.map(formatBudgetSku).join(', ');
+    case 'scope':
+      return formatBudgetScope(budget.scope);
+    case 'scopeTarget':
+      return budget.scopeTarget;
+    case 'budgetAmount':
+      return budget.limit;
+    case 'percent':
+      return budget.limit > 0 ? (budget.used / budget.limit) * 100 : 0;
+    case 'alertRecipients':
+      return formatAlertRecipients(budget);
+  }
+}
+
+function formatAlertRecipients(budget: GitHubBudget): string {
+  return budget.alertRecipients.length > 0
+    ? budget.alertRecipients.join(', ')
+    : 'Default enterprise recipients';
+}
+
+function SortableBudgetHeader({
+  label,
+  sortKey,
+  activeSort,
+  onSort,
+  align = 'left',
+  className = '',
+}: {
+  label: string;
+  sortKey: BudgetSortKey;
+  activeSort: BudgetSort | null;
+  onSort: (key: BudgetSortKey) => void;
+  align?: 'left' | 'right';
+  className?: string;
+}) {
+  const isActive = activeSort?.key === sortKey;
+  const direction = isActive ? activeSort.direction : 'none';
+  const SortIcon = !isActive
+    ? ArrowUpDown
+    : activeSort.direction === 'ascending'
+      ? ArrowUp
+      : ArrowDown;
+
+  return (
+    <th
+      className={`px-3 py-2 font-semibold ${align === 'right' ? 'text-right' : ''} ${className}`}
+      aria-sort={direction}
+    >
+      <button
+        type="button"
+        onClick={() => onSort(sortKey)}
+        className={`inline-flex items-center gap-1.5 text-slate-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 ${
+          align === 'right' ? 'justify-end' : ''
+        }`}
+        aria-label={`Sort by ${label} ${isActive && activeSort.direction === 'ascending' ? 'descending' : 'ascending'}`}
+      >
+        <span>{label}</span>
+        <SortIcon className={`h-3.5 w-3.5 ${isActive ? 'text-teal-300' : 'text-slate-500'}`} />
+      </button>
+    </th>
+  );
 }
 
 function formatBudgetLicenses(budget: GitHubBudget): { label: string; description: string } {
