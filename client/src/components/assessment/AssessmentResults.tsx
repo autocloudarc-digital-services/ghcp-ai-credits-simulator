@@ -7,7 +7,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { useRef, useState, type ReactNode } from 'react';
+import { useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
@@ -49,9 +49,11 @@ type BudgetSortKey =
   | 'percent'
   | 'alertRecipients';
 type BudgetSort = { key: BudgetSortKey; direction: 'ascending' | 'descending' };
+type GovernanceTab = 'budgets' | 'costCenters';
 
 export default function AssessmentResults({ result, totalIncludedPool }: AssessmentResultsProps) {
   const [budgetSort, setBudgetSort] = useState<BudgetSort | null>(null);
+  const [activeGovernanceTab, setActiveGovernanceTab] = useState<GovernanceTab>('budgets');
   const [costCenterStatusFilter, setCostCenterStatusFilter] =
     useState<'all' | 'active' | 'deleted'>('all');
   const [costCenterStatusSort, setCostCenterStatusSort] =
@@ -91,6 +93,23 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
           ? 'descending'
           : 'ascending',
     }));
+  };
+
+  const handleGovernanceTabKeyDown = (
+    event: ReactKeyboardEvent<HTMLButtonElement>,
+    currentTab: GovernanceTab
+  ) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const nextTab: GovernanceTab = event.key === 'Home'
+      ? 'budgets'
+      : event.key === 'End'
+        ? 'costCenters'
+        : currentTab === 'budgets'
+          ? 'costCenters'
+          : 'budgets';
+    setActiveGovernanceTab(nextTab);
+    requestAnimationFrame(() => document.getElementById(`governance-tab-${nextTab}`)?.focus());
   };
 
   return (
@@ -323,8 +342,57 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
 
         <AICConsumptionFlow result={result} />
 
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
-          <h4 className="text-sm font-semibold text-slate-200 mb-3">Budgets (monthly)</h4>
+        <div className="rounded-lg border border-slate-700 bg-slate-800 p-4">
+          <div className="mb-4 border-b border-slate-700">
+            <h4 className="mb-3 text-sm font-semibold text-slate-200">Governance Configuration</h4>
+            <div
+              className="flex gap-1 overflow-x-auto"
+              role="tablist"
+              aria-label="Governance configuration tables"
+            >
+              <button
+                id="governance-tab-budgets"
+                type="button"
+                role="tab"
+                aria-selected={activeGovernanceTab === 'budgets'}
+                aria-controls="governance-panel-budgets"
+                tabIndex={activeGovernanceTab === 'budgets' ? 0 : -1}
+                onClick={() => setActiveGovernanceTab('budgets')}
+                onKeyDown={(event) => handleGovernanceTabKeyDown(event, 'budgets')}
+                className={`shrink-0 border-b-2 px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 ${
+                  activeGovernanceTab === 'budgets'
+                    ? 'border-teal-400 text-teal-300'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Budgets (monthly) · {result.existingBudgets.length}
+              </button>
+              <button
+                id="governance-tab-costCenters"
+                type="button"
+                role="tab"
+                aria-selected={activeGovernanceTab === 'costCenters'}
+                aria-controls="governance-panel-costCenters"
+                tabIndex={activeGovernanceTab === 'costCenters' ? 0 : -1}
+                onClick={() => setActiveGovernanceTab('costCenters')}
+                onKeyDown={(event) => handleGovernanceTabKeyDown(event, 'costCenters')}
+                className={`shrink-0 border-b-2 px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 ${
+                  activeGovernanceTab === 'costCenters'
+                    ? 'border-teal-400 text-teal-300'
+                    : 'border-transparent text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Cost Centers · {result.existingCostCenters.length}
+              </button>
+            </div>
+          </div>
+
+          <div
+            id="governance-panel-budgets"
+            role="tabpanel"
+            aria-labelledby="governance-tab-budgets"
+            hidden={activeGovernanceTab !== 'budgets'}
+          >
           {budgetsWarning ? (
             <p className="text-sm text-amber-300">Budget data unavailable.</p>
           ) : result.existingBudgets.length === 0 ? (
@@ -445,9 +513,14 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
               </table>
             </div>
           )}
-        </div>
-        <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
-          <h4 className="text-sm font-semibold text-slate-200 mb-3">Cost Centers</h4>
+          </div>
+
+          <div
+            id="governance-panel-costCenters"
+            role="tabpanel"
+            aria-labelledby="governance-tab-costCenters"
+            hidden={activeGovernanceTab !== 'costCenters'}
+          >
           {costCentersWarning ? (
             <p className="text-sm text-amber-300">Cost-center data unavailable.</p>
           ) : result.existingCostCenters.length === 0 ? (
@@ -569,6 +642,7 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
               )}
             </>
           )}
+          </div>
         </div>
       </div>
     </div>
