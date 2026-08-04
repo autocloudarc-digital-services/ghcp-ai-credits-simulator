@@ -15,17 +15,20 @@ import {
   ArrowRight,
   ArrowUp,
   ArrowUpDown,
+  Bell,
   Building2,
   Check,
   CircleDollarSign,
-  CircleStop,
   Coins,
+  Database,
+  Eye,
   Filter,
   Gauge,
   Info,
   LockKeyhole,
   OctagonX,
   Route,
+  Settings,
   ShieldCheck,
   UserRoundCheck,
   Users,
@@ -712,181 +715,262 @@ function AICConsumptionFlow({ result }: { result: AssessmentResult }) {
   const costCentersUnavailable = result.governanceDataWarnings.some(
     (warning) => warning.source === 'costCenters'
   );
+  const stopEnabledCount = normalizedBudgets.filter(
+    ({ budget }) => budget.preventFurtherUsage
+  ).length;
+  const poolValue = pool
+    ? `${pool.limit.toLocaleString()} monthly`
+    : 'Not reported';
+  const poolDecisionValue = poolUsageAvailable
+    ? (poolExhausted ? 'Yes' : 'No')
+    : 'Unavailable';
+  const meteredValue = meteredCredits === null
+    ? 'Not reported'
+    : `${meteredCredits.toLocaleString()} credits`;
 
   return (
-    <section className="rounded-lg border border-slate-700 bg-slate-800 p-4" aria-labelledby="aic-consumption-flow-title">
-      <div className="mb-3 flex items-center gap-2">
-        <Route className="h-4 w-4 text-orange-300" aria-hidden="true" />
-        <h4 id="aic-consumption-flow-title" className="text-sm font-semibold text-slate-200">
-          Included Pool Exhaustion &amp; Budget Enforcement Flow
-        </h4>
+    <section className="space-y-3" aria-label="AI credit end-to-end activity flow references">
+      <div className="overflow-x-auto rounded-lg border border-blue-800/60 bg-slate-800">
+        <table className="min-w-[1880px] w-full table-fixed text-left">
+          <caption className="sr-only">End-to-end AI credit activity flow with current assessment values</caption>
+          <thead className="bg-blue-950/20">
+            <tr>
+              <th colSpan={19} className="px-4 py-3 text-xs font-semibold uppercase text-blue-300">
+                End-to-End Flow (UML Activity Diagram Style)
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="h-48 align-middle">
+              <td className="w-36 px-2">
+                <UmlActivityNode index="1" tone="blue" icon={<Database className="h-5 w-5" />} title="Automatic Included Pool Established" value={poolValue} detail="GitHub automatically establishes one shared monthly included AI credit pool from eligible Copilot licenses." />
+              </td>
+              <FlowArrow />
+              <td className="w-36 px-2">
+                <UmlActivityNode index="2" tone="green" icon={<ShieldCheck className="h-5 w-5" />} title="Governance & Policy Enforcement" value="All requests" detail="Enterprise governance and policy controls are evaluated for every AI request in every phase." />
+              </td>
+              <FlowArrow />
+              <td className="relative w-40 px-2">
+                <UmlDecisionNode index="3" title="Included Pool Exhausted?" value={poolDecisionValue} detail={pool ? `${poolRemaining?.toLocaleString()} of ${pool.limit.toLocaleString()} included AI credits remain.` : 'No included enterprise AI credit pool was reported.'} />
+              </td>
+              <FlowArrow label="Yes" />
+              <td className="w-36 px-2">
+                <UmlActivityNode index="4" tone="orange" icon={<Coins className="h-5 w-5" />} title="Metered AI Credits Begin" value={meteredValue} detail="Additional usage is metered using actual token consumption and model-specific AI credit rates." />
+              </td>
+              <FlowArrow />
+              <td className="w-36 px-2">
+                <UmlActivityNode index="5" tone="purple" icon={<UserRoundCheck className="h-5 w-5" />} title="Applicable ULB Enforcement" value={budgetsUnavailable ? 'Unavailable' : `${userLevelBudgets.length} scoped`} detail="The most specific applicable user-level budget applies: individual, then cost center, then universal." />
+              </td>
+              <FlowArrow />
+              <td className="w-36 px-2">
+                <UmlActivityNode tone="slate" icon={<Users className="h-5 w-5" />} title="User Assigned to a Cost Center?" value={costCentersUnavailable ? 'Unavailable' : assignedCostCenters.length > 0 ? 'Yes / No routes' : 'No assignments'} detail="Cost center resource assignments determine whether metered usage follows the cost center or organization route." />
+              </td>
+              <FlowArrow />
+              <td className="w-44 px-2">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1"><span className="text-[10px] font-semibold text-green-300">Yes</span><ArrowRight className="h-3 w-3 text-slate-500" /></div>
+                  <UmlActivityNode index="6a" tone="cyan" compact icon={<Building2 className="h-4 w-4" />} title="Cost Center Overage Budget" value={costCentersUnavailable ? 'Unavailable' : `${assignedCostCenters.length} assigned`} detail={`${activeCostCenters.length} active cost centers were reported; ${assignedCostCenters.length} have resource assignments.`} />
+                  <div className="flex items-center gap-1"><span className="text-[10px] font-semibold text-red-300">No</span><ArrowRight className="h-3 w-3 text-slate-500" /></div>
+                  <UmlActivityNode index="6b" tone="cyan" compact icon={<Route className="h-4 w-4" />} title="Organization Budget" value={budgetsUnavailable ? 'Unavailable' : `${organizationBudgets.length} configured`} detail="Users without a cost center follow the applicable organization budget route." />
+                </div>
+              </td>
+              <FlowArrow />
+              <td className="w-36 px-2">
+                <UmlActivityNode index="7" tone="red" icon={<CircleDollarSign className="h-5 w-5" />} title="Enterprise Spending Budget" value={budgetsUnavailable ? 'Unavailable' : `$${enterpriseBudgetRemaining.toLocaleString()} remaining`} detail={`${enterpriseBudgets.length} enterprise ${pluralize(enterpriseBudgets.length, 'budget')} configured as the universal metered-overage safeguard.`} />
+              </td>
+              <FlowArrow />
+              <td className="w-40 px-2">
+                <UmlDecisionNode index="8" title="Enterprise Budget Exhausted?" value={budgetsUnavailable ? 'Unavailable' : exhaustedEnterpriseBudgets.length > 0 ? 'Yes' : 'No'} detail={`${exhaustedEnterpriseBudgets.length} of ${enterpriseBudgets.length} enterprise budgets have reached their limit.`} />
+              </td>
+              <FlowArrow label="Yes" />
+              <td className="w-36 px-2">
+                <UmlActivityNode index="9" tone="purple" icon={<Settings className="h-5 w-5" />} title="Stop Usage Setting?" value={budgetsUnavailable ? 'Unavailable' : `${stopEnabledCount} enabled`} detail="An exhausted applicable budget blocks requests only when prevent-further-usage is enabled." />
+              </td>
+              <td className="w-48 px-2">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1"><span className="text-[10px] font-semibold text-red-300">Yes</span><ArrowRight className="h-3 w-3 text-slate-500" /></div>
+                  <UmlActivityNode index="10a" tone="red" compact icon={<OctagonX className="h-4 w-4" />} title="Blocked" value={budgetsUnavailable ? 'Unavailable' : `${blockingBudgets.length} blocking`} detail="Requests are blocked when an exhausted applicable budget prevents further usage." />
+                  <div className="flex items-center gap-1"><span className="text-[10px] font-semibold text-green-300">No</span><ArrowRight className="h-3 w-3 text-slate-500" /></div>
+                  <UmlActivityNode index="10b" tone="orange" compact icon={<CircleDollarSign className="h-4 w-4" />} title="Continue Billing" value={budgetsUnavailable ? 'Unavailable' : blockingBudgets.length === 0 ? 'Current path' : 'Conditional'} detail="Usage continues in a paid state when the applicable budget does not block further requests." />
+                </div>
+              </td>
+            </tr>
+            <tr className="h-10 text-[10px] text-slate-400">
+              <td colSpan={5} className="px-5 pb-3">
+                <div className="relative border-t border-dashed border-slate-500 pt-2 text-center">
+                  Included credits remaining
+                  <span className="absolute right-1 -top-3 flex items-center gap-1 font-semibold text-orange-300">
+                    <ArrowUp className="h-3 w-3" /> No
+                  </span>
+                </div>
+              </td>
+              <td colSpan={8} className="px-5 pb-3">
+                <div className="border-t border-dashed border-slate-500 pt-2 text-center">Metered usage and budget routing</div>
+              </td>
+              <td colSpan={6} className="px-5 pb-3">
+                <div className="border-t border-dashed border-slate-500 pt-2 text-center">Enterprise budget safeguard and stop control</div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
-      <div className="grid gap-2 lg:grid-cols-2">
-        <IndexedFlowStep
-          index="3"
-          tone="orange"
-          icon={<Gauge className="h-4 w-4" aria-hidden="true" />}
-          title="Included AIC Pool Exhausted?"
-          value={poolUsageAvailable ? (poolExhausted ? 'Yes' : 'No') : 'Usage unavailable'}
-          detail={pool
-            ? `${poolRemaining?.toLocaleString()} of ${pool.limit.toLocaleString()} included AI credits remain. New usage becomes metered only after the shared pool reaches zero.`
-            : 'No included enterprise AI credit pool was reported.'}
-        />
-        <IndexedFlowStep
-          index="4"
-          tone="orange"
-          icon={<Coins className="h-4 w-4" aria-hidden="true" />}
-          title="Metered AI Credits Begin"
-          value={meteredCredits === null ? 'Not reported' : `${meteredCredits.toLocaleString()} credits`}
-          detail="Additional usage is metered in AI credits using actual token consumption and model-specific rates."
-        />
-      </div>
-
-      <div className="my-2 flex justify-center" aria-hidden="true">
-        <ArrowDown className="h-4 w-4 text-slate-500" />
-      </div>
-
-      <div className="grid gap-2 lg:grid-cols-[1fr_1fr_1fr]">
-        <IndexedFlowStep
-          index="5"
-          tone="purple"
-          icon={<UserRoundCheck className="h-4 w-4" aria-hidden="true" />}
-          title="User-Level Budget Enforcement"
-          value={budgetsUnavailable ? 'Unavailable' : `${userLevelBudgets.length} scoped ${pluralize(userLevelBudgets.length, 'limit')}`}
-          detail="The most specific applicable user-level budget continues to apply. Budgets are not additive and apply across AI credit SKUs."
-        />
-        <IndexedFlowStep
-          index="6a"
-          tone="cyan"
-          icon={<Building2 className="h-4 w-4" aria-hidden="true" />}
-          title="Cost Center Overage Budget"
-          value={costCentersUnavailable
-            ? 'Unavailable'
-            : `${assignedCostCenters.length} assigned / ${activeCostCenters.length} active`}
-          detail="For users assigned to a cost center, metered AI credit charges can route to its overage budget when one exists and usage is not excluded."
-        />
-        <IndexedFlowStep
-          index="6b"
-          tone="cyan"
-          icon={<Route className="h-4 w-4" aria-hidden="true" />}
-          title="Organization Budget Route"
-          value={budgetsUnavailable
-            ? 'Unavailable'
-            : `${organizationBudgets.length} ${pluralize(organizationBudgets.length, 'budget')}`}
-          detail="Users without a cost center can route metered AI credit charges to the applicable organization budget."
-        />
-      </div>
-
-      <div className="my-2 flex justify-center" aria-hidden="true">
-        <ArrowDown className="h-4 w-4 text-slate-500" />
-      </div>
-
-      <div className="grid gap-2 lg:grid-cols-[1.2fr_1fr_1fr]">
-        <IndexedFlowStep
-          index="7"
-          tone="red"
-          icon={<CircleDollarSign className="h-4 w-4" aria-hidden="true" />}
-          title="Enterprise Spending Budget"
-          value={budgetsUnavailable
-            ? 'Unavailable'
-            : `${enterpriseBudgets.length} configured · $${enterpriseBudgetRemaining.toLocaleString()} remaining`}
-          detail="The enterprise spending budget acts as the universal backstop for remaining metered overage. Cost center and organization charges can count against it."
-        />
-        <IndexedFlowStep
-          index="8"
-          tone="red"
-          icon={<Gauge className="h-4 w-4" aria-hidden="true" />}
-          title="Enterprise Budget Exhausted?"
-          value={budgetsUnavailable
-            ? 'Unavailable'
-            : exhaustedEnterpriseBudgets.length > 0 ? 'Yes' : 'No'}
-          detail={`${exhaustedEnterpriseBudgets.length} of ${enterpriseBudgets.length} enterprise budgets have reached or exceeded their configured amount.`}
-        />
-        <IndexedFlowStep
-          index="9"
-          tone="purple"
-          icon={<CircleStop className="h-4 w-4" aria-hidden="true" />}
-          title="Stop Usage at Budget Limit?"
-          value={budgetsUnavailable
-            ? 'Unavailable'
-            : `${normalizedBudgets.filter(({ budget }) => budget.preventFurtherUsage).length} enabled`}
-          detail="When stop-at-limit is enabled, reaching the applicable budget can block further AI requests. Otherwise usage continues and remains billable."
-        />
-      </div>
-
-      <div className="mt-2 grid gap-2 sm:grid-cols-2">
-        <IndexedFlowStep
-          index="10a"
-          tone="red"
-          icon={<OctagonX className="h-4 w-4" aria-hidden="true" />}
-          title="AI Requests Blocked"
-          value={budgetsUnavailable ? 'Unavailable' : `${blockingBudgets.length} blocking ${pluralize(blockingBudgets.length, 'budget')}`}
-          detail="Requests are blocked only when an exhausted applicable budget is configured to prevent further usage."
-        />
-        <IndexedFlowStep
-          index="10b"
-          tone="orange"
-          icon={<CircleDollarSign className="h-4 w-4" aria-hidden="true" />}
-          title="Continue Billing"
-          value={budgetsUnavailable
-            ? 'Unavailable'
-            : blockingBudgets.length === 0 ? 'Current path' : 'Conditional'}
-          detail="If the applicable budget does not stop usage, requests continue and metered AI credit spending remains chargeable."
+      <div className="grid gap-3 lg:grid-cols-[0.9fr_1.1fr]">
+        <IconLegendTable />
+        <TermsTable
+          pool={pool}
+          poolRemaining={poolRemaining}
+          meteredCredits={meteredCredits}
+          userLevelBudgetCount={userLevelBudgets.length}
+          assignedCostCenterCount={assignedCostCenters.length}
+          organizationBudgetCount={organizationBudgets.length}
+          enterpriseBudgetCount={enterpriseBudgets.length}
+          enterpriseBudgetRemaining={enterpriseBudgetRemaining}
+          budgetsUnavailable={budgetsUnavailable}
+          costCentersUnavailable={costCentersUnavailable}
         />
       </div>
     </section>
   );
 }
 
-type FlowTone = 'orange' | 'purple' | 'cyan' | 'red';
+type FlowTone = 'blue' | 'green' | 'orange' | 'purple' | 'cyan' | 'red' | 'slate';
 
 const flowToneClasses: Record<FlowTone, { border: string; badge: string; text: string }> = {
+  blue: { border: 'border-blue-700/70', badge: 'bg-blue-600', text: 'text-blue-300' },
+  green: { border: 'border-green-700/70', badge: 'bg-green-700', text: 'text-green-300' },
   orange: { border: 'border-orange-700/70', badge: 'bg-orange-600', text: 'text-orange-300' },
   purple: { border: 'border-violet-700/70', badge: 'bg-violet-600', text: 'text-violet-300' },
   cyan: { border: 'border-cyan-700/70', badge: 'bg-cyan-700', text: 'text-cyan-300' },
   red: { border: 'border-red-800/70', badge: 'bg-red-700', text: 'text-red-300' },
+  slate: { border: 'border-slate-600', badge: 'bg-slate-600', text: 'text-slate-300' },
 };
 
-function IndexedFlowStep({
+function UmlActivityNode({
   index,
   tone,
   icon,
   title,
   value,
   detail,
+  compact = false,
 }: {
-  index: string;
+  index?: string;
   tone: FlowTone;
   icon: ReactNode;
   title: string;
   value: string;
   detail: string;
+  compact?: boolean;
 }) {
   const colors = flowToneClasses[tone];
-  const tooltipId = `aic-flow-${index.replace(/[^a-z0-9]/gi, '').toLowerCase()}-help`;
+  const tooltipId = `aic-flow-${(index ?? title).replace(/[^a-z0-9]/gi, '').toLowerCase()}-help`;
 
   return (
     <HoverCallout
       tooltipId={tooltipId}
       tooltip={detail}
       tooltipClassName={colors.border}
-      className={`min-w-0 rounded-md border bg-slate-900/40 p-2.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-slate-400 ${colors.border}`}
+      className={`flex min-w-0 flex-col items-center justify-center rounded-md border bg-slate-900/40 p-2 text-center outline-none transition-colors focus-visible:ring-2 focus-visible:ring-slate-400 ${compact ? 'min-h-16' : 'min-h-28'} ${colors.border}`}
     >
-      <div className="flex items-start gap-2">
-        <span className={`flex h-5 min-w-5 shrink-0 items-center justify-center rounded px-1 text-[10px] font-bold text-white ${colors.badge}`}>
-          {index}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className={`mb-1 flex items-center gap-1.5 ${colors.text}`}>
-            {icon}
-            <span className="truncate text-xs font-semibold">{title}</span>
-            <Info className="h-3 w-3 shrink-0 opacity-70" aria-hidden="true" />
-          </div>
-          <div className="truncate font-numeric text-xs text-slate-200">{value}</div>
-        </div>
+      {index && <span className={`mb-1 flex h-5 min-w-5 items-center justify-center rounded px-1 text-[10px] font-bold text-white ${colors.badge}`}>{index}</span>}
+      <div className={`mb-1 flex items-center gap-1.5 ${colors.text}`}>
+        {icon}
+        <Info className="h-3 w-3 opacity-70" aria-hidden="true" />
+      </div>
+      <div className="text-[11px] font-semibold leading-4 text-slate-100">{title}</div>
+      <div className="mt-1 max-w-full truncate font-numeric text-[10px] text-slate-300">{value}</div>
+    </HoverCallout>
+  );
+}
+
+function UmlDecisionNode({ index, title, value, detail }: { index: string; title: string; value: string; detail: string }) {
+  return (
+    <HoverCallout tooltipId={`aic-decision-${index}-help`} tooltip={detail} tooltipClassName="border-orange-700/70" className="relative flex h-36 items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-orange-400">
+      <div className="absolute h-24 w-24 rotate-45 border border-orange-500 bg-orange-950/20" aria-hidden="true" />
+      <div className="relative z-10 flex w-24 flex-col items-center text-center">
+        <span className="mb-1 flex h-5 min-w-5 items-center justify-center rounded bg-blue-600 px-1 text-[10px] font-bold text-white">{index}</span>
+        <span className="text-[10px] font-semibold leading-4 text-slate-100">{title}</span>
+        <span className="mt-1 font-numeric text-[10px] text-orange-300">{value}</span>
       </div>
     </HoverCallout>
+  );
+}
+
+function FlowArrow({ label }: { label?: string }) {
+  return (
+    <td className="w-8 px-0 text-center" aria-hidden="true">
+      {label && <div className="mb-1 text-[10px] font-semibold text-orange-300">{label}</div>}
+      <ArrowRight className="mx-auto h-4 w-4 text-slate-500" />
+    </td>
+  );
+}
+
+const iconLegend = [
+  { icon: Users, label: 'Users' },
+  { icon: Building2, label: 'Cost Center' },
+  { icon: ShieldCheck, label: 'Policy / Shield' },
+  { icon: Settings, label: 'Governance' },
+  { icon: Database, label: 'Data / Stored' },
+  { icon: CircleDollarSign, label: 'Budget / Finance' },
+  { icon: Eye, label: 'Visibility' },
+  { icon: Bell, label: 'Alert / Notification' },
+  { icon: Gauge, label: 'Workflow / Decision' },
+  { icon: OctagonX, label: 'Stop / Blocked' },
+] as const;
+
+function IconLegendTable() {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-blue-800/60 bg-slate-800">
+      <table className="min-w-[620px] w-full text-left text-xs">
+        <caption className="sr-only">Icon legend for the AI credit activity flow</caption>
+        <thead className="bg-blue-950/20"><tr><th colSpan={5} className="px-3 py-2 font-semibold uppercase text-blue-300">Icon Legend</th></tr></thead>
+        <tbody className="divide-y divide-slate-700">
+          {[iconLegend.slice(0, 5), iconLegend.slice(5)].map((row, rowIndex) => (
+            <tr key={rowIndex}>
+              {row.map(({ icon: Icon, label }) => (
+                <td key={label} className="px-3 py-3 text-slate-300">
+                  <div className="flex items-center gap-2"><Icon className="h-4 w-4 shrink-0 text-blue-300" aria-hidden="true" /><span>{label}</span></div>
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function TermsTable({ pool, poolRemaining, meteredCredits, userLevelBudgetCount, assignedCostCenterCount, organizationBudgetCount, enterpriseBudgetCount, enterpriseBudgetRemaining, budgetsUnavailable, costCentersUnavailable }: {
+  pool: AssessmentResult['includedCreditPools'][number] | undefined;
+  poolRemaining: number | null;
+  meteredCredits: number | null;
+  userLevelBudgetCount: number;
+  assignedCostCenterCount: number;
+  organizationBudgetCount: number;
+  enterpriseBudgetCount: number;
+  enterpriseBudgetRemaining: number;
+  budgetsUnavailable: boolean;
+  costCentersUnavailable: boolean;
+}) {
+  const terms = [
+    ['AIC (AI Credits)', 'Token-based unit used for included and metered AI consumption.', meteredCredits === null ? 'Metered usage not reported' : `${meteredCredits.toLocaleString()} metered this month`],
+    ['Included Pool', 'Shared monthly pool created automatically from eligible licenses.', pool ? `${poolRemaining?.toLocaleString()} / ${pool.limit.toLocaleString()} remaining` : 'Not reported'],
+    ['User-Level Budget (ULB)', 'Most specific user budget: individual, cost center, then universal.', budgetsUnavailable ? 'Unavailable' : `${userLevelBudgetCount} scoped ${pluralize(userLevelBudgetCount, 'limit')}`],
+    ['Cost Center Overage Budget', 'Metered overage charged to an assigned cost center.', costCentersUnavailable ? 'Unavailable' : `${assignedCostCenterCount} assigned`],
+    ['Organization Budget', 'Alternative route for metered overage without a cost center.', budgetsUnavailable ? 'Unavailable' : `${organizationBudgetCount} configured`],
+    ['Enterprise Spending Budget', 'Universal safeguard for remaining metered overage.', budgetsUnavailable ? 'Unavailable' : `${enterpriseBudgetCount} configured · $${enterpriseBudgetRemaining.toLocaleString()} remaining`],
+  ];
+  return (
+    <div className="overflow-x-auto rounded-lg border border-blue-800/60 bg-slate-800">
+      <table className="min-w-[720px] w-full text-left text-xs">
+        <caption className="sr-only">Terms and current assessment values for AI credit flow</caption>
+        <thead className="bg-blue-950/20"><tr><th className="px-3 py-2 font-semibold uppercase text-blue-300">Terms</th><th className="px-3 py-2 font-semibold text-slate-300">Definition</th><th className="px-3 py-2 font-semibold text-slate-300">Current assessment</th></tr></thead>
+        <tbody className="divide-y divide-slate-700">
+          {terms.map(([term, definition, current]) => <tr key={term}><th scope="row" className="px-3 py-2 font-semibold text-slate-200">{term}</th><td className="px-3 py-2 text-slate-400">{definition}</td><td className="px-3 py-2 font-numeric text-slate-300">{current}</td></tr>)}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
