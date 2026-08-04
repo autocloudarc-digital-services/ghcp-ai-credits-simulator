@@ -5,9 +5,9 @@ import {
   getAICreditUsage,
   getCopilotLicenseInventory,
   getCostCenters,
+  getEnterpriseAICreditUsage,
   getEnterpriseCopilotLicenseCounts,
   getExistingBudgets,
-  getUsageSummary,
   GitHubBillingServiceError,
 } from '../services/githubBillingService';
 import { AssessmentResult, DailyBurnPoint, UserConsumption } from '../types';
@@ -23,6 +23,15 @@ interface AssessmentJob {
 
 const jobs = new Map<string, AssessmentJob>();
 
+const STANDARD_INCLUDED_CREDITS = {
+  'copilot-business': 1900,
+  'copilot-enterprise': 3900,
+} as const;
+const PROMOTIONAL_INCLUDED_CREDITS = {
+  'copilot-business': 3000,
+  'copilot-enterprise': 7000,
+} as const;
+
 function scoreConcentrationRisk(topUsers: UserConsumption[], totalConsumption: number): number {
   if (totalConsumption <= 0 || topUsers.length === 0) return 0;
   const topCount = Math.max(1, Math.ceil(topUsers.length * 0.1));
@@ -36,6 +45,23 @@ function getCopilotSkuKey(sku: string): string | null {
   if (normalizedSku.includes('business')) return 'copilot-business';
   if (normalizedSku.includes('enterprise')) return 'copilot-enterprise';
   return null;
+}
+
+function getIncludedCreditsPerLicense(
+  skuKey: keyof typeof STANDARD_INCLUDED_CREDITS,
+  now: Date
+): number {
+  const promotionStarts = Date.UTC(2026, 5, 1);
+  const promotionEnds = Date.UTC(2026, 8, 1);
+  const currentTime = now.getTime();
+  const rates = currentTime >= promotionStarts && currentTime < promotionEnds
+    ? PROMOTIONAL_INCLUDED_CREDITS
+    : STANDARD_INCLUDED_CREDITS;
+  return rates[skuKey];
+}
+
+function getCopilotPlan(skuKey: string): 'Copilot Business' | 'Copilot Enterprise' {
+  return skuKey === 'copilot-enterprise' ? 'Copilot Enterprise' : 'Copilot Business';
 }
 
 function buildGovernanceGaps(
@@ -76,35 +102,38 @@ async function runAssessment(
 
     const byOrganization: Record<string, number> = {};
     const byModel: Record<string, number> = {};
+    const includedUsageByOrganization = new Map<string, number>();
     const userTotals = new Map<string, number>();
 
     const orgsToAssess = organizations.length > 0 ? organizations : [enterpriseSlug];
 
     for (const org of orgsToAssess) {
-      const [usage, summary] = await Promise.all([
-        getAICreditUsage(org, session, year, month),
-        getUsageSummary(org, session, year, month),
-      ]);
-
-      byOrganization[org] = (byOrganization[org] ?? 0) + summary.totalCredits;
-      for (const [model, credits] of Object.entries(summary.byModel)) {
-        byModel[model] = (byModel[model] ?? 0) + credits;
-      }
+      const usage = await getAICreditUsage(org, session, year, month);
+      byOrganization[org] = usage.reduce((total, item) => total + item.grossQuantity, 0);
+      includedUsageByOrganization.set(
+        org.toLowerCase(),
+        usage.reduce((total, item) => total + item.discountQuantity, 0)
+      );
       for (const entry of usage) {
-        userTotals.set(entry.userId, (userTotals.get(entry.userId) ?? 0) + entry.creditsUsed);
+        byModel[entry.model] = (byModel[entry.model] ?? 0) + entry.grossQuantity;
+        if (entry.userId) {
+          userTotals.set(entry.userId, (userTotals.get(entry.userId) ?? 0) + entry.grossQuantity);
+        }
       }
     }
 
     const totalCreditsConsumed = Object.values(byOrganization).reduce((s, v) => s + v, 0);
 
     const topUsers: UserConsumption[] = Array.from(userTotals.entries())
-      .sort((a, b) => b[1] - a[1])
+      .sort((first, second) => second[1] - first[1])
       .slice(0, 10)
-      .map(([userId, creditsConsumed], idx) => ({
+      .map(([userId, creditsConsumed], index) => ({
         userId,
-        displayName: `Developer ${String(idx + 1).padStart(2, '0')}`,
+        displayName: `Developer ${String(index + 1).padStart(2, '0')}`,
         creditsConsumed,
-        percentOfTotal: totalCreditsConsumed > 0 ? (creditsConsumed / totalCreditsConsumed) * 100 : 0,
+        percentOfTotal: totalCreditsConsumed > 0
+          ? (creditsConsumed / totalCreditsConsumed) * 100
+          : 0,
       }));
 
     const dailyTrend: DailyBurnPoint[] = Array.from({ length: periodDays }, (_, i) => {
@@ -115,7 +144,12 @@ async function runAssessment(
 
     const concentrationRiskScore = scoreConcentrationRisk(topUsers, totalCreditsConsumed);
 
-    const [governanceResults, licenseInventoryResults, enterpriseLicenseResults] = await Promise.all([
+    const [
+      governanceResults,
+      licenseInventoryResults,
+      enterpriseLicenseResults,
+      enterpriseUsageResults,
+    ] = await Promise.all([
       Promise.allSettled([
         getExistingBudgets(enterpriseSlug, session, enterpriseBillingToken),
         getCostCenters(enterpriseSlug, session, enterpriseBillingToken),
@@ -132,9 +166,19 @@ async function runAssessment(
           enterpriseBillingToken
         ),
       ]),
+      Promise.allSettled([
+        getEnterpriseAICreditUsage(
+          enterpriseSlug,
+          session,
+          year,
+          month,
+          enterpriseBillingToken
+        ),
+      ]),
     ]);
     const [budgetsResult, costCentersResult] = governanceResults;
     const enterpriseLicenseResult = enterpriseLicenseResults[0];
+    const enterpriseUsageResult = enterpriseUsageResults[0];
 
     const budgetsAvailable = budgetsResult.status === 'fulfilled';
     const costCentersAvailable = costCentersResult.status === 'fulfilled';
@@ -159,6 +203,37 @@ async function runAssessment(
         if (skuKey) enterpriseLicenseCounts.set(skuKey, count);
       }
     }
+
+    const organizationBusinessLicenses = Array.from(licenseCountsByOrganization.values())
+      .reduce((total, counts) => total + (counts.get('copilot-business') ?? 0), 0);
+    const organizationEnterpriseLicenses = Array.from(licenseCountsByOrganization.values())
+      .reduce((total, counts) => total + (counts.get('copilot-enterprise') ?? 0), 0);
+    const businessLicenseCount = organizationBusinessLicenses
+      + (enterpriseLicenseCounts.get('copilot-business') ?? 0);
+    const enterpriseLicenseCount = organizationEnterpriseLicenses
+      + (enterpriseLicenseCounts.get('copilot-enterprise') ?? 0);
+    const totalLicenseCount = businessLicenseCount + enterpriseLicenseCount;
+    const enterpriseIncludedUsage = enterpriseUsageResult?.status === 'fulfilled'
+      ? enterpriseUsageResult.value.reduce(
+          (total, item) => total + item.discountQuantity,
+          0
+        )
+      : null;
+    const includedCreditPools: AssessmentResult['includedCreditPools'] = totalLicenseCount > 0
+      ? [{
+          id: `enterprise:${enterpriseSlug}`,
+          scope: 'enterprise',
+          scopeTarget: enterpriseSlug,
+          businessLicenseCount,
+          enterpriseLicenseCount,
+          totalLicenseCount,
+          used: enterpriseIncludedUsage,
+          limit:
+            businessLicenseCount * getIncludedCreditsPerLicense('copilot-business', now)
+            + enterpriseLicenseCount * getIncludedCreditsPerLicense('copilot-enterprise', now),
+          resetDate: new Date(Date.UTC(year, month, 1)).toISOString(),
+        }]
+      : [];
 
     const existingBudgets = budgetsAvailable
       ? budgetsResult.value.map((budget) => {
@@ -221,6 +296,16 @@ async function runAssessment(
         message: `Copilot license inventory is incomplete: ${licenseWarnings.join('; ')}.`,
       });
     }
+    const includedCreditWarnings: string[] = [];
+    if (!enterpriseUsageResult || enterpriseUsageResult.status === 'rejected') {
+      includedCreditWarnings.push('enterprise included-credit consumption is unavailable');
+    }
+    if (includedCreditWarnings.length > 0) {
+      governanceDataWarnings.push({
+        source: 'includedCredits',
+        message: `Included AI credit data is incomplete: ${includedCreditWarnings.join('; ')}.`,
+      });
+    }
 
     const governanceGaps = buildGovernanceGaps(
       existingBudgets,
@@ -239,6 +324,7 @@ async function runAssessment(
       concentrationRiskScore,
       governanceGaps,
       governanceDataWarnings,
+      includedCreditPools,
       existingBudgets,
       existingCostCenters,
     };

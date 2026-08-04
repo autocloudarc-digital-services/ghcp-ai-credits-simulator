@@ -7,8 +7,24 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { useState } from 'react';
-import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Check, Filter } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import {
+  AlertTriangle,
+  ArrowDown,
+  ArrowRight,
+  ArrowUp,
+  ArrowUpDown,
+  Building2,
+  Check,
+  Coins,
+  Filter,
+  Gauge,
+  Info,
+  LockKeyhole,
+  ShieldCheck,
+  UserRoundCheck,
+  Users,
+} from 'lucide-react';
 import { AssessmentResult, GitHubBudget } from '../../types';
 import ConcentrationRiskChart from './ConcentrationRiskChart';
 
@@ -33,6 +49,7 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
   const [costCenterStatusSort, setCostCenterStatusSort] =
     useState<'active-first' | 'deleted-first'>('active-first');
   const governanceDataWarnings = result.governanceDataWarnings ?? [];
+  const includedCreditPool = (result.includedCreditPools ?? [])[0];
   const budgetsWarning = governanceDataWarnings.find((warning) => warning.source === 'budgets');
   const costCentersWarning = governanceDataWarnings.find((warning) => warning.source === 'costCenters');
   const poolUtilization =
@@ -171,6 +188,131 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
       </div>
 
       <div className="space-y-6">
+        <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+          <div className="mb-4 grid gap-4 lg:grid-cols-[minmax(300px,0.9fr)_minmax(520px,1.1fr)] lg:items-center">
+            <div className="flex items-start gap-2.5">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-blue-600 text-xs font-bold text-white shadow-sm shadow-blue-950/50">
+                1
+              </span>
+              <div>
+                <h4 className="mb-1 text-sm font-semibold text-blue-300">
+                  Monthly Included AI Credits (AIC) Shared Enterprise Pool
+                </h4>
+                <p className="text-xs leading-5 text-slate-400">
+                  Included AI credits consumed by Copilot users across the assessed enterprise.
+                </p>
+              </div>
+            </div>
+            {includedCreditPool && (
+              <div className="min-w-0 lg:border-l lg:border-slate-700 lg:pl-5">
+                <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase text-blue-300">
+                  <span>Automatic shared pool</span>
+                  <Info className="h-3.5 w-3.5" aria-hidden="true" />
+                </div>
+                <div className="grid grid-cols-[minmax(0,1fr)_20px_minmax(0,1.1fr)_20px_minmax(0,1fr)] items-center gap-1">
+                  <PoolFlowStep
+                    tooltipId="assigned-license-pool-help"
+                    icon={<Users className="h-4 w-4" aria-hidden="true" />}
+                    label="Eligible licenses"
+                    value={`${includedCreditPool.totalLicenseCount.toLocaleString()} assigned`}
+                    tooltip={`GitHub aggregates ${includedCreditPool.businessLicenseCount.toLocaleString()} Copilot Business and ${includedCreditPool.enterpriseLicenseCount.toLocaleString()} Copilot Enterprise licenses.`}
+                  />
+                  <ArrowRight className="h-4 w-4 justify-self-center text-slate-500" aria-hidden="true" />
+                  <PoolFlowStep
+                    tooltipId="shared-credit-pool-help"
+                    icon={<Coins className="h-4 w-4" aria-hidden="true" />}
+                    label="Shared AIC pool"
+                    value={`${includedCreditPool.limit.toLocaleString()} monthly`}
+                    tooltip="GitHub automatically creates one shared monthly included AI credit pool. No manual pool configuration is required."
+                    emphasized
+                  />
+                  <ArrowRight className="h-4 w-4 justify-self-center text-slate-500" aria-hidden="true" />
+                  <PoolFlowStep
+                    tooltipId="enterprise-access-pool-help"
+                    icon={<Users className="h-4 w-4" aria-hidden="true" />}
+                    label="Enterprise access"
+                    value="All licensed users"
+                    tooltip="Every licensed Copilot user in the enterprise consumes included AI credits from the same shared pool each month."
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          {(result.includedCreditPools ?? []).length === 0 ? (
+            <p className="text-sm text-slate-500">No included AI credit pools were reported.</p>
+          ) : (
+            <div className="overflow-x-auto rounded-md border border-slate-700">
+              <table className="min-w-[1080px] w-full text-left text-sm">
+                <caption className="sr-only">
+                  Monthly enterprise included AI credit consumption and license totals by Copilot SKU
+                </caption>
+                <thead className="bg-slate-900/70 text-slate-200">
+                  <tr>
+                    <th className="px-3 py-2 font-semibold">Scope</th>
+                    <th className="px-3 py-2 font-semibold">Scope target</th>
+                    <th className="px-3 py-2 text-right font-semibold">Copilot Business</th>
+                    <th className="px-3 py-2 text-right font-semibold">Copilot Enterprise</th>
+                    <th className="px-3 py-2 text-right font-semibold">Total licenses</th>
+                    <th className="w-80 px-3 py-2 font-semibold">Included credits</th>
+                    <th className="px-3 py-2 font-semibold">Monthly reset</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700 text-slate-200">
+                  {(result.includedCreditPools ?? []).map((pool) => {
+                    const utilization = getIncludedCreditUtilization(pool.used, pool.limit);
+                    const progressColor = getIncludedCreditProgressColor(pool.used, utilization);
+                    const usedLabel = pool.used === null ? 'Not reported' : pool.used.toLocaleString();
+
+                    return (
+                      <tr key={pool.id}>
+                        <td className="px-3 py-3 capitalize">{pool.scope}</td>
+                        <td className="max-w-48 break-words px-3 py-3">{pool.scopeTarget}</td>
+                        <td className="px-3 py-3 text-right font-numeric">
+                          {pool.businessLicenseCount.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-3 text-right font-numeric">
+                          {pool.enterpriseLicenseCount.toLocaleString()}
+                        </td>
+                        <td className="px-3 py-3 text-right font-numeric font-semibold">
+                          {pool.totalLicenseCount.toLocaleString()}
+                        </td>
+                        <td className="w-80 px-3 py-3">
+                          <div className="mb-2 font-numeric text-slate-100">
+                            {usedLabel} / {pool.limit.toLocaleString()} AI credits
+                          </div>
+                          <div
+                            className="h-2 w-full overflow-hidden rounded-full bg-slate-700"
+                            role="progressbar"
+                            aria-label={`Enterprise included AI credits used for ${pool.scopeTarget}`}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-valuenow={pool.used === null ? undefined : Math.min(100, utilization)}
+                            aria-valuetext={
+                              pool.used === null
+                                ? 'Usage not reported'
+                                : `${utilization.toFixed(1)} percent used`
+                            }
+                          >
+                            <div
+                              className={`h-full rounded-full ${progressColor}`}
+                              style={{ width: `${pool.used === null ? 0 : Math.min(100, utilization)}%` }}
+                            />
+                          </div>
+                        </td>
+                        <td className="max-w-64 px-3 py-3 text-xs text-slate-400">
+                          {formatIncludedCreditReset(pool.resetDate)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <GovernancePolicyTable />
+
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
           <h4 className="text-sm font-semibold text-slate-200 mb-3">Budgets (monthly)</h4>
           {budgetsWarning ? (
@@ -423,6 +565,159 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
   );
 }
 
+const governancePolicies = [
+  {
+    id: 'user-level-budget-policy-help',
+    icon: UserRoundCheck,
+    title: 'User-Level Budget (ULB)',
+    summary: 'Most specific budget applies first.',
+    detail: 'Individual ULB, then Cost Center ULB, then Universal ULB. Budgets are not additive and apply to all AI credit SKUs.',
+    status: 'Applicable',
+  },
+  {
+    id: 'cost-center-policy-help',
+    icon: Building2,
+    title: 'Cost Center Policies',
+    summary: 'Optional overage routing and exclusions.',
+    detail: 'Cost center policies can route metered overage to a cost center budget and define policy or usage exclusions.',
+    status: 'Optional',
+  },
+  {
+    id: 'model-governance-policy-help',
+    icon: ShieldCheck,
+    title: 'Model Governance & Access',
+    summary: 'Controls model access and availability.',
+    detail: 'Policies can allow or block models, define model selection behavior, and control which models are available to users.',
+    status: 'Applicable',
+  },
+  {
+    id: 'consumption-control-policy-help',
+    icon: Gauge,
+    title: 'AI Credit Consumption Controls',
+    summary: 'Token-based, model-specific credit rates.',
+    detail: 'AI credit consumption is measured from token usage using the credit rate assigned to each model.',
+    status: 'Applicable',
+  },
+  {
+    id: 'other-enterprise-policy-help',
+    icon: LockKeyhole,
+    title: 'Other Policies',
+    summary: 'Security, compliance, and audit controls.',
+    detail: 'Enterprise controls may also govern data residency, auditing, feature access, security, and compliance requirements.',
+    status: 'Applicable',
+  },
+] as const;
+
+function GovernancePolicyTable() {
+  return (
+    <section className="rounded-lg border border-green-700/70 bg-slate-800 p-4" aria-labelledby="governance-policy-title">
+      <div className="mb-3 flex items-start gap-2.5">
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-green-700 text-xs font-bold text-white shadow-sm shadow-green-950/50">
+          2
+        </span>
+        <div>
+          <h4 id="governance-policy-title" className="mb-1 text-sm font-semibold text-green-300">
+            Governance &amp; Policy Enforcement
+          </h4>
+          <p className="text-xs leading-5 text-slate-400">
+            Policies are evaluated for every AI request in every phase.
+          </p>
+        </div>
+      </div>
+      <div className="overflow-x-auto rounded-md border border-green-800/60">
+        <table className="min-w-[920px] w-full table-fixed text-left">
+          <caption className="sr-only">Enterprise governance and policy controls applied to AI credit requests</caption>
+          <thead className="bg-green-950/30">
+            <tr>
+              {governancePolicies.map((policy) => {
+                const Icon = policy.icon;
+                return (
+                  <th key={policy.id} scope="col" className="border-r border-green-900/60 px-3 py-3 last:border-r-0">
+                    <div className="flex items-center gap-2 text-green-300">
+                      <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      <span className="text-xs font-semibold leading-4">{policy.title}</span>
+                    </div>
+                  </th>
+                );
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="align-top">
+              {governancePolicies.map((policy) => (
+                <td key={policy.id} className="border-r border-slate-700 px-3 py-3 last:border-r-0">
+                  <div
+                    className="group relative rounded outline-none focus-visible:ring-2 focus-visible:ring-green-400"
+                    tabIndex={0}
+                    aria-describedby={policy.id}
+                  >
+                    <div className="mb-2 inline-flex items-center gap-1 rounded bg-green-950/50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-green-300">
+                      <Check className="h-3 w-3" aria-hidden="true" />
+                      {policy.status}
+                    </div>
+                    <p className="text-xs leading-5 text-slate-300">{policy.summary}</p>
+                    <Info className="mt-2 h-3.5 w-3.5 text-slate-500" aria-hidden="true" />
+                    <div
+                      id={policy.id}
+                      role="tooltip"
+                      className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-20 hidden w-64 -translate-x-1/2 rounded-md border border-green-800 bg-slate-950 px-3 py-2 text-xs font-normal leading-5 text-slate-200 shadow-xl group-hover:block group-focus:block"
+                    >
+                      {policy.detail}
+                    </div>
+                  </div>
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+interface PoolFlowStepProps {
+  tooltipId: string;
+  icon: ReactNode;
+  label: string;
+  value: string;
+  tooltip: string;
+  emphasized?: boolean;
+}
+
+function PoolFlowStep({
+  tooltipId,
+  icon,
+  label,
+  value,
+  tooltip,
+  emphasized = false,
+}: PoolFlowStepProps) {
+  return (
+    <div
+      className={`group relative min-w-0 rounded-md border px-2.5 py-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-teal-400 ${
+        emphasized
+          ? 'border-blue-500/70 bg-blue-500/10'
+          : 'border-slate-700 bg-slate-900/40'
+      }`}
+      tabIndex={0}
+      aria-describedby={tooltipId}
+    >
+      <div className={`mb-1 flex items-center gap-1.5 ${emphasized ? 'text-blue-300' : 'text-slate-400'}`}>
+        {icon}
+        <span className="truncate text-[10px] font-semibold uppercase">{label}</span>
+      </div>
+      <div className="truncate text-xs font-semibold text-slate-100">{value}</div>
+      <div
+        id={tooltipId}
+        role="tooltip"
+        className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-20 hidden w-64 -translate-x-1/2 rounded-md border border-slate-600 bg-slate-950 px-3 py-2 text-left text-xs font-normal leading-5 text-slate-200 shadow-xl group-hover:block group-focus:block"
+      >
+        {tooltip}
+      </div>
+    </div>
+  );
+}
+
 function StatCard({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
@@ -440,6 +735,32 @@ function formatBudgetSku(sku: string): string {
 
 function formatBudgetScope(scope: string): string {
   return scope.replace(/_/g, ' ');
+}
+
+function getIncludedCreditUtilization(used: number | null, limit: number): number {
+  return used !== null && limit > 0 ? (used / limit) * 100 : 0;
+}
+
+function getIncludedCreditProgressColor(used: number | null, utilization: number): string {
+  if (used === null || used <= 0) return 'bg-slate-500';
+  if (utilization >= 90) return 'bg-red-500';
+  if (utilization > 75) return 'bg-amber-400';
+  return 'bg-green-500';
+}
+
+function formatIncludedCreditReset(resetDate: string): string {
+  const reset = new Date(resetDate);
+  const daysUntilReset = Math.max(
+    0,
+    Math.ceil((reset.getTime() - Date.now()) / (24 * 60 * 60 * 1000))
+  );
+  const formattedDate = new Intl.DateTimeFormat(undefined, {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(reset);
+  return `Resets in ${daysUntilReset} ${daysUntilReset === 1 ? 'day' : 'days'} on ${formattedDate}.`;
 }
 
 function resolveBudgetType(budget: GitHubBudget): string {

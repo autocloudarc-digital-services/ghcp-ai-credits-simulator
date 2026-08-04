@@ -92,13 +92,26 @@ export interface AssessmentResult {
   concentrationRiskScore: number;
   governanceGaps: string[];
   governanceDataWarnings: GovernanceDataWarning[];
+  includedCreditPools: IncludedCreditPool[];
   existingBudgets: GitHubBudget[];
   existingCostCenters: GitHubCostCenter[];
 }
 
 export interface GovernanceDataWarning {
-  source: 'budgets' | 'costCenters' | 'licenses';
+  source: 'budgets' | 'costCenters' | 'licenses' | 'includedCredits';
   message: string;
+}
+
+export interface IncludedCreditPool {
+  id: string;
+  scope: 'enterprise';
+  scopeTarget: string;
+  businessLicenseCount: number;
+  enterpriseLicenseCount: number;
+  totalLicenseCount: number;
+  used: number | null;
+  limit: number;
+  resetDate: string;
 }
 
 export interface GitHubBudget {

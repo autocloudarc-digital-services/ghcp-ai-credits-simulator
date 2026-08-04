@@ -91,11 +91,15 @@ async function authenticatedGet<T>(
 }
 
 export interface AICreditUsageEntry {
-  userId: string;
-  login: string;
-  creditsUsed: number;
-  model?: string;
-  organization?: string;
+  product: string;
+  sku: string;
+  model: string;
+  unitType: string;
+  grossQuantity: number;
+  discountQuantity: number;
+  netQuantity: number;
+  userId?: string;
+  login?: string;
 }
 
 /**
@@ -117,9 +121,34 @@ export async function getAICreditUsage(
   return data.usageItems ?? [];
 }
 
-export interface UsageSummary {
-  totalCredits: number;
-  byModel: Record<string, number>;
+/**
+ * Retrieves enterprise-wide AI credit usage for the current billing period.
+ * GET /enterprises/{enterprise}/settings/billing/ai_credit/usage
+ */
+export async function getEnterpriseAICreditUsage(
+  enterprise: string,
+  session: Session,
+  year: number,
+  month: number,
+  suppliedBillingToken?: string
+): Promise<AICreditUsageEntry[]> {
+  const enterpriseBillingToken = suppliedBillingToken?.trim() || getEnterpriseBillingToken();
+  if (!enterpriseBillingToken) {
+    throw new GitHubBillingServiceError(
+      'Enterprise AI credit usage requires GHCP_ENTERPRISE_BILLING_TOKEN.',
+      503
+    );
+  }
+
+  const data = await authenticatedGet<{ usageItems?: AICreditUsageEntry[] }>(
+    session,
+    enterprise,
+    (validatedEnterprise) =>
+      `/enterprises/${validatedEnterprise}/settings/billing/ai_credit/usage`,
+    { year, month },
+    enterpriseBillingToken
+  );
+  return data.usageItems ?? [];
 }
 
 interface GitHubBudgetResponse {
@@ -258,25 +287,6 @@ export async function getEnterpriseCopilotLicenseCounts(
       Math.round(quantity * daysInMonth),
     ])
   );
-}
-
-/**
- * Retrieves the aggregated usage summary for an organization.
- * GET /organizations/{org}/settings/billing/usage/summary
- */
-export async function getUsageSummary(
-  org: string,
-  session: Session,
-  year: number,
-  month: number
-): Promise<UsageSummary> {
-  const data = await authenticatedGet<Partial<UsageSummary>>(
-    session,
-    org,
-    (validatedOrg) => `/organizations/${validatedOrg}/settings/billing/usage/summary`,
-    { year, month }
-  );
-  return { totalCredits: data.totalCredits ?? 0, byModel: data.byModel ?? {} };
 }
 
 /**
