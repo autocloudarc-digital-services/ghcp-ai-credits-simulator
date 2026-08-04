@@ -730,9 +730,21 @@ function AICConsumptionFlow({ result }: { result: AssessmentResult }) {
 
   return (
     <section className="space-y-3" aria-label="AI credit end-to-end activity flow references">
-      <div className="overflow-x-auto rounded-lg border border-blue-800/60 bg-slate-800">
-        <table className="min-w-[1880px] w-full table-fixed text-left">
+      <div className="overflow-hidden rounded-lg border border-blue-800/60 bg-slate-800">
+        <table className="w-full table-fixed text-left">
           <caption className="sr-only">End-to-end AI credit activity flow with current assessment values</caption>
+          <colgroup>
+            <col className="w-[8%]" /><col className="w-[1.5%]" />
+            <col className="w-[8%]" /><col className="w-[1.5%]" />
+            <col className="w-[8%]" /><col className="w-[1.5%]" />
+            <col className="w-[8%]" /><col className="w-[1.5%]" />
+            <col className="w-[8%]" /><col className="w-[1.5%]" />
+            <col className="w-[8%]" /><col className="w-[1.5%]" />
+            <col className="w-[10%]" /><col className="w-[1.5%]" />
+            <col className="w-[8%]" /><col className="w-[1.5%]" />
+            <col className="w-[8%]" /><col className="w-[1.5%]" />
+            <col className="w-[10%]" />
+          </colgroup>
           <thead className="bg-blue-950/20">
             <tr>
               <th colSpan={19} className="px-4 py-3 text-xs font-semibold uppercase text-blue-300">
@@ -741,32 +753,32 @@ function AICConsumptionFlow({ result }: { result: AssessmentResult }) {
             </tr>
           </thead>
           <tbody>
-            <tr className="h-48 align-middle">
-              <td className="w-36 px-2">
+            <tr className="h-44 align-middle">
+              <td className="px-1">
                 <UmlActivityNode index="1" tone="blue" icon={<Database className="h-5 w-5" />} title="Automatic Included Pool Established" value={poolValue} detail="GitHub automatically establishes one shared monthly included AI credit pool from eligible Copilot licenses." />
               </td>
               <FlowArrow />
-              <td className="w-36 px-2">
+              <td className="px-1">
                 <UmlActivityNode index="2" tone="green" icon={<ShieldCheck className="h-5 w-5" />} title="Governance & Policy Enforcement" value="All requests" detail="Enterprise governance and policy controls are evaluated for every AI request in every phase." />
               </td>
               <FlowArrow />
-              <td className="relative w-40 px-2">
+              <td className="relative px-1">
                 <UmlDecisionNode index="3" title="Included Pool Exhausted?" value={poolDecisionValue} detail={pool ? `${poolRemaining?.toLocaleString()} of ${pool.limit.toLocaleString()} included AI credits remain.` : 'No included enterprise AI credit pool was reported.'} />
               </td>
               <FlowArrow label="Yes" />
-              <td className="w-36 px-2">
+              <td className="px-1">
                 <UmlActivityNode index="4" tone="orange" icon={<Coins className="h-5 w-5" />} title="Metered AI Credits Begin" value={meteredValue} detail="Additional usage is metered using actual token consumption and model-specific AI credit rates." />
               </td>
               <FlowArrow />
-              <td className="w-36 px-2">
+              <td className="px-1">
                 <UmlActivityNode index="5" tone="purple" icon={<UserRoundCheck className="h-5 w-5" />} title="Applicable ULB Enforcement" value={budgetsUnavailable ? 'Unavailable' : `${userLevelBudgets.length} scoped`} detail="The most specific applicable user-level budget applies: individual, then cost center, then universal." />
               </td>
               <FlowArrow />
-              <td className="w-36 px-2">
+              <td className="px-1">
                 <UmlActivityNode tone="slate" icon={<Users className="h-5 w-5" />} title="User Assigned to a Cost Center?" value={costCentersUnavailable ? 'Unavailable' : assignedCostCenters.length > 0 ? 'Yes / No routes' : 'No assignments'} detail="Cost center resource assignments determine whether metered usage follows the cost center or organization route." />
               </td>
               <FlowArrow />
-              <td className="w-44 px-2">
+              <td className="px-1">
                 <div className="space-y-2">
                   <div className="flex items-center gap-1"><span className="text-[10px] font-semibold text-green-300">Yes</span><ArrowRight className="h-3 w-3 text-slate-500" /></div>
                   <UmlActivityNode index="6a" tone="cyan" compact icon={<Building2 className="h-4 w-4" />} title="Cost Center Overage Budget" value={costCentersUnavailable ? 'Unavailable' : `${assignedCostCenters.length} assigned`} detail={`${activeCostCenters.length} active cost centers were reported; ${assignedCostCenters.length} have resource assignments.`} />
@@ -775,18 +787,18 @@ function AICConsumptionFlow({ result }: { result: AssessmentResult }) {
                 </div>
               </td>
               <FlowArrow />
-              <td className="w-36 px-2">
+              <td className="px-1">
                 <UmlActivityNode index="7" tone="red" icon={<CircleDollarSign className="h-5 w-5" />} title="Enterprise Spending Budget" value={budgetsUnavailable ? 'Unavailable' : `$${enterpriseBudgetRemaining.toLocaleString()} remaining`} detail={`${enterpriseBudgets.length} enterprise ${pluralize(enterpriseBudgets.length, 'budget')} configured as the universal metered-overage safeguard.`} />
               </td>
               <FlowArrow />
-              <td className="w-40 px-2">
+              <td className="px-1">
                 <UmlDecisionNode index="8" title="Enterprise Budget Exhausted?" value={budgetsUnavailable ? 'Unavailable' : exhaustedEnterpriseBudgets.length > 0 ? 'Yes' : 'No'} detail={`${exhaustedEnterpriseBudgets.length} of ${enterpriseBudgets.length} enterprise budgets have reached their limit.`} />
               </td>
               <FlowArrow label="Yes" />
-              <td className="w-36 px-2">
+              <td className="px-1">
                 <UmlActivityNode index="9" tone="purple" icon={<Settings className="h-5 w-5" />} title="Stop Usage Setting?" value={budgetsUnavailable ? 'Unavailable' : `${stopEnabledCount} enabled`} detail="An exhausted applicable budget blocks requests only when prevent-further-usage is enabled." />
               </td>
-              <td className="w-48 px-2">
+              <td className="px-1">
                 <div className="space-y-2">
                   <div className="flex items-center gap-1"><span className="text-[10px] font-semibold text-red-300">Yes</span><ArrowRight className="h-3 w-3 text-slate-500" /></div>
                   <UmlActivityNode index="10a" tone="red" compact icon={<OctagonX className="h-4 w-4" />} title="Blocked" value={budgetsUnavailable ? 'Unavailable' : `${blockingBudgets.length} blocking`} detail="Requests are blocked when an exhausted applicable budget prevents further usage." />
@@ -871,27 +883,27 @@ function UmlActivityNode({
       tooltipId={tooltipId}
       tooltip={detail}
       tooltipClassName={colors.border}
-      className={`flex min-w-0 flex-col items-center justify-center rounded-md border bg-slate-900/40 p-2 text-center outline-none transition-colors focus-visible:ring-2 focus-visible:ring-slate-400 ${compact ? 'min-h-16' : 'min-h-28'} ${colors.border}`}
+      className={`flex min-w-0 flex-col items-center justify-center rounded-md border bg-slate-900/40 p-1.5 text-center outline-none transition-colors focus-visible:ring-2 focus-visible:ring-slate-400 ${compact ? 'min-h-14' : 'min-h-24'} ${colors.border}`}
     >
       {index && <span className={`mb-1 flex h-5 min-w-5 items-center justify-center rounded px-1 text-[10px] font-bold text-white ${colors.badge}`}>{index}</span>}
       <div className={`mb-1 flex items-center gap-1.5 ${colors.text}`}>
         {icon}
         <Info className="h-3 w-3 opacity-70" aria-hidden="true" />
       </div>
-      <div className="text-[11px] font-semibold leading-4 text-slate-100">{title}</div>
-      <div className="mt-1 max-w-full truncate font-numeric text-[10px] text-slate-300">{value}</div>
+      <div className="break-words text-[10px] font-semibold leading-3 text-slate-100">{title}</div>
+      <div className="mt-1 max-w-full break-words font-numeric text-[9px] leading-3 text-slate-300">{value}</div>
     </HoverCallout>
   );
 }
 
 function UmlDecisionNode({ index, title, value, detail }: { index: string; title: string; value: string; detail: string }) {
   return (
-    <HoverCallout tooltipId={`aic-decision-${index}-help`} tooltip={detail} tooltipClassName="border-orange-700/70" className="relative flex h-36 items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-orange-400">
-      <div className="absolute h-24 w-24 rotate-45 border border-orange-500 bg-orange-950/20" aria-hidden="true" />
-      <div className="relative z-10 flex w-24 flex-col items-center text-center">
+    <HoverCallout tooltipId={`aic-decision-${index}-help`} tooltip={detail} tooltipClassName="border-orange-700/70" className="relative flex h-28 items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-orange-400">
+      <div className="absolute h-16 w-16 rotate-45 border border-orange-500 bg-orange-950/20" aria-hidden="true" />
+      <div className="relative z-10 flex w-16 flex-col items-center text-center">
         <span className="mb-1 flex h-5 min-w-5 items-center justify-center rounded bg-blue-600 px-1 text-[10px] font-bold text-white">{index}</span>
-        <span className="text-[10px] font-semibold leading-4 text-slate-100">{title}</span>
-        <span className="mt-1 font-numeric text-[10px] text-orange-300">{value}</span>
+        <span className="text-[9px] font-semibold leading-3 text-slate-100">{title}</span>
+        <span className="mt-1 font-numeric text-[9px] text-orange-300">{value}</span>
       </div>
     </HoverCallout>
   );
@@ -899,7 +911,7 @@ function UmlDecisionNode({ index, title, value, detail }: { index: string; title
 
 function FlowArrow({ label }: { label?: string }) {
   return (
-    <td className="w-8 px-0 text-center" aria-hidden="true">
+    <td className="px-0 text-center" aria-hidden="true">
       {label && <div className="mb-1 text-[10px] font-semibold text-orange-300">{label}</div>}
       <ArrowRight className="mx-auto h-4 w-4 text-slate-500" />
     </td>
