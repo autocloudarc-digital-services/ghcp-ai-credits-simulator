@@ -85,6 +85,7 @@ export interface AssessmentConfig {
 
 export interface AssessmentResult {
   totalCreditsConsumed: number;
+  meteredCreditsConsumed?: number | null;
   byOrganization: Record<string, number>;
   byModel: Record<string, number>;
   topUsers: UserConsumption[];

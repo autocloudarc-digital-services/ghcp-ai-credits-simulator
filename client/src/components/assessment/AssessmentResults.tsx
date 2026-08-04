@@ -7,7 +7,8 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
   ArrowDown,
@@ -16,11 +17,15 @@ import {
   ArrowUpDown,
   Building2,
   Check,
+  CircleDollarSign,
+  CircleStop,
   Coins,
   Filter,
   Gauge,
   Info,
   LockKeyhole,
+  OctagonX,
+  Route,
   ShieldCheck,
   UserRoundCheck,
   Users,
@@ -312,6 +317,8 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
         </div>
 
         <GovernancePolicyTable />
+
+        <AICConsumptionFlow result={result} />
 
         <div className="bg-slate-800 border border-slate-700 rounded-lg p-4">
           <h4 className="text-sm font-semibold text-slate-200 mb-3">Budgets (monthly)</h4>
@@ -646,10 +653,11 @@ function GovernancePolicyTable() {
             <tr className="align-top">
               {governancePolicies.map((policy) => (
                 <td key={policy.id} className="border-r border-slate-700 px-3 py-3 last:border-r-0">
-                  <div
-                    className="group relative rounded outline-none focus-visible:ring-2 focus-visible:ring-green-400"
-                    tabIndex={0}
-                    aria-describedby={policy.id}
+                  <HoverCallout
+                    tooltipId={policy.id}
+                    tooltip={policy.detail}
+                    className="rounded outline-none focus-visible:ring-2 focus-visible:ring-green-400"
+                    tooltipClassName="border-green-800"
                   >
                     <div className="mb-2 inline-flex items-center gap-1 rounded bg-green-950/50 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-green-300">
                       <Check className="h-3 w-3" aria-hidden="true" />
@@ -657,14 +665,7 @@ function GovernancePolicyTable() {
                     </div>
                     <p className="text-xs leading-5 text-slate-300">{policy.summary}</p>
                     <Info className="mt-2 h-3.5 w-3.5 text-slate-500" aria-hidden="true" />
-                    <div
-                      id={policy.id}
-                      role="tooltip"
-                      className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-20 hidden w-64 -translate-x-1/2 rounded-md border border-green-800 bg-slate-950 px-3 py-2 text-xs font-normal leading-5 text-slate-200 shadow-xl group-hover:block group-focus:block"
-                    >
-                      {policy.detail}
-                    </div>
-                  </div>
+                  </HoverCallout>
                 </td>
               ))}
             </tr>
@@ -672,6 +673,220 @@ function GovernancePolicyTable() {
         </table>
       </div>
     </section>
+  );
+}
+
+function AICConsumptionFlow({ result }: { result: AssessmentResult }) {
+  const pool = (result.includedCreditPools ?? [])[0];
+  const poolUsageAvailable = pool?.used !== null && pool?.used !== undefined;
+  const poolUsed = pool?.used ?? 0;
+  const poolRemaining = pool ? Math.max(0, pool.limit - poolUsed) : null;
+  const poolExhausted = Boolean(pool && poolUsageAvailable && poolUsed >= pool.limit);
+  const meteredCredits = result.meteredCreditsConsumed !== undefined
+    ? result.meteredCreditsConsumed
+    : poolUsageAvailable
+      ? Math.max(0, result.totalCreditsConsumed - poolUsed)
+      : null;
+  const normalizedBudgets = result.existingBudgets.map((budget) => ({
+    budget,
+    scope: normalizeBudgetScope(budget.scope),
+  }));
+  const userLevelBudgets = normalizedBudgets.filter(({ scope }) =>
+    scope.includes('user') || scope.includes('costcenter')
+  );
+  const organizationBudgets = normalizedBudgets.filter(({ scope }) => scope.includes('organization'));
+  const enterpriseBudgets = normalizedBudgets.filter(({ scope }) => scope === 'enterprise');
+  const activeCostCenters = result.existingCostCenters.filter((costCenter) => costCenter.state === 'active');
+  const assignedCostCenters = activeCostCenters.filter((costCenter) => costCenter.resources.length > 0);
+  const exhaustedEnterpriseBudgets = enterpriseBudgets.filter(
+    ({ budget }) => budget.limit > 0 && budget.used >= budget.limit
+  );
+  const blockingBudgets = normalizedBudgets.filter(
+    ({ budget }) => budget.preventFurtherUsage && budget.limit > 0 && budget.used >= budget.limit
+  );
+  const enterpriseBudgetRemaining = enterpriseBudgets.reduce(
+    (total, { budget }) => total + Math.max(0, budget.limit - budget.used),
+    0
+  );
+  const budgetsUnavailable = result.governanceDataWarnings.some((warning) => warning.source === 'budgets');
+  const costCentersUnavailable = result.governanceDataWarnings.some(
+    (warning) => warning.source === 'costCenters'
+  );
+
+  return (
+    <section className="rounded-lg border border-slate-700 bg-slate-800 p-4" aria-labelledby="aic-consumption-flow-title">
+      <div className="mb-3 flex items-center gap-2">
+        <Route className="h-4 w-4 text-orange-300" aria-hidden="true" />
+        <h4 id="aic-consumption-flow-title" className="text-sm font-semibold text-slate-200">
+          Included Pool Exhaustion &amp; Budget Enforcement Flow
+        </h4>
+      </div>
+
+      <div className="grid gap-2 lg:grid-cols-2">
+        <IndexedFlowStep
+          index="3"
+          tone="orange"
+          icon={<Gauge className="h-4 w-4" aria-hidden="true" />}
+          title="Included AIC Pool Exhausted?"
+          value={poolUsageAvailable ? (poolExhausted ? 'Yes' : 'No') : 'Usage unavailable'}
+          detail={pool
+            ? `${poolRemaining?.toLocaleString()} of ${pool.limit.toLocaleString()} included AI credits remain. New usage becomes metered only after the shared pool reaches zero.`
+            : 'No included enterprise AI credit pool was reported.'}
+        />
+        <IndexedFlowStep
+          index="4"
+          tone="orange"
+          icon={<Coins className="h-4 w-4" aria-hidden="true" />}
+          title="Metered AI Credits Begin"
+          value={meteredCredits === null ? 'Not reported' : `${meteredCredits.toLocaleString()} credits`}
+          detail="Additional usage is metered in AI credits using actual token consumption and model-specific rates."
+        />
+      </div>
+
+      <div className="my-2 flex justify-center" aria-hidden="true">
+        <ArrowDown className="h-4 w-4 text-slate-500" />
+      </div>
+
+      <div className="grid gap-2 lg:grid-cols-[1fr_1fr_1fr]">
+        <IndexedFlowStep
+          index="5"
+          tone="purple"
+          icon={<UserRoundCheck className="h-4 w-4" aria-hidden="true" />}
+          title="User-Level Budget Enforcement"
+          value={budgetsUnavailable ? 'Unavailable' : `${userLevelBudgets.length} scoped ${pluralize(userLevelBudgets.length, 'limit')}`}
+          detail="The most specific applicable user-level budget continues to apply. Budgets are not additive and apply across AI credit SKUs."
+        />
+        <IndexedFlowStep
+          index="6a"
+          tone="cyan"
+          icon={<Building2 className="h-4 w-4" aria-hidden="true" />}
+          title="Cost Center Overage Budget"
+          value={costCentersUnavailable
+            ? 'Unavailable'
+            : `${assignedCostCenters.length} assigned / ${activeCostCenters.length} active`}
+          detail="For users assigned to a cost center, metered AI credit charges can route to its overage budget when one exists and usage is not excluded."
+        />
+        <IndexedFlowStep
+          index="6b"
+          tone="cyan"
+          icon={<Route className="h-4 w-4" aria-hidden="true" />}
+          title="Organization Budget Route"
+          value={budgetsUnavailable
+            ? 'Unavailable'
+            : `${organizationBudgets.length} ${pluralize(organizationBudgets.length, 'budget')}`}
+          detail="Users without a cost center can route metered AI credit charges to the applicable organization budget."
+        />
+      </div>
+
+      <div className="my-2 flex justify-center" aria-hidden="true">
+        <ArrowDown className="h-4 w-4 text-slate-500" />
+      </div>
+
+      <div className="grid gap-2 lg:grid-cols-[1.2fr_1fr_1fr]">
+        <IndexedFlowStep
+          index="7"
+          tone="red"
+          icon={<CircleDollarSign className="h-4 w-4" aria-hidden="true" />}
+          title="Enterprise Spending Budget"
+          value={budgetsUnavailable
+            ? 'Unavailable'
+            : `${enterpriseBudgets.length} configured · $${enterpriseBudgetRemaining.toLocaleString()} remaining`}
+          detail="The enterprise spending budget acts as the universal backstop for remaining metered overage. Cost center and organization charges can count against it."
+        />
+        <IndexedFlowStep
+          index="8"
+          tone="red"
+          icon={<Gauge className="h-4 w-4" aria-hidden="true" />}
+          title="Enterprise Budget Exhausted?"
+          value={budgetsUnavailable
+            ? 'Unavailable'
+            : exhaustedEnterpriseBudgets.length > 0 ? 'Yes' : 'No'}
+          detail={`${exhaustedEnterpriseBudgets.length} of ${enterpriseBudgets.length} enterprise budgets have reached or exceeded their configured amount.`}
+        />
+        <IndexedFlowStep
+          index="9"
+          tone="purple"
+          icon={<CircleStop className="h-4 w-4" aria-hidden="true" />}
+          title="Stop Usage at Budget Limit?"
+          value={budgetsUnavailable
+            ? 'Unavailable'
+            : `${normalizedBudgets.filter(({ budget }) => budget.preventFurtherUsage).length} enabled`}
+          detail="When stop-at-limit is enabled, reaching the applicable budget can block further AI requests. Otherwise usage continues and remains billable."
+        />
+      </div>
+
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        <IndexedFlowStep
+          index="10a"
+          tone="red"
+          icon={<OctagonX className="h-4 w-4" aria-hidden="true" />}
+          title="AI Requests Blocked"
+          value={budgetsUnavailable ? 'Unavailable' : `${blockingBudgets.length} blocking ${pluralize(blockingBudgets.length, 'budget')}`}
+          detail="Requests are blocked only when an exhausted applicable budget is configured to prevent further usage."
+        />
+        <IndexedFlowStep
+          index="10b"
+          tone="orange"
+          icon={<CircleDollarSign className="h-4 w-4" aria-hidden="true" />}
+          title="Continue Billing"
+          value={budgetsUnavailable
+            ? 'Unavailable'
+            : blockingBudgets.length === 0 ? 'Current path' : 'Conditional'}
+          detail="If the applicable budget does not stop usage, requests continue and metered AI credit spending remains chargeable."
+        />
+      </div>
+    </section>
+  );
+}
+
+type FlowTone = 'orange' | 'purple' | 'cyan' | 'red';
+
+const flowToneClasses: Record<FlowTone, { border: string; badge: string; text: string }> = {
+  orange: { border: 'border-orange-700/70', badge: 'bg-orange-600', text: 'text-orange-300' },
+  purple: { border: 'border-violet-700/70', badge: 'bg-violet-600', text: 'text-violet-300' },
+  cyan: { border: 'border-cyan-700/70', badge: 'bg-cyan-700', text: 'text-cyan-300' },
+  red: { border: 'border-red-800/70', badge: 'bg-red-700', text: 'text-red-300' },
+};
+
+function IndexedFlowStep({
+  index,
+  tone,
+  icon,
+  title,
+  value,
+  detail,
+}: {
+  index: string;
+  tone: FlowTone;
+  icon: ReactNode;
+  title: string;
+  value: string;
+  detail: string;
+}) {
+  const colors = flowToneClasses[tone];
+  const tooltipId = `aic-flow-${index.replace(/[^a-z0-9]/gi, '').toLowerCase()}-help`;
+
+  return (
+    <HoverCallout
+      tooltipId={tooltipId}
+      tooltip={detail}
+      tooltipClassName={colors.border}
+      className={`min-w-0 rounded-md border bg-slate-900/40 p-2.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-slate-400 ${colors.border}`}
+    >
+      <div className="flex items-start gap-2">
+        <span className={`flex h-5 min-w-5 shrink-0 items-center justify-center rounded px-1 text-[10px] font-bold text-white ${colors.badge}`}>
+          {index}
+        </span>
+        <div className="min-w-0 flex-1">
+          <div className={`mb-1 flex items-center gap-1.5 ${colors.text}`}>
+            {icon}
+            <span className="truncate text-xs font-semibold">{title}</span>
+            <Info className="h-3 w-3 shrink-0 opacity-70" aria-hidden="true" />
+          </div>
+          <div className="truncate font-numeric text-xs text-slate-200">{value}</div>
+        </div>
+      </div>
+    </HoverCallout>
   );
 }
 
@@ -693,28 +908,91 @@ function PoolFlowStep({
   emphasized = false,
 }: PoolFlowStepProps) {
   return (
-    <div
+    <HoverCallout
+      tooltipId={tooltipId}
+      tooltip={tooltip}
       className={`group relative min-w-0 rounded-md border px-2.5 py-2 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-teal-400 ${
         emphasized
           ? 'border-blue-500/70 bg-blue-500/10'
           : 'border-slate-700 bg-slate-900/40'
       }`}
-      tabIndex={0}
-      aria-describedby={tooltipId}
     >
       <div className={`mb-1 flex items-center gap-1.5 ${emphasized ? 'text-blue-300' : 'text-slate-400'}`}>
         {icon}
         <span className="truncate text-[10px] font-semibold uppercase">{label}</span>
       </div>
       <div className="truncate text-xs font-semibold text-slate-100">{value}</div>
+    </HoverCallout>
+  );
+}
+
+interface HoverCalloutProps {
+  tooltipId: string;
+  tooltip: string;
+  children: ReactNode;
+  className?: string;
+  tooltipClassName?: string;
+}
+
+function HoverCallout({
+  tooltipId,
+  tooltip,
+  children,
+  className = '',
+  tooltipClassName = 'border-slate-600',
+}: HoverCalloutProps) {
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<{
+    left: number;
+    top: number;
+    placement: 'above' | 'below';
+  } | null>(null);
+
+  const showCallout = () => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const bounds = trigger.getBoundingClientRect();
+    const width = 256;
+    const edgePadding = 8;
+    const placement = bounds.top >= 128 ? 'above' : 'below';
+    setPosition({
+      left: Math.max(
+        edgePadding,
+        Math.min(window.innerWidth - width - edgePadding, bounds.left + bounds.width / 2 - width / 2)
+      ),
+      top: placement === 'above' ? bounds.top - 8 : bounds.bottom + 8,
+      placement,
+    });
+  };
+
+  return (
+    <>
       <div
-        id={tooltipId}
-        role="tooltip"
-        className="pointer-events-none absolute bottom-[calc(100%+8px)] left-1/2 z-20 hidden w-64 -translate-x-1/2 rounded-md border border-slate-600 bg-slate-950 px-3 py-2 text-left text-xs font-normal leading-5 text-slate-200 shadow-xl group-hover:block group-focus:block"
+        ref={triggerRef}
+        className={className}
+        tabIndex={0}
+        aria-describedby={position ? tooltipId : undefined}
+        onMouseEnter={showCallout}
+        onMouseLeave={() => setPosition(null)}
+        onFocus={showCallout}
+        onBlur={() => setPosition(null)}
       >
-        {tooltip}
+        {children}
       </div>
-    </div>
+      {position && createPortal(
+        <div
+          id={tooltipId}
+          role="tooltip"
+          className={`pointer-events-none fixed z-50 w-64 rounded-md border bg-slate-950 px-3 py-2 text-left text-xs font-normal leading-5 text-slate-200 shadow-xl ${tooltipClassName} ${
+            position.placement === 'above' ? '-translate-y-full' : ''
+          }`}
+          style={{ left: position.left, top: position.top }}
+        >
+          {tooltip}
+        </div>,
+        document.body
+      )}
+    </>
   );
 }
 
@@ -735,6 +1013,14 @@ function formatBudgetSku(sku: string): string {
 
 function formatBudgetScope(scope: string): string {
   return scope.replace(/_/g, ' ');
+}
+
+function normalizeBudgetScope(scope: string): string {
+  return scope.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function pluralize(count: number, singular: string): string {
+  return count === 1 ? singular : `${singular}s`;
 }
 
 function getIncludedCreditUtilization(used: number | null, limit: number): number {

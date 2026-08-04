@@ -219,6 +219,9 @@ async function runAssessment(
           0
         )
       : null;
+    const meteredCreditsConsumed = enterpriseUsageResult?.status === 'fulfilled'
+      ? enterpriseUsageResult.value.reduce((total, item) => total + item.netQuantity, 0)
+      : null;
     const includedCreditPools: AssessmentResult['includedCreditPools'] = totalLicenseCount > 0
       ? [{
           id: `enterprise:${enterpriseSlug}`,
@@ -317,6 +320,7 @@ async function runAssessment(
 
     const result: AssessmentResult = {
       totalCreditsConsumed,
+      meteredCreditsConsumed,
       byOrganization,
       byModel,
       topUsers,
