@@ -54,6 +54,7 @@
                 "github.vscode-github-actions",
                 "github.vscode-pull-request-github",
                 "davidanson.vscode-markdownlint",
+                "mefisto04.csv-viewer",
                 "streetsidesoftware.code-spell-checker"
             ],
             "settings": {

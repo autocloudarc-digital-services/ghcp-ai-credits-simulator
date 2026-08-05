@@ -125,6 +125,7 @@ flowchart LR
 | npm | Install and run the workspace packages |
 | Modern browser | Run the React UI and WebGL visualization |
 | VS Code 1.101 or later | Load the configured MCP servers and extension providers |
+| CSV Viewer VS Code extension (`mefisto04.csv-viewer`) | Preview, filter, and sort naming-standard CSV catalogs in a tabular grid |
 | GitHub Copilot access | Use GitHub, Azure, and Fabric MCP tools in Copilot Chat agent mode |
 | Azure account with an active subscription | Authenticate Azure MCP and access Azure resources |
 | Microsoft Fabric access | Use live Fabric and OneLake operations when tenant access is required |
