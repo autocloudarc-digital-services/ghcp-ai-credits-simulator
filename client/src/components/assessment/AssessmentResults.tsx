@@ -49,7 +49,9 @@ type BudgetSortKey =
   | 'percent'
   | 'alertRecipients';
 type BudgetSort = { key: BudgetSortKey; direction: 'ascending' | 'descending' };
-type GovernanceTab = 'budgets' | 'costCenters';
+type GovernanceTab = 'budgets' | 'costCenters' | 'organizations' | 'teams' | 'users';
+
+const governanceTabs: GovernanceTab[] = ['budgets', 'costCenters', 'organizations', 'teams', 'users'];
 
 export default function AssessmentResults({ result, totalIncludedPool }: AssessmentResultsProps) {
   const [budgetSort, setBudgetSort] = useState<BudgetSort | null>(null);
@@ -62,6 +64,9 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
   const includedCreditPool = (result.includedCreditPools ?? [])[0];
   const budgetsWarning = governanceDataWarnings.find((warning) => warning.source === 'budgets');
   const costCentersWarning = governanceDataWarnings.find((warning) => warning.source === 'costCenters');
+  const organizationsWarning = governanceDataWarnings.find((warning) => warning.source === 'organizations');
+  const teamsWarning = governanceDataWarnings.find((warning) => warning.source === 'teams');
+  const usersWarning = governanceDataWarnings.find((warning) => warning.source === 'users');
   const poolUtilization =
     totalIncludedPool > 0 ? Math.min(999, (result.totalCreditsConsumed / totalIncludedPool) * 100) : 0;
 
@@ -69,6 +74,11 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
   const modelTotal = modelEntries.reduce((s, [, v]) => s + v, 0);
 
   const orgEntries = Object.entries(result.byOrganization).sort((a, b) => b[1] - a[1]);
+  const organizationInventory = result.organizations ?? [];
+  const teamInventory = result.teams ?? [];
+  const userInventory = result.users ?? [];
+  const teamMemberships = result.teamMemberships ?? [];
+  const assessedUserCount = userInventory.length > 0 ? userInventory.length : result.topUsers.length;
   const visibleBudgets = sortBudgets(result.existingBudgets, budgetSort);
   const visibleCostCenters = result.existingCostCenters
     .filter((costCenter) => costCenterStatusFilter === 'all' || costCenter.state === costCenterStatusFilter)
@@ -101,13 +111,15 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
   ) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
     event.preventDefault();
-    const nextTab: GovernanceTab = event.key === 'Home'
-      ? 'budgets'
+    const currentIndex = governanceTabs.indexOf(currentTab);
+    const nextIndex = event.key === 'Home'
+      ? 0
       : event.key === 'End'
-        ? 'costCenters'
-        : currentTab === 'budgets'
-          ? 'costCenters'
-          : 'budgets';
+        ? governanceTabs.length - 1
+        : event.key === 'ArrowRight'
+          ? (currentIndex + 1) % governanceTabs.length
+          : (currentIndex - 1 + governanceTabs.length) % governanceTabs.length;
+    const nextTab = governanceTabs[nextIndex];
     setActiveGovernanceTab(nextTab);
     requestAnimationFrame(() => document.getElementById(`governance-tab-${nextTab}`)?.focus());
   };
@@ -350,40 +362,34 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
               role="tablist"
               aria-label="Governance configuration tables"
             >
-              <button
-                id="governance-tab-budgets"
-                type="button"
-                role="tab"
-                aria-selected={activeGovernanceTab === 'budgets'}
-                aria-controls="governance-panel-budgets"
-                tabIndex={activeGovernanceTab === 'budgets' ? 0 : -1}
-                onClick={() => setActiveGovernanceTab('budgets')}
-                onKeyDown={(event) => handleGovernanceTabKeyDown(event, 'budgets')}
-                className={`shrink-0 border-b-2 px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 ${
-                  activeGovernanceTab === 'budgets'
-                    ? 'border-teal-400 text-teal-300'
-                    : 'border-transparent text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                Budgets (monthly) · {result.existingBudgets.length}
-              </button>
-              <button
-                id="governance-tab-costCenters"
-                type="button"
-                role="tab"
-                aria-selected={activeGovernanceTab === 'costCenters'}
-                aria-controls="governance-panel-costCenters"
-                tabIndex={activeGovernanceTab === 'costCenters' ? 0 : -1}
-                onClick={() => setActiveGovernanceTab('costCenters')}
-                onKeyDown={(event) => handleGovernanceTabKeyDown(event, 'costCenters')}
-                className={`shrink-0 border-b-2 px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 ${
-                  activeGovernanceTab === 'costCenters'
-                    ? 'border-teal-400 text-teal-300'
-                    : 'border-transparent text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                Cost Centers · {result.existingCostCenters.length}
-              </button>
+              {governanceTabs.map((tab) => (
+                <button
+                  key={tab}
+                  id={`governance-tab-${tab}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeGovernanceTab === tab}
+                  aria-controls={`governance-panel-${tab}`}
+                  tabIndex={activeGovernanceTab === tab ? 0 : -1}
+                  onClick={() => setActiveGovernanceTab(tab)}
+                  onKeyDown={(event) => handleGovernanceTabKeyDown(event, tab)}
+                  className={`shrink-0 border-b-2 px-3 py-2 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 ${
+                    activeGovernanceTab === tab
+                      ? 'border-teal-400 text-teal-300'
+                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  {formatGovernanceTabLabel(tab, {
+                    budgets: result.existingBudgets.length,
+                    costCenters: result.existingCostCenters.length,
+                    organizations: organizationInventory.length > 0
+                      ? organizationInventory.length
+                      : orgEntries.length,
+                    teams: teamInventory.length,
+                    users: assessedUserCount,
+                  })}
+                </button>
+              ))}
             </div>
           </div>
 
@@ -642,6 +648,166 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
               )}
             </>
           )}
+          </div>
+
+          <div
+            id="governance-panel-organizations"
+            role="tabpanel"
+            aria-labelledby="governance-tab-organizations"
+            hidden={activeGovernanceTab !== 'organizations'}
+          >
+            {organizationInventory.length === 0 ? (
+              <p className={`text-sm ${organizationsWarning ? 'text-amber-300' : 'text-slate-500'}`}>
+                {organizationsWarning?.message ?? 'No organization inventory was reported.'}
+              </p>
+            ) : (
+              <div className="overflow-x-auto rounded-md border border-slate-700">
+                <table className="w-full min-w-[1120px] text-left text-sm">
+                  <caption className="sr-only">Assessed organization inventory and AI credit consumption</caption>
+                  <thead className="bg-slate-900/70 text-slate-200">
+                    <tr>
+                      <th className="px-3 py-2 font-semibold">Organization ID</th>
+                      <th className="px-3 py-2 font-semibold">Organization</th>
+                      <th className="px-3 py-2 font-semibold">Node ID</th>
+                      <th className="px-3 py-2 font-semibold">Slug</th>
+                      <th className="px-3 py-2 text-right font-semibold">Members</th>
+                      <th className="px-3 py-2 text-right font-semibold">Teams</th>
+                      <th className="px-3 py-2 text-right font-semibold">Credits consumed</th>
+                      <th className="px-3 py-2 text-right font-semibold">Share of total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700 text-slate-200">
+                    {organizationInventory.map((organization) => {
+                      const credits = result.byOrganization[organization.slug] ?? 0;
+                      const share = result.totalCreditsConsumed > 0
+                        ? (credits / result.totalCreditsConsumed) * 100
+                        : 0;
+                      return (
+                        <tr key={organization.slug}>
+                          <td className="px-3 py-3 font-numeric text-xs text-slate-400">{organization.id ?? 'Unavailable'}</td>
+                          <td className="max-w-80 break-words px-3 py-3 font-medium">{organization.name ?? organization.slug}</td>
+                          <td className="max-w-64 break-words px-3 py-3 font-numeric text-xs text-slate-400">{organization.nodeId ?? 'Unavailable'}</td>
+                          <td className="max-w-64 break-words px-3 py-3 text-slate-300">{organization.slug}</td>
+                          <td className="px-3 py-3 text-right font-numeric">{organization.memberCount?.toLocaleString() ?? 'Unavailable'}</td>
+                          <td className="px-3 py-3 text-right font-numeric">{organization.teamCount?.toLocaleString() ?? 'Unavailable'}</td>
+                          <td className="px-3 py-3 text-right font-numeric">{credits.toLocaleString()}</td>
+                          <td className="px-3 py-3 text-right font-numeric">{share.toFixed(1)}%</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div
+            id="governance-panel-teams"
+            role="tabpanel"
+            aria-labelledby="governance-tab-teams"
+            hidden={activeGovernanceTab !== 'teams'}
+          >
+            {teamInventory.length === 0 ? (
+              <p className={`text-sm ${teamsWarning ? 'text-amber-300' : 'text-slate-500'}`}>
+                {teamsWarning?.message ?? 'No teams were reported by the assessed organizations.'}
+              </p>
+            ) : (
+            <div className="overflow-x-auto rounded-md border border-slate-700">
+              <table className="w-full min-w-[1100px] text-left text-sm">
+                <caption className="sr-only">Organization team inventory and memberships</caption>
+                <thead className="bg-slate-900/70 text-slate-200">
+                  <tr>
+                    <th className="px-3 py-2 font-semibold">Team ID</th>
+                    <th className="px-3 py-2 font-semibold">Organization ID</th>
+                    <th className="px-3 py-2 font-semibold">Parent team ID</th>
+                    <th className="px-3 py-2 font-semibold">Slug</th>
+                    <th className="px-3 py-2 font-semibold">Name</th>
+                    <th className="px-3 py-2 font-semibold">Privacy</th>
+                    <th className="px-3 py-2 font-semibold">Permission</th>
+                    <th className="px-3 py-2 text-right font-semibold">Members</th>
+                    <th className="px-3 py-2 text-right font-semibold">Maintainers</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-700 text-slate-200">
+                  {teamInventory.map((team) => {
+                    const organizationId = organizationInventory.find(
+                      (organization) => organization.slug === team.organization
+                    )?.id;
+                    return (
+                      <tr key={`${team.organization}:${team.id}`}>
+                        <td className="px-3 py-3 font-numeric text-xs text-slate-400">{team.id}</td>
+                        <td className="px-3 py-3 font-numeric text-xs text-slate-400">{organizationId ?? 'Unavailable'}</td>
+                        <td className="px-3 py-3 font-numeric text-xs text-slate-400">{team.parentTeamId ?? 'None'}</td>
+                        <td className="max-w-64 break-words px-3 py-3 text-slate-300">{team.slug}</td>
+                        <td className="max-w-80 break-words px-3 py-3 font-medium">{team.name}</td>
+                        <td className="px-3 py-3 text-slate-300">{team.privacy}</td>
+                        <td className="px-3 py-3 text-slate-300">{team.permission}</td>
+                        <td className="px-3 py-3 text-right font-numeric">{team.memberCount.toLocaleString()}</td>
+                        <td className="px-3 py-3 text-right font-numeric">
+                          {teamMemberships.filter(
+                            (membership) => membership.teamId === team.id
+                              && membership.organization === team.organization
+                              && membership.role === 'maintainer'
+                          ).length.toLocaleString()}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            )}
+          </div>
+
+          <div
+            id="governance-panel-users"
+            role="tabpanel"
+            aria-labelledby="governance-tab-users"
+            hidden={activeGovernanceTab !== 'users'}
+          >
+            {userInventory.length === 0 ? (
+              <p className={`text-sm ${usersWarning ? 'text-amber-300' : 'text-slate-500'}`}>
+                {usersWarning?.message ?? 'No organization members were reported.'}
+              </p>
+            ) : (
+              <div className="overflow-x-auto rounded-md border border-slate-700">
+                <table className="w-full min-w-[1180px] text-left text-sm">
+                  <caption className="sr-only">Organization member inventory with team memberships and AI credit consumption</caption>
+                  <thead className="bg-slate-900/70 text-slate-200">
+                    <tr>
+                      <th className="px-3 py-2 font-semibold">User ID</th>
+                      <th className="px-3 py-2 font-semibold">Login</th>
+                      <th className="px-3 py-2 font-semibold">Display name</th>
+                      <th className="px-3 py-2 font-semibold">Email</th>
+                      <th className="px-3 py-2 font-semibold">Status</th>
+                      <th className="px-3 py-2 font-semibold">Organizations</th>
+                      <th className="px-3 py-2 font-semibold">Teams</th>
+                      <th className="px-3 py-2 text-right font-semibold">Credits consumed</th>
+                      <th className="px-3 py-2 text-right font-semibold">Share of total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700 text-slate-200">
+                    {userInventory.map((user) => (
+                      <tr key={user.id}>
+                        <td className="max-w-72 break-words px-3 py-3 font-numeric text-xs text-slate-400">{user.id}</td>
+                        <td className="px-3 py-3 font-medium">{user.login}</td>
+                        <td className="px-3 py-3 text-slate-400">{user.displayName ?? 'Not provided by member inventory'}</td>
+                        <td className="px-3 py-3 text-slate-400">{user.email ?? 'Not provided by member inventory'}</td>
+                        <td className="px-3 py-3 text-slate-300">{user.status}</td>
+                        <td className="max-w-72 break-words px-3 py-3 text-slate-300">{user.organizations.join(', ')}</td>
+                        <td className="max-w-96 break-words px-3 py-3 text-slate-300">
+                          {user.teams.length > 0
+                            ? user.teams.map((team) => `${team.organization}/${team.slug}`).join(', ')
+                            : 'None'}
+                        </td>
+                        <td className="px-3 py-3 text-right font-numeric">{user.creditsConsumed?.toLocaleString() ?? 'Not attributed'}</td>
+                        <td className="px-3 py-3 text-right font-numeric">{user.percentOfTotal !== null ? `${user.percentOfTotal.toFixed(1)}%` : 'Not attributed'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1183,6 +1349,24 @@ function formatBudgetSku(sku: string): string {
 
 function formatBudgetScope(scope: string): string {
   return scope.replace(/_/g, ' ');
+}
+
+function formatGovernanceTabLabel(
+  tab: GovernanceTab,
+  counts: Record<GovernanceTab, number>
+): string {
+  switch (tab) {
+    case 'budgets':
+      return `Budgets (monthly) · ${counts.budgets}`;
+    case 'costCenters':
+      return `Cost Centers · ${counts.costCenters}`;
+    case 'organizations':
+      return `Organizations · ${counts.organizations}`;
+    case 'teams':
+      return `Teams · ${counts.teams}`;
+    case 'users':
+      return `Users · ${counts.users}`;
+  }
 }
 
 function normalizeBudgetScope(scope: string): string {

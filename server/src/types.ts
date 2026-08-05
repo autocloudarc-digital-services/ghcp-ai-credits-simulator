@@ -102,11 +102,59 @@ export interface AssessmentResult {
   includedCreditPools: IncludedCreditPool[];
   existingBudgets: GitHubBudget[];
   existingCostCenters: GitHubCostCenter[];
+  organizations?: GitHubOrganizationInventory[];
+  teams?: GitHubTeamInventory[];
+  users?: GitHubUserInventory[];
+  teamMemberships?: GitHubTeamMembership[];
 }
 
 export interface GovernanceDataWarning {
-  source: 'budgets' | 'costCenters' | 'licenses' | 'includedCredits';
+  source: 'budgets' | 'costCenters' | 'licenses' | 'includedCredits' | 'organizations' | 'teams' | 'users';
   message: string;
+}
+
+export interface GitHubOrganizationInventory {
+  id: number | null;
+  nodeId: string | null;
+  slug: string;
+  name: string | null;
+  memberCount: number | null;
+  teamCount: number | null;
+}
+
+export interface GitHubTeamInventory {
+  id: number;
+  nodeId: string;
+  organization: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  privacy: string;
+  permission: string;
+  parentTeamId: number | null;
+  memberCount: number;
+}
+
+export interface GitHubUserInventory {
+  id: number;
+  nodeId: string;
+  login: string;
+  displayName: string | null;
+  email: string | null;
+  status: string;
+  organizations: string[];
+  teams: Array<{ id: number; name: string; slug: string; organization: string }>;
+  creditsConsumed: number | null;
+  percentOfTotal: number | null;
+}
+
+export interface GitHubTeamMembership {
+  teamId: number;
+  userId: number;
+  login: string;
+  organization: string;
+  role: 'member' | 'maintainer';
+  state: 'active';
 }
 
 export interface IncludedCreditPool {

@@ -8,9 +8,18 @@ import {
   getEnterpriseAICreditUsage,
   getEnterpriseCopilotLicenseCounts,
   getExistingBudgets,
+  getOrganizationDetails,
+  getOrganizationMembers,
+  getOrganizationTeams,
+  getTeamMembers,
   GitHubBillingServiceError,
 } from '../services/githubBillingService';
-import { AssessmentResult, DailyBurnPoint, UserConsumption } from '../types';
+import {
+  AssessmentResult,
+  DailyBurnPoint,
+  GitHubTeamMembership,
+  UserConsumption,
+} from '../types';
 
 const router = Router();
 
@@ -84,6 +93,33 @@ function buildGovernanceGaps(
   return gaps;
 }
 
+async function settleInBatches<T, TResult>(
+  items: T[],
+  batchSize: number,
+  operation: (item: T) => Promise<TResult>
+): Promise<PromiseSettledResult<TResult>[]> {
+  const results: PromiseSettledResult<TResult>[] = [];
+  for (let index = 0; index < items.length; index += batchSize) {
+    results.push(...await Promise.allSettled(items.slice(index, index + batchSize).map(operation)));
+  }
+  return results;
+}
+
+async function collectOrganizationInventory(org: string, session: Session) {
+  const [detailsResult, membersResult, teamsResult] = await Promise.allSettled([
+    getOrganizationDetails(org, session),
+    getOrganizationMembers(org, session),
+    getOrganizationTeams(org, session),
+  ]);
+  const teams = teamsResult.status === 'fulfilled' ? teamsResult.value : [];
+  const teamMemberResults = await settleInBatches(
+    teams,
+    5,
+    async (team) => ({ team, members: await getTeamMembers(org, team.slug, session) })
+  );
+  return { org, detailsResult, membersResult, teamsResult, teamMemberResults };
+}
+
 async function runAssessment(
   jobId: string,
   enterpriseSlug: string,
@@ -137,6 +173,7 @@ async function runAssessment(
       licenseInventoryResults,
       enterpriseLicenseResults,
       enterpriseUsageResults,
+      organizationInventoryResults,
     ] = await Promise.all([
       Promise.allSettled([
         getExistingBudgets(enterpriseSlug, session, enterpriseBillingToken),
@@ -163,6 +200,7 @@ async function runAssessment(
           enterpriseBillingToken
         ),
       ]),
+      Promise.all(orgsToAssess.map((org) => collectOrganizationInventory(org, session))),
     ]);
     const [budgetsResult, costCentersResult] = governanceResults;
     const enterpriseLicenseResult = enterpriseLicenseResults[0];
@@ -182,6 +220,128 @@ async function runAssessment(
     const totalCreditsConsumed = enterpriseUsage
       ? enterpriseUsage.reduce((total, item) => total + item.grossQuantity, 0)
       : Object.values(byOrganization).reduce((total, value) => total + value, 0);
+
+    const organizationInventory: NonNullable<AssessmentResult['organizations']> = [];
+    const teams: NonNullable<AssessmentResult['teams']> = [];
+    const teamMemberships: GitHubTeamMembership[] = [];
+    const usersById = new Map<number, {
+      id: number;
+      nodeId: string;
+      login: string;
+      organizations: Set<string>;
+      teams: Map<number, { id: number; name: string; slug: string; organization: string }>;
+    }>();
+    const organizationInventoryFailures: string[] = [];
+    const userInventoryFailures: string[] = [];
+    const teamInventoryFailures: string[] = [];
+
+    for (const inventory of organizationInventoryResults) {
+      const details = inventory.detailsResult.status === 'fulfilled'
+        ? inventory.detailsResult.value
+        : null;
+      const members = inventory.membersResult.status === 'fulfilled'
+        ? inventory.membersResult.value
+        : [];
+      const organizationTeams = inventory.teamsResult.status === 'fulfilled'
+        ? inventory.teamsResult.value
+        : [];
+      organizationInventory.push({
+        id: details?.id ?? null,
+        nodeId: details?.nodeId ?? null,
+        slug: inventory.org,
+        name: details?.name ?? null,
+        memberCount: inventory.membersResult.status === 'fulfilled' ? members.length : null,
+        teamCount: inventory.teamsResult.status === 'fulfilled' ? organizationTeams.length : null,
+      });
+      if (!details) organizationInventoryFailures.push(inventory.org);
+      if (inventory.membersResult.status === 'rejected') userInventoryFailures.push(inventory.org);
+      if (inventory.teamsResult.status === 'rejected') teamInventoryFailures.push(inventory.org);
+
+      for (const member of members) {
+        const user = usersById.get(member.id) ?? {
+          id: member.id,
+          nodeId: member.nodeId,
+          login: member.login,
+          organizations: new Set<string>(),
+          teams: new Map(),
+        };
+        user.organizations.add(inventory.org);
+        usersById.set(member.id, user);
+      }
+
+      const memberCountByTeam = new Map<number, number>();
+      for (const teamMemberResult of inventory.teamMemberResults) {
+        if (teamMemberResult.status === 'rejected') continue;
+        const { team, members: teamMembers } = teamMemberResult.value;
+        memberCountByTeam.set(team.id, teamMembers.length);
+        for (const member of teamMembers) {
+          teamMemberships.push({
+            teamId: team.id,
+            userId: member.id,
+            login: member.login,
+            organization: inventory.org,
+            role: member.role,
+            state: 'active',
+          });
+          const user = usersById.get(member.id) ?? {
+            id: member.id,
+            nodeId: member.nodeId,
+            login: member.login,
+            organizations: new Set<string>(),
+            teams: new Map(),
+          };
+          user.organizations.add(inventory.org);
+          user.teams.set(team.id, {
+            id: team.id,
+            name: team.name,
+            slug: team.slug,
+            organization: inventory.org,
+          });
+          usersById.set(member.id, user);
+        }
+      }
+      const failedTeamMemberships = inventory.teamMemberResults.filter(
+        (result) => result.status === 'rejected'
+      ).length;
+      if (failedTeamMemberships > 0) {
+        teamInventoryFailures.push(`${inventory.org} (${failedTeamMemberships} membership lists)`);
+      }
+
+      teams.push(...organizationTeams.map((team) => ({
+        id: team.id,
+        nodeId: team.nodeId,
+        organization: inventory.org,
+        name: team.name,
+        slug: team.slug,
+        description: team.description,
+        privacy: team.privacy,
+        permission: team.permission,
+        parentTeamId: team.parentTeamId,
+        memberCount: memberCountByTeam.get(team.id) ?? 0,
+      })));
+    }
+
+    const users: NonNullable<AssessmentResult['users']> = Array.from(usersById.values())
+      .map((user) => {
+        const creditsConsumed = userTotals.get(String(user.id)) ?? null;
+        return {
+          id: user.id,
+          nodeId: user.nodeId,
+          login: user.login,
+          displayName: null,
+          email: null,
+          status: 'active',
+          organizations: Array.from(user.organizations).sort(),
+          teams: Array.from(user.teams.values()).sort((first, second) =>
+            first.name.localeCompare(second.name)
+          ),
+          creditsConsumed,
+          percentOfTotal: creditsConsumed !== null && totalCreditsConsumed > 0
+            ? (creditsConsumed / totalCreditsConsumed) * 100
+            : null,
+        };
+      })
+      .sort((first, second) => first.login.localeCompare(second.login));
     const topUsers: UserConsumption[] = Array.from(userTotals.entries())
       .sort((first, second) => second[1] - first[1])
       .slice(0, 10)
@@ -331,6 +491,24 @@ async function runAssessment(
         message: `Included AI credit data is incomplete: ${includedCreditWarnings.join('; ')}.`,
       });
     }
+    if (organizationInventoryFailures.length > 0) {
+      governanceDataWarnings.push({
+        source: 'organizations',
+        message: `Organization details are unavailable for ${organizationInventoryFailures.join(', ')}.`,
+      });
+    }
+    if (userInventoryFailures.length > 0) {
+      governanceDataWarnings.push({
+        source: 'users',
+        message: `Organization member inventory is unavailable for ${userInventoryFailures.join(', ')}.`,
+      });
+    }
+    if (teamInventoryFailures.length > 0) {
+      governanceDataWarnings.push({
+        source: 'teams',
+        message: `Team inventory is incomplete for ${teamInventoryFailures.join(', ')}.`,
+      });
+    }
 
     const governanceGaps = buildGovernanceGaps(
       existingBudgets,
@@ -353,6 +531,10 @@ async function runAssessment(
       includedCreditPools,
       existingBudgets,
       existingCostCenters,
+      organizations: organizationInventory,
+      teams,
+      users,
+      teamMemberships,
     };
 
     session.assessmentCompleted = true;

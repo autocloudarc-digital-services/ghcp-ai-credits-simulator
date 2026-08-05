@@ -1,0 +1,130 @@
+erDiagram
+    ENTERPRISE ||--o{ ORGANIZATION : owns
+    ENTERPRISE ||--o{ COST_CENTER : defines
+    ENTERPRISE ||--o{ BUDGET : governs
+    ENTERPRISE ||--o{ AI_CREDIT_USAGE : aggregates
+
+    ORGANIZATION ||--o{ TEAM : contains
+    ORGANIZATION ||--o{ ORGANIZATION_MEMBERSHIP : has
+    ORGANIZATION ||--o{ AI_CREDIT_USAGE : attributes
+
+    TEAM ||--o{ TEAM : parent_of
+    TEAM ||--o{ TEAM_MEMBERSHIP : has
+
+    USER ||--o{ ORGANIZATION_MEMBERSHIP : joins
+    USER ||--o{ TEAM_MEMBERSHIP : joins
+    USER ||--o{ AI_CREDIT_USAGE : consumes
+
+    COST_CENTER ||--o{ COST_CENTER_RESOURCE : owns
+    COST_CENTER ||--o{ BUDGET_ASSIGNMENT : scopes
+    COST_CENTER ||--o{ AI_CREDIT_USAGE : charged_to
+
+    BUDGET ||--o{ BUDGET_ASSIGNMENT : applies_through
+    BUDGET ||--o{ AI_CREDIT_USAGE : constrains
+
+    ORGANIZATION ||--o{ COST_CENTER_RESOURCE : mapped_resource
+    TEAM ||--o{ COST_CENTER_RESOURCE : mapped_resource
+    USER ||--o{ COST_CENTER_RESOURCE : mapped_resource
+
+    ORGANIZATION ||--o{ BUDGET_ASSIGNMENT : budget_scope
+    TEAM ||--o{ BUDGET_ASSIGNMENT : budget_scope
+    USER ||--o{ BUDGET_ASSIGNMENT : budget_scope
+
+    ENTERPRISE {
+        string enterprise_id PK
+        string slug
+        string name
+    }
+
+    ORGANIZATION {
+        string organization_id PK
+        string enterprise_id FK
+        string slug
+        string name
+    }
+
+    TEAM {
+        string team_id PK
+        string organization_id FK
+        string parent_team_id FK
+        string slug
+        string name
+    }
+
+    USER {
+        string user_id PK
+        string login
+        string display_name
+        string email
+        string status
+    }
+
+    ORGANIZATION_MEMBERSHIP {
+        string organization_id FK
+        string user_id FK
+        string role
+        string state
+    }
+
+    TEAM_MEMBERSHIP {
+        string team_id FK
+        string user_id FK
+        string role
+        string state
+    }
+
+    COST_CENTER {
+        string cost_center_id PK
+        string enterprise_id FK
+        string name
+        string state
+        boolean ai_credit_pool_enabled
+        decimal target_amount
+        decimal current_amount
+    }
+
+    COST_CENTER_RESOURCE {
+        string cost_center_id FK
+        string resource_type
+        string resource_name
+        string organization_id FK
+        string team_id FK
+        string user_id FK
+    }
+
+    BUDGET {
+        string budget_id PK
+        string enterprise_id FK
+        string name
+        string scope_type
+        string sku
+        decimal limit_amount
+        decimal used_amount
+        boolean prevent_further_usage
+        boolean alerts_enabled
+    }
+
+    BUDGET_ASSIGNMENT {
+        string budget_id FK
+        string scope_type
+        string enterprise_id FK
+        string organization_id FK
+        string team_id FK
+        string user_id FK
+        string cost_center_id FK
+    }
+
+    AI_CREDIT_USAGE {
+        string usage_id PK
+        string enterprise_id FK
+        string organization_id FK
+        string user_id FK
+        string cost_center_id FK
+        string budget_id FK
+        string sku
+        string model
+        decimal gross_quantity
+        decimal discount_quantity
+        decimal net_quantity
+        date usage_date
+    }

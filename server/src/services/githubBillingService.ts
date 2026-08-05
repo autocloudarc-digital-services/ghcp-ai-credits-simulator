@@ -7,6 +7,7 @@ import { getTokenFromSession } from './githubAuthService';
 const GITHUB_API_BASE_URL = 'https://api.github.com';
 const API_VERSION = '2026-03-10';
 const MAX_RETRIES = 3;
+const MAX_PAGES = 100;
 const RETRYABLE_STATUS_CODES = new Set([429, 503]);
 
 export class GitHubBillingServiceError extends Error {
@@ -29,6 +30,7 @@ function sleep(ms: number): Promise<void> {
 // separators, or other characters that could redirect the request to an
 // unintended host or path.
 const GITHUB_SLUG_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,38}$/;
+const GITHUB_TEAM_SLUG_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9-]{0,99}$/;
 
 /**
  * Performs an authenticated GET request against the GitHub REST API using
@@ -88,6 +90,158 @@ async function authenticatedGet<T>(
     }
   }
   throw lastError instanceof Error ? lastError : new GitHubBillingServiceError('Unknown error');
+}
+
+async function authenticatedGetAll<T>(
+  session: Session,
+  slug: string,
+  buildPath: (validatedSlug: string) => string,
+  params?: Record<string, string | number | undefined>
+): Promise<T[]> {
+  const items: T[] = [];
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const pageItems = await authenticatedGet<T[]>(session, slug, buildPath, {
+      ...params,
+      per_page: 100,
+      page,
+    });
+    items.push(...pageItems);
+    if (pageItems.length < 100) return items;
+  }
+  throw new GitHubBillingServiceError(
+    `GitHub API pagination exceeded ${MAX_PAGES} pages for ${buildPath(slug)}.`,
+    422
+  );
+}
+
+export interface GitHubOrganizationDetails {
+  id: number;
+  nodeId: string;
+  login: string;
+  name: string | null;
+}
+
+export interface GitHubOrganizationMember {
+  id: number;
+  nodeId: string;
+  login: string;
+}
+
+export interface GitHubTeamMember extends GitHubOrganizationMember {
+  role: 'member' | 'maintainer';
+}
+
+export interface GitHubTeam {
+  id: number;
+  nodeId: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  privacy: string;
+  permission: string;
+  parentTeamId: number | null;
+}
+
+interface GitHubOrganizationDetailsResponse {
+  id: number;
+  node_id: string;
+  login: string;
+  name: string | null;
+}
+
+interface GitHubMemberResponse {
+  id: number;
+  node_id: string;
+  login: string;
+}
+
+interface GitHubTeamResponse {
+  id: number;
+  node_id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  privacy: string;
+  permission: string;
+  parent?: { id: number } | null;
+}
+
+export async function getOrganizationDetails(
+  org: string,
+  session: Session
+): Promise<GitHubOrganizationDetails> {
+  const organization = await authenticatedGet<GitHubOrganizationDetailsResponse>(
+    session,
+    org,
+    (validatedOrg) => `/orgs/${validatedOrg}`
+  );
+  return {
+    id: organization.id,
+    nodeId: organization.node_id,
+    login: organization.login,
+    name: organization.name,
+  };
+}
+
+export async function getOrganizationMembers(
+  org: string,
+  session: Session
+): Promise<GitHubOrganizationMember[]> {
+  const members = await authenticatedGetAll<GitHubMemberResponse>(
+    session,
+    org,
+    (validatedOrg) => `/orgs/${validatedOrg}/members`,
+    { filter: 'all', role: 'all' }
+  );
+  return members.map((member) => ({
+    id: member.id,
+    nodeId: member.node_id,
+    login: member.login,
+  }));
+}
+
+export async function getOrganizationTeams(
+  org: string,
+  session: Session
+): Promise<GitHubTeam[]> {
+  const teams = await authenticatedGetAll<GitHubTeamResponse>(
+    session,
+    org,
+    (validatedOrg) => `/orgs/${validatedOrg}/teams`
+  );
+  return teams.map((team) => ({
+    id: team.id,
+    nodeId: team.node_id,
+    name: team.name,
+    slug: team.slug,
+    description: team.description,
+    privacy: team.privacy,
+    permission: team.permission,
+    parentTeamId: team.parent?.id ?? null,
+  }));
+}
+
+export async function getTeamMembers(
+  org: string,
+  teamSlug: string,
+  session: Session
+): Promise<GitHubTeamMember[]> {
+  if (!GITHUB_TEAM_SLUG_PATTERN.test(teamSlug)) {
+    throw new GitHubBillingServiceError(`Invalid GitHub team slug: "${teamSlug}"`, 400);
+  }
+  const buildPath = (validatedOrg: string) =>
+    `/orgs/${validatedOrg}/teams/${teamSlug}/members`;
+  const [members, maintainers] = await Promise.all([
+    authenticatedGetAll<GitHubMemberResponse>(session, org, buildPath, { role: 'all' }),
+    authenticatedGetAll<GitHubMemberResponse>(session, org, buildPath, { role: 'maintainer' }),
+  ]);
+  const maintainerIds = new Set(maintainers.map((maintainer) => maintainer.id));
+  return members.map((member) => ({
+    id: member.id,
+    nodeId: member.node_id,
+    login: member.login,
+    role: maintainerIds.has(member.id) ? 'maintainer' : 'member',
+  }));
 }
 
 export interface AICreditUsageEntry {
