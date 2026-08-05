@@ -104,11 +104,21 @@ async function runAssessment(
     const byModel: Record<string, number> = {};
     const includedUsageByOrganization = new Map<string, number>();
     const userTotals = new Map<string, number>();
+    const unavailableUsageOrganizations: string[] = [];
 
     const orgsToAssess = organizations.length > 0 ? organizations : [enterpriseSlug];
 
     for (const org of orgsToAssess) {
-      const usage = await getAICreditUsage(org, session, year, month);
+      let usage;
+      try {
+        usage = await getAICreditUsage(org, session, year, month);
+      } catch (error) {
+        if (error instanceof GitHubBillingServiceError && error.status === 404) {
+          unavailableUsageOrganizations.push(org);
+          continue;
+        }
+        throw error;
+      }
       byOrganization[org] = usage.reduce((total, item) => total + item.grossQuantity, 0);
       includedUsageByOrganization.set(
         org.toLowerCase(),
@@ -121,28 +131,6 @@ async function runAssessment(
         }
       }
     }
-
-    const totalCreditsConsumed = Object.values(byOrganization).reduce((s, v) => s + v, 0);
-
-    const topUsers: UserConsumption[] = Array.from(userTotals.entries())
-      .sort((first, second) => second[1] - first[1])
-      .slice(0, 10)
-      .map(([userId, creditsConsumed], index) => ({
-        userId,
-        displayName: `Developer ${String(index + 1).padStart(2, '0')}`,
-        creditsConsumed,
-        percentOfTotal: totalCreditsConsumed > 0
-          ? (creditsConsumed / totalCreditsConsumed) * 100
-          : 0,
-      }));
-
-    const dailyTrend: DailyBurnPoint[] = Array.from({ length: periodDays }, (_, i) => {
-      const day = i + 1;
-      const credits = periodDays > 0 ? totalCreditsConsumed / periodDays : 0;
-      return { day, credits, cumulative: credits * day };
-    });
-
-    const concentrationRiskScore = scoreConcentrationRisk(topUsers, totalCreditsConsumed);
 
     const [
       governanceResults,
@@ -182,6 +170,35 @@ async function runAssessment(
 
     const budgetsAvailable = budgetsResult.status === 'fulfilled';
     const costCentersAvailable = costCentersResult.status === 'fulfilled';
+    const enterpriseUsage = enterpriseUsageResult?.status === 'fulfilled'
+      ? enterpriseUsageResult.value
+      : null;
+    if (enterpriseUsage) {
+      for (const model of Object.keys(byModel)) delete byModel[model];
+      for (const entry of enterpriseUsage) {
+        byModel[entry.model] = (byModel[entry.model] ?? 0) + entry.grossQuantity;
+      }
+    }
+    const totalCreditsConsumed = enterpriseUsage
+      ? enterpriseUsage.reduce((total, item) => total + item.grossQuantity, 0)
+      : Object.values(byOrganization).reduce((total, value) => total + value, 0);
+    const topUsers: UserConsumption[] = Array.from(userTotals.entries())
+      .sort((first, second) => second[1] - first[1])
+      .slice(0, 10)
+      .map(([userId, creditsConsumed], index) => ({
+        userId,
+        displayName: `Developer ${String(index + 1).padStart(2, '0')}`,
+        creditsConsumed,
+        percentOfTotal: totalCreditsConsumed > 0
+          ? (creditsConsumed / totalCreditsConsumed) * 100
+          : 0,
+      }));
+    const dailyTrend: DailyBurnPoint[] = Array.from({ length: periodDays }, (_, index) => {
+      const day = index + 1;
+      const credits = periodDays > 0 ? totalCreditsConsumed / periodDays : 0;
+      return { day, credits, cumulative: credits * day };
+    });
+    const concentrationRiskScore = scoreConcentrationRisk(topUsers, totalCreditsConsumed);
     const licenseCountsByOrganization = new Map<string, Map<string, number>>();
     const unavailableLicenseOrganizations: string[] = [];
     licenseInventoryResults.forEach((licenseResult, index) => {
@@ -300,6 +317,11 @@ async function runAssessment(
       });
     }
     const includedCreditWarnings: string[] = [];
+    if (unavailableUsageOrganizations.length > 0) {
+      includedCreditWarnings.push(
+        `organization usage attribution is unavailable for ${unavailableUsageOrganizations.join(', ')}`
+      );
+    }
     if (!enterpriseUsageResult || enterpriseUsageResult.status === 'rejected') {
       includedCreditWarnings.push('enterprise included-credit consumption is unavailable');
     }
