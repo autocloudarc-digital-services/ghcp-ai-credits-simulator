@@ -130,7 +130,7 @@ export interface GitHubTeamInventory {
 }
 
 export interface GitHubUserInventory {
-  id: number;
+  id: number | null;
   nodeId: string;
   login: string;
   displayName: string | null;

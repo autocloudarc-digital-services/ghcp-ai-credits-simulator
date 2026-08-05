@@ -58,9 +58,13 @@ export default function ApiConfigForm({ onSubmit, isSubmitting, disabled = false
           type="text"
           {...register('enterpriseSlug')}
           placeholder="autocloudarc"
+          aria-describedby="enterprise-slug-note"
           aria-invalid={Boolean(errors.enterpriseSlug)}
           className="bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-400"
         />
+        <span id="enterprise-slug-note" className="text-xs leading-relaxed text-slate-500">
+          Use the enterprise URL slug from github.com/enterprises/&lt;slug&gt;. It is used to discover the enterprise organization and member directory.
+        </span>
         {errors.enterpriseSlug && <span className="text-xs text-red-400">{errors.enterpriseSlug.message}</span>}
       </label>
       <label className="flex flex-col gap-1">
@@ -71,9 +75,13 @@ export default function ApiConfigForm({ onSubmit, isSubmitting, disabled = false
           type="text"
           {...register('organizations')}
           placeholder="autocloudarc-digital-services, autocloudarc-space-fleet"
+          aria-describedby="organizations-note"
           aria-invalid={Boolean(errors.organizations)}
           className="bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-400"
         />
+        <span id="organizations-note" className="text-xs leading-relaxed text-slate-500">
+          These organizations define the billing assessment scope. Governance inventory includes all organizations discovered from the enterprise.
+        </span>
         {errors.organizations && <span className="text-xs text-red-400">{errors.organizations.message}</span>}
       </label>
       <label className="flex flex-col gap-1">

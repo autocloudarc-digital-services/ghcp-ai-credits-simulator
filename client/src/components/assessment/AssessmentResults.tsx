@@ -67,6 +67,18 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
   const organizationsWarning = governanceDataWarnings.find((warning) => warning.source === 'organizations');
   const teamsWarning = governanceDataWarnings.find((warning) => warning.source === 'teams');
   const usersWarning = governanceDataWarnings.find((warning) => warning.source === 'users');
+  const organizationWarningMessage = governanceDataWarnings
+    .filter((warning) => warning.source === 'organizations')
+    .map((warning) => warning.message)
+    .join(' ');
+  const teamWarningMessage = governanceDataWarnings
+    .filter((warning) => warning.source === 'teams')
+    .map((warning) => warning.message)
+    .join(' ');
+  const userWarningMessage = governanceDataWarnings
+    .filter((warning) => warning.source === 'users')
+    .map((warning) => warning.message)
+    .join(' ');
   const poolUtilization =
     totalIncludedPool > 0 ? Math.min(999, (result.totalCreditsConsumed / totalIncludedPool) * 100) : 0;
 
@@ -181,8 +193,8 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
             <AlertTriangle className="w-4 h-4" /> Some enterprise governance data is unavailable
           </div>
           <ul className="mt-2 space-y-1">
-            {governanceDataWarnings.map((warning) => (
-              <li key={warning.source} className="text-xs break-words">
+            {governanceDataWarnings.map((warning, index) => (
+              <li key={`${warning.source}:${index}`} className="text-xs break-words">
                 {warning.message}
               </li>
             ))}
@@ -656,9 +668,12 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
             aria-labelledby="governance-tab-organizations"
             hidden={activeGovernanceTab !== 'organizations'}
           >
+            {organizationWarningMessage && organizationInventory.length > 0 && (
+              <p className="mb-3 text-sm text-amber-300">{organizationWarningMessage}</p>
+            )}
             {organizationInventory.length === 0 ? (
               <p className={`text-sm ${organizationsWarning ? 'text-amber-300' : 'text-slate-500'}`}>
-                {organizationsWarning?.message ?? 'No organization inventory was reported.'}
+                {organizationWarningMessage || 'No organization inventory was reported.'}
               </p>
             ) : (
               <div className="overflow-x-auto rounded-md border border-slate-700">
@@ -707,9 +722,12 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
             aria-labelledby="governance-tab-teams"
             hidden={activeGovernanceTab !== 'teams'}
           >
+            {teamWarningMessage && teamInventory.length > 0 && (
+              <p className="mb-3 text-sm text-amber-300">{teamWarningMessage}</p>
+            )}
             {teamInventory.length === 0 ? (
               <p className={`text-sm ${teamsWarning ? 'text-amber-300' : 'text-slate-500'}`}>
-                {teamsWarning?.message ?? 'No teams were reported by the assessed organizations.'}
+                {teamWarningMessage || 'No teams were reported by the assessed organizations.'}
               </p>
             ) : (
             <div className="overflow-x-auto rounded-md border border-slate-700">
@@ -765,9 +783,12 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
             aria-labelledby="governance-tab-users"
             hidden={activeGovernanceTab !== 'users'}
           >
+            {userWarningMessage && userInventory.length > 0 && (
+              <p className="mb-3 text-sm text-amber-300">{userWarningMessage}</p>
+            )}
             {userInventory.length === 0 ? (
               <p className={`text-sm ${usersWarning ? 'text-amber-300' : 'text-slate-500'}`}>
-                {usersWarning?.message ?? 'No organization members were reported.'}
+                {userWarningMessage || 'No enterprise members were reported.'}
               </p>
             ) : (
               <div className="overflow-x-auto rounded-md border border-slate-700">
@@ -788,8 +809,8 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
                   </thead>
                   <tbody className="divide-y divide-slate-700 text-slate-200">
                     {userInventory.map((user) => (
-                      <tr key={user.id}>
-                        <td className="max-w-72 break-words px-3 py-3 font-numeric text-xs text-slate-400">{user.id}</td>
+                      <tr key={user.nodeId}>
+                        <td className="max-w-72 break-words px-3 py-3 font-numeric text-xs text-slate-400">{user.id ?? 'Managed account'}</td>
                         <td className="px-3 py-3 font-medium">{user.login}</td>
                         <td className="px-3 py-3 text-slate-400">{user.displayName ?? 'Not provided by member inventory'}</td>
                         <td className="px-3 py-3 text-slate-400">{user.email ?? 'Not provided by member inventory'}</td>

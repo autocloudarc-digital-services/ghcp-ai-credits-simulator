@@ -10,6 +10,15 @@ const MAX_RETRIES = 3;
 const MAX_PAGES = 100;
 const RETRYABLE_STATUS_CODES = new Set([429, 503]);
 
+interface GraphQLErrorResponse {
+  message: string;
+}
+
+interface GraphQLResponse<T> {
+  data?: T;
+  errors?: GraphQLErrorResponse[];
+}
+
 export class GitHubBillingServiceError extends Error {
   constructor(message: string, public status?: number) {
     super(message);
@@ -114,6 +123,64 @@ async function authenticatedGetAll<T>(
   );
 }
 
+async function authenticatedGraphQL<T>(
+  session: Session,
+  operationName: string,
+  query: string,
+  variables: Record<string, unknown>
+): Promise<T> {
+  const token = getTokenFromSession(session);
+  if (!token) {
+    throw new GitHubBillingServiceError('No authenticated GitHub session found.', 401);
+  }
+
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await axios.post<GraphQLResponse<T>>(
+        `${GITHUB_API_BASE_URL}/graphql`,
+        { operationName, query, variables },
+        {
+          headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github+json',
+            'X-GitHub-Api-Version': API_VERSION,
+          },
+        }
+      );
+      if (response.data.errors?.length) {
+        throw new GitHubBillingServiceError(
+          `GitHub GraphQL ${operationName} failed: ${response.data.errors
+            .map((error) => error.message)
+            .join('; ')}`,
+          422
+        );
+      }
+      if (!response.data.data) {
+        throw new GitHubBillingServiceError(
+          `GitHub GraphQL ${operationName} returned no data.`,
+          502
+        );
+      }
+      return response.data.data;
+    } catch (err) {
+      if (err instanceof GitHubBillingServiceError) throw err;
+      lastError = err;
+      const axiosErr = err as AxiosError;
+      const status = axiosErr.response?.status;
+      if (status && RETRYABLE_STATUS_CODES.has(status) && attempt < MAX_RETRIES) {
+        await sleep(2 ** attempt * 250);
+        continue;
+      }
+      throw new GitHubBillingServiceError(
+        `GitHub GraphQL ${operationName} failed: ${axiosErr.message}`,
+        status
+      );
+    }
+  }
+  throw lastError instanceof Error ? lastError : new GitHubBillingServiceError('Unknown error');
+}
+
 export interface GitHubOrganizationDetails {
   id: number;
   nodeId: string;
@@ -142,6 +209,49 @@ export interface GitHubTeam {
   parentTeamId: number | null;
 }
 
+export interface GitHubEnterpriseMember {
+  id: number | null;
+  nodeId: string;
+  login: string;
+  name: string | null;
+  email: string | null;
+}
+
+interface GraphQLPageInfo {
+  hasNextPage: boolean;
+  endCursor: string | null;
+}
+
+interface EnterpriseOrganizationsResponse {
+  enterprise: {
+    organizations: {
+      nodes: Array<{
+        id: string;
+        databaseId: number;
+        login: string;
+        name: string | null;
+      }>;
+      pageInfo: GraphQLPageInfo;
+    };
+  } | null;
+}
+
+interface EnterpriseMembersResponse {
+  enterprise: {
+    members: {
+      nodes: Array<{
+        __typename: 'User' | 'EnterpriseUserAccount';
+        id: string;
+        databaseId?: number;
+        login: string;
+        name: string | null;
+        email?: string;
+      }>;
+      pageInfo: GraphQLPageInfo;
+    };
+  } | null;
+}
+
 interface GitHubOrganizationDetailsResponse {
   id: number;
   node_id: string;
@@ -164,6 +274,99 @@ interface GitHubTeamResponse {
   privacy: string;
   permission: string;
   parent?: { id: number } | null;
+}
+
+export async function getEnterpriseOrganizations(
+  enterprise: string,
+  session: Session
+): Promise<GitHubOrganizationDetails[]> {
+  if (!GITHUB_SLUG_PATTERN.test(enterprise)) {
+    throw new GitHubBillingServiceError(`Invalid GitHub organization/enterprise slug: "${enterprise}"`, 400);
+  }
+
+  const organizations: GitHubOrganizationDetails[] = [];
+  let cursor: string | null = null;
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const result: EnterpriseOrganizationsResponse = await authenticatedGraphQL<EnterpriseOrganizationsResponse>(
+      session,
+      'EnterpriseOrganizations',
+      `query EnterpriseOrganizations($slug: String!, $cursor: String) {
+        enterprise(slug: $slug) {
+          organizations(first: 100, after: $cursor) {
+            nodes { id databaseId login name }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      }`,
+      { slug: enterprise, cursor }
+    );
+    if (!result.enterprise) {
+      throw new GitHubBillingServiceError(`GitHub enterprise "${enterprise}" was not found or is not visible.`, 404);
+    }
+    const connection: EnterpriseOrganizationsResponse['enterprise'] extends null
+      ? never
+      : NonNullable<EnterpriseOrganizationsResponse['enterprise']>['organizations'] = result.enterprise.organizations;
+    organizations.push(...connection.nodes.map((organization) => ({
+      id: organization.databaseId,
+      nodeId: organization.id,
+      login: organization.login,
+      name: organization.name,
+    })));
+    if (!connection.pageInfo.hasNextPage) return organizations;
+    cursor = connection.pageInfo.endCursor;
+  }
+  throw new GitHubBillingServiceError(
+    `GitHub GraphQL pagination exceeded ${MAX_PAGES} pages for enterprise organizations.`,
+    422
+  );
+}
+
+export async function getEnterpriseMembers(
+  enterprise: string,
+  session: Session
+): Promise<GitHubEnterpriseMember[]> {
+  if (!GITHUB_SLUG_PATTERN.test(enterprise)) {
+    throw new GitHubBillingServiceError(`Invalid GitHub organization/enterprise slug: "${enterprise}"`, 400);
+  }
+
+  const members: GitHubEnterpriseMember[] = [];
+  let cursor: string | null = null;
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const result: EnterpriseMembersResponse = await authenticatedGraphQL<EnterpriseMembersResponse>(
+      session,
+      'EnterpriseMembers',
+      `query EnterpriseMembers($slug: String!, $cursor: String) {
+        enterprise(slug: $slug) {
+          members(first: 100, after: $cursor) {
+            nodes {
+              __typename
+              ... on User { id databaseId login name email }
+              ... on EnterpriseUserAccount { id login name }
+            }
+            pageInfo { hasNextPage endCursor }
+          }
+        }
+      }`,
+      { slug: enterprise, cursor }
+    );
+    if (!result.enterprise) {
+      throw new GitHubBillingServiceError(`GitHub enterprise "${enterprise}" was not found or is not visible.`, 404);
+    }
+    const connection = result.enterprise.members;
+    members.push(...connection.nodes.map((member) => ({
+      id: member.databaseId ?? null,
+      nodeId: member.id,
+      login: member.login,
+      name: member.name,
+      email: member.email || null,
+    })));
+    if (!connection.pageInfo.hasNextPage) return members;
+    cursor = connection.pageInfo.endCursor;
+  }
+  throw new GitHubBillingServiceError(
+    `GitHub GraphQL pagination exceeded ${MAX_PAGES} pages for enterprise members.`,
+    422
+  );
 }
 
 export async function getOrganizationDetails(

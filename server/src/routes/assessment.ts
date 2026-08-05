@@ -7,6 +7,8 @@ import {
   getCostCenters,
   getEnterpriseAICreditUsage,
   getEnterpriseCopilotLicenseCounts,
+  getEnterpriseMembers,
+  getEnterpriseOrganizations,
   getExistingBudgets,
   getOrganizationDetails,
   getOrganizationMembers,
@@ -105,6 +107,18 @@ async function settleInBatches<T, TResult>(
   return results;
 }
 
+async function mapInBatches<T, TResult>(
+  items: T[],
+  batchSize: number,
+  operation: (item: T) => Promise<TResult>
+): Promise<TResult[]> {
+  const results: TResult[] = [];
+  for (let index = 0; index < items.length; index += batchSize) {
+    results.push(...await Promise.all(items.slice(index, index + batchSize).map(operation)));
+  }
+  return results;
+}
+
 async function collectOrganizationInventory(org: string, session: Session) {
   const [detailsResult, membersResult, teamsResult] = await Promise.allSettled([
     getOrganizationDetails(org, session),
@@ -118,6 +132,10 @@ async function collectOrganizationInventory(org: string, session: Session) {
     async (team) => ({ team, members: await getTeamMembers(org, team.slug, session) })
   );
   return { org, detailsResult, membersResult, teamsResult, teamMemberResults };
+}
+
+function getFailureMessage(reason: unknown): string {
+  return reason instanceof Error ? reason.message : 'Unknown GitHub API error.';
 }
 
 async function runAssessment(
@@ -143,6 +161,20 @@ async function runAssessment(
     const unavailableUsageOrganizations: string[] = [];
 
     const orgsToAssess = organizations.length > 0 ? organizations : [enterpriseSlug];
+    const [enterpriseOrganizationsResult, enterpriseMembersResult] = await Promise.allSettled([
+      getEnterpriseOrganizations(enterpriseSlug, session),
+      getEnterpriseMembers(enterpriseSlug, session),
+    ]);
+    const discoveredOrganizations = enterpriseOrganizationsResult.status === 'fulfilled'
+      ? enterpriseOrganizationsResult.value
+      : [];
+    const inventoryOrganizationSlugs = Array.from(new Map(
+      [...discoveredOrganizations.map((organization) => organization.login), ...orgsToAssess]
+        .map((organization) => [organization.toLowerCase(), organization])
+    ).values());
+    const discoveredOrganizationsBySlug = new Map(
+      discoveredOrganizations.map((organization) => [organization.login.toLowerCase(), organization])
+    );
 
     for (const org of orgsToAssess) {
       let usage;
@@ -200,7 +232,7 @@ async function runAssessment(
           enterpriseBillingToken
         ),
       ]),
-      Promise.all(orgsToAssess.map((org) => collectOrganizationInventory(org, session))),
+      mapInBatches(inventoryOrganizationSlugs, 5, (org) => collectOrganizationInventory(org, session)),
     ]);
     const [budgetsResult, costCentersResult] = governanceResults;
     const enterpriseLicenseResult = enterpriseLicenseResults[0];
@@ -224,10 +256,12 @@ async function runAssessment(
     const organizationInventory: NonNullable<AssessmentResult['organizations']> = [];
     const teams: NonNullable<AssessmentResult['teams']> = [];
     const teamMemberships: GitHubTeamMembership[] = [];
-    const usersById = new Map<number, {
-      id: number;
+    const usersByLogin = new Map<string, {
+      id: number | null;
       nodeId: string;
       login: string;
+      displayName: string | null;
+      email: string | null;
       organizations: Set<string>;
       teams: Map<number, { id: number; name: string; slug: string; organization: string }>;
     }>();
@@ -235,10 +269,24 @@ async function runAssessment(
     const userInventoryFailures: string[] = [];
     const teamInventoryFailures: string[] = [];
 
+    if (enterpriseMembersResult.status === 'fulfilled') {
+      for (const member of enterpriseMembersResult.value) {
+        usersByLogin.set(member.login.toLowerCase(), {
+          id: member.id,
+          nodeId: member.nodeId,
+          login: member.login,
+          displayName: member.name,
+          email: member.email,
+          organizations: new Set<string>(),
+          teams: new Map(),
+        });
+      }
+    }
+
     for (const inventory of organizationInventoryResults) {
       const details = inventory.detailsResult.status === 'fulfilled'
         ? inventory.detailsResult.value
-        : null;
+        : discoveredOrganizationsBySlug.get(inventory.org.toLowerCase()) ?? null;
       const members = inventory.membersResult.status === 'fulfilled'
         ? inventory.membersResult.value
         : [];
@@ -253,20 +301,36 @@ async function runAssessment(
         memberCount: inventory.membersResult.status === 'fulfilled' ? members.length : null,
         teamCount: inventory.teamsResult.status === 'fulfilled' ? organizationTeams.length : null,
       });
-      if (!details) organizationInventoryFailures.push(inventory.org);
-      if (inventory.membersResult.status === 'rejected') userInventoryFailures.push(inventory.org);
-      if (inventory.teamsResult.status === 'rejected') teamInventoryFailures.push(inventory.org);
+      if (inventory.detailsResult.status === 'rejected' && !details) {
+        organizationInventoryFailures.push(
+          `${inventory.org}: ${getFailureMessage(inventory.detailsResult.reason)}`
+        );
+      }
+      if (inventory.membersResult.status === 'rejected') {
+        userInventoryFailures.push(
+          `${inventory.org}: ${getFailureMessage(inventory.membersResult.reason)}`
+        );
+      }
+      if (inventory.teamsResult.status === 'rejected') {
+        teamInventoryFailures.push(
+          `${inventory.org}: ${getFailureMessage(inventory.teamsResult.reason)}`
+        );
+      }
 
       for (const member of members) {
-        const user = usersById.get(member.id) ?? {
+        const memberKey = member.login.toLowerCase();
+        const user = usersByLogin.get(memberKey) ?? {
           id: member.id,
           nodeId: member.nodeId,
           login: member.login,
+          displayName: null,
+          email: null,
           organizations: new Set<string>(),
           teams: new Map(),
         };
+        user.id ??= member.id;
         user.organizations.add(inventory.org);
-        usersById.set(member.id, user);
+        usersByLogin.set(memberKey, user);
       }
 
       const memberCountByTeam = new Map<number, number>();
@@ -283,13 +347,17 @@ async function runAssessment(
             role: member.role,
             state: 'active',
           });
-          const user = usersById.get(member.id) ?? {
+          const memberKey = member.login.toLowerCase();
+          const user = usersByLogin.get(memberKey) ?? {
             id: member.id,
             nodeId: member.nodeId,
             login: member.login,
+            displayName: null,
+            email: null,
             organizations: new Set<string>(),
             teams: new Map(),
           };
+          user.id ??= member.id;
           user.organizations.add(inventory.org);
           user.teams.set(team.id, {
             id: team.id,
@@ -297,15 +365,17 @@ async function runAssessment(
             slug: team.slug,
             organization: inventory.org,
           });
-          usersById.set(member.id, user);
+          usersByLogin.set(memberKey, user);
         }
       }
-      const failedTeamMemberships = inventory.teamMemberResults.filter(
-        (result) => result.status === 'rejected'
-      ).length;
-      if (failedTeamMemberships > 0) {
-        teamInventoryFailures.push(`${inventory.org} (${failedTeamMemberships} membership lists)`);
-      }
+      inventory.teamMemberResults.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          const team = organizationTeams[index];
+          teamInventoryFailures.push(
+            `${inventory.org}/${team?.slug ?? 'unknown team'}: ${getFailureMessage(result.reason)}`
+          );
+        }
+      });
 
       teams.push(...organizationTeams.map((team) => ({
         id: team.id,
@@ -321,15 +391,15 @@ async function runAssessment(
       })));
     }
 
-    const users: NonNullable<AssessmentResult['users']> = Array.from(usersById.values())
+    const users: NonNullable<AssessmentResult['users']> = Array.from(usersByLogin.values())
       .map((user) => {
-        const creditsConsumed = userTotals.get(String(user.id)) ?? null;
+        const creditsConsumed = user.id === null ? null : userTotals.get(String(user.id)) ?? null;
         return {
           id: user.id,
           nodeId: user.nodeId,
           login: user.login,
-          displayName: null,
-          email: null,
+          displayName: user.displayName,
+          email: user.email,
           status: 'active',
           organizations: Array.from(user.organizations).sort(),
           teams: Array.from(user.teams.values()).sort((first, second) =>
@@ -495,6 +565,18 @@ async function runAssessment(
       governanceDataWarnings.push({
         source: 'organizations',
         message: `Organization details are unavailable for ${organizationInventoryFailures.join(', ')}.`,
+      });
+    }
+    if (enterpriseOrganizationsResult.status === 'rejected') {
+      governanceDataWarnings.push({
+        source: 'organizations',
+        message: `Enterprise organization discovery failed; showing submitted organizations only. ${getFailureMessage(enterpriseOrganizationsResult.reason)}`,
+      });
+    }
+    if (enterpriseMembersResult.status === 'rejected') {
+      governanceDataWarnings.push({
+        source: 'users',
+        message: `Enterprise member discovery failed; showing members visible through organization and team APIs only. ${getFailureMessage(enterpriseMembersResult.reason)}`,
       });
     }
     if (userInventoryFailures.length > 0) {
