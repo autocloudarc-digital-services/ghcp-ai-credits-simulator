@@ -35,6 +35,17 @@ The governance process should produce:
 > authoritative provider records and documentation. Use controlled tests to
 > verify behavior in the customer environment before relying on any control.
 
+## Governance architecture and workflow
+
+[![Provider-neutral governance flow from owned evidence through configurable controls, approval, pilot, rollout, monitoring, and rollback.](diagrams/implementation-guide-external.svg)](diagrams/implementation-guide-external.svg)
+
+Diagram [IG-EXT-01](diagrams/index.md#ig-ext-01) summarizes the customer
+governance architecture and implementation workflow. The linked SVG is the
+maintained diagram asset.
+
+This flow is a decision method, not a guarantee of provider precedence or
+enforcement.
+
 ## Evidence foundations
 
 ### Evidence source register

@@ -33,6 +33,17 @@ The implementation should produce these outcomes:
 > organizations, teams, users, or Copilot policy settings. Authorized customer
 > administrators perform and verify all production changes in approved systems.
 
+## Application architecture and workflow
+
+[![Application flow from validated evidence through calculations, advisory profiles, owner approval, manual provider configuration, monitoring, and rollback.](diagrams/implementation-guide-internal.svg)](diagrams/implementation-guide-internal.svg)
+
+Diagram [IG-INT-01](diagrams/index.md#ig-int-01) summarizes the application
+architecture and implementation workflow. The linked SVG is the maintained
+diagram asset.
+
+Canonical tables remain authoritative for exact fields and values, and the
+application does not perform provider mutations.
+
 ## Data and action boundaries
 
 Treat every value according to its provenance. Do not present calculated,
