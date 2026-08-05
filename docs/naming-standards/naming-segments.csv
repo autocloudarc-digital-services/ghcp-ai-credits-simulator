@@ -1,0 +1,17 @@
+rule_id,position,segment_name,segment_type,literal_value,catalog_name,required,validation_pattern,description
+cost-center-v1,1,prefix,literal,cc,,true,^cc$,Cost-center entity abbreviation
+cost-center-v1,2,infix,literal,ghcp,,true,^ghcp$,GitHub Copilot workload qualifier
+cost-center-v1,3,business-unit,catalog,,business-unit,true,^[a-z][a-z0-9-]*$,Governed business unit or product area
+cost-center-v1,4,environment,catalog,,environment,true,^(dev|test|stage|prod)$,Deployment or financial reporting environment
+budget-v1,1,prefix,literal,bgt,,true,^bgt$,Budget entity abbreviation
+budget-v1,2,infix,literal,aic,,true,^aic$,AI credit billing qualifier
+budget-v1,3,scope,catalog,,budget-scope,true,^(enterprise|organization|cost-center|team|user)$,Governance scope receiving the budget
+budget-v1,4,period,catalog,,budget-period,true,^(monthly|quarterly|annual)$,Budget reporting period
+organization-v1,1,prefix,literal,org,,true,^org$,Organization entity abbreviation
+organization-v1,2,infix,literal,ghcp,,true,^ghcp$,GitHub Copilot governance qualifier
+organization-v1,3,business-unit,catalog,,business-unit,true,^[a-z][a-z0-9-]*$,Governed business unit represented by the organization
+team-v1,1,prefix,literal,team,,true,^team$,Team entity identifier
+team-v1,2,function,catalog,,function,true,^[a-z][a-z0-9-]*$,Primary organizational function
+team-v1,3,business-unit,catalog,,business-unit,true,^[a-z][a-z0-9-]*$,Governed business unit or product area
+team-v1,4,region,catalog,,region,true,^(global|amer|emea|apac)$,Geographic operating region
+user-v1,1,identity-name,provider,,,true,"^[a-z0-9](?:[a-z0-9-]{0,37}[a-z0-9])?$",Identifier assigned by GitHub or the enterprise identity provider

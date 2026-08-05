@@ -1,0 +1,25 @@
+catalog_name,value,display_name,status,description
+business-unit,platform,Platform,active,Platform engineering and shared services
+business-unit,data,Data,active,Data engineering and analytics
+business-unit,finance,Finance,active,Finance and financial operations
+business-unit,security,Security,active,Security engineering and operations
+environment,dev,Development,active,Development and experimentation
+environment,test,Test,active,Integration and validation
+environment,stage,Stage,active,Preproduction validation
+environment,prod,Production,active,Production operation
+budget-scope,enterprise,Enterprise,active,Enterprise-wide budget scope
+budget-scope,organization,Organization,active,Organization budget scope
+budget-scope,cost-center,Cost Center,active,Cost-center budget scope
+budget-scope,team,Team,active,Team budget scope
+budget-scope,user,User,active,Individual user budget scope
+budget-period,monthly,Monthly,active,Monthly reporting and reset period
+budget-period,quarterly,Quarterly,active,Quarterly reporting period
+budget-period,annual,Annual,active,Annual reporting period
+function,eng,Engineering,active,Software and platform engineering
+function,data,Data,active,Data engineering and analytics
+function,sec,Security,active,Security engineering and operations
+function,ops,Operations,active,Operational and service management
+region,global,Global,active,Global or region-independent team
+region,amer,Americas,active,Americas region
+region,emea,Europe Middle East and Africa,active,EMEA region
+region,apac,Asia Pacific,active,APAC region
