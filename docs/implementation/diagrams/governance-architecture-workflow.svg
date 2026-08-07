@@ -1,0 +1,250 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1404" height="1872" viewBox="0 0 1404 1872" role="img" aria-labelledby="title description" xml:space="preserve">
+  <title id="title">AI Credits Governance Architecture and Workflow</title>
+  <desc id="description">A color portrait infographic showing owned evidence inputs, seven governance lifecycle gates, four financial control layers, monitoring triggers, review decisions, evidence flow, and rollback.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 12 6 L 0 12 z" fill="#334155"/>
+    </marker>
+    <marker id="arrow-rose" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M 0 0 L 12 6 L 0 12 z" fill="#A33B48"/>
+    </marker>
+    <style>
+      text { font-family: "Atkinson Hyperlegible", "Noto Sans", "DejaVu Sans", sans-serif; fill: #17202A; }
+      .title { font-size: 38px; font-weight: 800; letter-spacing: 0; fill: #FFFFFF; }
+      .subtitle { font-size: 20px; font-weight: 500; fill: #FFFFFF; }
+      .section { font-size: 18px; font-weight: 800; letter-spacing: 0; fill: #17324D; }
+      .source-title { font-size: 19px; font-weight: 800; }
+      .source-copy { font-size: 15px; font-weight: 500; }
+      .phase-number { font-size: 30px; font-weight: 800; fill: #FFFFFF; }
+      .phase-title { font-size: 21px; font-weight: 800; fill: #FFFFFF; }
+      .owners { font-size: 13px; font-weight: 700; fill: #FFFFFF; }
+      .label { font-size: 15px; font-weight: 800; }
+      .copy { font-size: 15px; font-weight: 500; }
+      .small { font-size: 13px; font-weight: 500; }
+      .chip { font-size: 13px; font-weight: 800; }
+      .threshold { font-size: 19px; font-weight: 800; }
+      .threshold-copy { font-size: 14px; font-weight: 500; }
+      .decision { font-size: 16px; font-weight: 800; }
+      .footer { font-size: 15px; font-weight: 700; fill: #FFFFFF; }
+      .card { stroke-width: 2.5; }
+      .flow { fill: none; stroke: #334155; stroke-width: 3; marker-end: url(#arrow); }
+      .feedback { fill: none; stroke: #A33B48; stroke-width: 3; stroke-dasharray: 10 8; marker-end: url(#arrow-rose); }
+    </style>
+  </defs>
+
+  <rect width="1404" height="1872" fill="#FFFFFF"/>
+
+  <!-- Header -->
+  <rect x="48" y="42" width="1308" height="116" rx="8" fill="#17324D"/>
+  <text x="90" y="91" class="title">AI CREDITS GOVERNANCE</text>
+  <text x="90" y="128" class="subtitle">Owned evidence → controlled change → verified operation</text>
+  <rect x="1168" y="68" width="142" height="60" rx="6" fill="#FFFFFF" opacity="0.14"/>
+  <text x="1239" y="92" text-anchor="middle" class="owners">APPENDIX B</text>
+  <text x="1239" y="115" text-anchor="middle" class="owners">WORKFLOW</text>
+
+  <!-- Owned inputs -->
+  <text x="48" y="194" class="section">OWNED INPUTS</text>
+  <text x="230" y="194" class="small">Confirm authority, freshness, scope, and coverage before use.</text>
+
+  <g>
+    <rect x="48" y="214" width="309" height="112" rx="7" fill="#DCEAF7" stroke="#2D5F88" class="card"/>
+    <rect x="48" y="214" width="10" height="112" rx="5" fill="#2D5F88"/>
+    <text x="78" y="249" class="source-title">PROVIDER</text>
+    <text x="78" y="277" class="source-copy">Usage · billing · settings</text>
+    <text x="78" y="302" class="source-copy">Alerts · supported controls</text>
+
+    <rect x="381" y="214" width="309" height="112" rx="7" fill="#DDF0EA" stroke="#26735E" class="card"/>
+    <rect x="381" y="214" width="10" height="112" rx="5" fill="#26735E"/>
+    <text x="411" y="249" class="source-title">FINANCE</text>
+    <text x="411" y="277" class="source-copy">Rates · charges · funding</text>
+    <text x="411" y="302" class="source-copy">Forecast · risk tolerance</text>
+
+    <rect x="714" y="214" width="309" height="112" rx="7" fill="#F7EDBD" stroke="#8A711B" class="card"/>
+    <rect x="714" y="214" width="10" height="112" rx="5" fill="#8A711B"/>
+    <text x="744" y="249" class="source-title">IDENTITY &amp; LICENSE</text>
+    <text x="744" y="277" class="source-copy">Users · teams · organizations</text>
+    <text x="744" y="302" class="source-copy">Eligibility · assignments · SKUs</text>
+
+    <rect x="1047" y="214" width="309" height="112" rx="7" fill="#F8DFC4" stroke="#A85B24" class="card"/>
+    <rect x="1047" y="214" width="10" height="112" rx="5" fill="#A85B24"/>
+    <text x="1077" y="249" class="source-title">BUSINESS &amp; RISK</text>
+    <text x="1077" y="277" class="source-copy">Need · value · security</text>
+    <text x="1077" y="302" class="source-copy">Impact · interruption tolerance</text>
+  </g>
+
+  <!-- Evidence rule -->
+  <rect x="48" y="350" width="1308" height="86" rx="7" fill="#E7F0F5" stroke="#315C72" class="card"/>
+  <rect x="48" y="350" width="190" height="86" rx="7" fill="#315C72"/>
+  <text x="143" y="387" text-anchor="middle" class="phase-title">EVIDENCE</text>
+  <text x="143" y="413" text-anchor="middle" class="owners">RULE</text>
+  <text x="267" y="380" class="copy"><tspan class="label">Preserve</tspan><tspan> source + timestamp + limitations. Mark unavailable or partial values </tspan><tspan class="label">UNKNOWN.</tspan></text>
+  <text x="267" y="410" class="copy">Reconcile provider, finance, license, organization, and cohort records before a material decision.</text>
+
+  <text x="48" y="477" class="section">SEVEN GOVERNANCE GATES</text>
+  <text x="335" y="477" class="small">Each gate produces evidence and requires a named owner for unresolved action.</text>
+
+  <!-- Main lifecycle flow -->
+  <path d="M 702 436 L 702 494" class="flow"/>
+
+  <!-- Phase 1 -->
+  <rect x="48" y="504" width="1308" height="106" rx="7" fill="#DDECF8" stroke="#2D5F88" class="card"/>
+  <rect x="48" y="504" width="224" height="106" rx="7" fill="#2D5F88"/>
+  <text x="76" y="545" class="phase-number">01</text>
+  <text x="132" y="543" class="phase-title">PREPARE</text>
+  <text x="76" y="575" class="owners">SERVICE · BUDGET</text>
+  <text x="76" y="594" class="owners">SECURITY · LICENSE</text>
+  <text x="300" y="535" class="label">ACT</text>
+  <text x="300" y="559" class="copy">Set scope, roles, sources, handling, tests, success measures, and rollback.</text>
+  <text x="300" y="587" class="small"><tspan class="label">RECORD</tspan><tspan>  Scope · role matrix · source plan · test plan</tspan></text>
+  <text x="948" y="535" class="label">EXIT</text>
+  <text x="948" y="559" class="copy">Owners accept authority, evidence</text>
+  <text x="948" y="582" class="copy">handling, and decision rights.</text>
+  <path d="M 702 610 L 702 624" class="flow"/>
+
+  <!-- Phase 2 -->
+  <rect x="48" y="634" width="1308" height="106" rx="7" fill="#DDF0EA" stroke="#26735E" class="card"/>
+  <rect x="48" y="634" width="224" height="106" rx="7" fill="#26735E"/>
+  <text x="76" y="675" class="phase-number">02</text>
+  <text x="132" y="673" class="phase-title">BASELINE</text>
+  <text x="76" y="705" class="owners">SERVICE · BUDGET</text>
+  <text x="76" y="724" class="owners">LICENSE · ADMIN</text>
+  <text x="300" y="665" class="label">ACT</text>
+  <text x="300" y="689" class="copy">Collect records, preserve gaps, reconcile totals, and explain variance.</text>
+  <text x="300" y="717" class="small"><tspan class="label">RECORD</tspan><tspan>  Source register · worksheet · reconciliation</tspan></text>
+  <text x="948" y="665" class="label">EXIT</text>
+  <text x="948" y="689" class="copy">Values reconcile, or limitations</text>
+  <text x="948" y="712" class="copy">are formally accepted.</text>
+  <path d="M 702 740 L 702 754" class="flow"/>
+
+  <!-- Phase 3 -->
+  <rect x="48" y="764" width="1308" height="132" rx="7" fill="#F7EDBD" stroke="#8A711B" class="card"/>
+  <rect x="48" y="764" width="224" height="132" rx="7" fill="#8A711B"/>
+  <text x="76" y="808" class="phase-number">03</text>
+  <text x="132" y="806" class="phase-title">DESIGN</text>
+  <text x="76" y="838" class="owners">SERVICE · BUSINESS</text>
+  <text x="76" y="857" class="owners">BUDGET · SECURITY</text>
+  <text x="76" y="876" class="owners">LICENSE</text>
+  <text x="300" y="793" class="label">FOUR DISTINCT FINANCIAL CONTROL LAYERS</text>
+  <rect x="300" y="807" width="151" height="27" rx="5" fill="#FFFFFF" stroke="#8A711B"/>
+  <rect x="461" y="807" width="151" height="27" rx="5" fill="#FFFFFF" stroke="#8A711B"/>
+  <rect x="622" y="807" width="171" height="27" rx="5" fill="#FFFFFF" stroke="#8A711B"/>
+  <rect x="803" y="807" width="184" height="27" rx="5" fill="#FFFFFF" stroke="#8A711B"/>
+  <text x="375" y="826" text-anchor="middle" class="chip">ENTERPRISE SPEND</text>
+  <text x="536" y="826" text-anchor="middle" class="chip">UNIVERSAL ULB</text>
+  <text x="707" y="826" text-anchor="middle" class="chip">COST-CENTER ULB</text>
+  <text x="895" y="826" text-anchor="middle" class="chip">ORG / SKU ALLOCATION</text>
+  <text x="300" y="858" class="small"><tspan class="label">KEEP SEPARATE</tspan><tspan>  Access-policy profiles · assignments · alerts · exceptions</tspan></text>
+  <text x="300" y="881" class="small"><tspan class="label">RECORD</tspan><tspan>  Draft profile register · impact assessment</tspan></text>
+  <text x="1010" y="793" class="label">EXIT</text>
+  <text x="1010" y="817" class="copy">Every proposal has evidence,</text>
+  <text x="1010" y="840" class="copy">rationale, owner, duration,</text>
+  <text x="1010" y="863" class="copy">and review date.</text>
+  <path d="M 702 896 L 702 910" class="flow"/>
+
+  <!-- Phase 4 -->
+  <rect x="48" y="920" width="1308" height="116" rx="7" fill="#F8DFC4" stroke="#A85B24" class="card"/>
+  <rect x="48" y="920" width="224" height="116" rx="7" fill="#A85B24"/>
+  <text x="76" y="963" class="phase-number">04</text>
+  <text x="132" y="961" class="phase-title">APPROVE</text>
+  <text x="76" y="988" class="owners">BUDGET · SECURITY</text>
+  <text x="76" y="1007" class="owners">LICENSE · BUSINESS</text>
+  <text x="76" y="1026" class="owners">SPONSOR</text>
+  <text x="300" y="950" class="label">DECIDE</text>
+  <text x="300" y="974" class="copy">Profile · assignment · exception · pilot · support path · change record</text>
+  <text x="300" y="1002" class="small"><tspan class="label">RECORD</tspan><tspan>  Decision · approvers · impact · authorized change · rollback trigger</tspan></text>
+  <rect x="1044" y="942" width="276" height="70" rx="6" fill="#FFFFFF" stroke="#A85B24" stroke-width="2"/>
+  <text x="1182" y="966" text-anchor="middle" class="decision">APPROVED FOR PILOT?</text>
+  <text x="1182" y="991" text-anchor="middle" class="small"><tspan font-weight="800">YES</tspan><tspan> → limited change</tspan></text>
+  <text x="1182" y="1009" text-anchor="middle" class="small"><tspan font-weight="800">NO</tspan><tspan> → return / defer with owner</tspan></text>
+  <path d="M 702 1036 L 702 1050" class="flow"/>
+
+  <!-- Phase 5 -->
+  <rect x="48" y="1060" width="1308" height="116" rx="7" fill="#E8E0F3" stroke="#6D4F91" class="card"/>
+  <rect x="48" y="1060" width="224" height="116" rx="7" fill="#6D4F91"/>
+  <text x="76" y="1103" class="phase-number">05</text>
+  <text x="132" y="1101" class="phase-title">PILOT</text>
+  <text x="76" y="1133" class="owners">PILOT LEAD · ADMIN</text>
+  <text x="76" y="1152" class="owners">SERVICE · SUPPORT</text>
+  <text x="300" y="1090" class="label">ACT</text>
+  <text x="300" y="1114" class="copy">Capture prior state, apply limited change, test actual behavior, monitor, reconcile.</text>
+  <text x="300" y="1142" class="small"><tspan class="label">RECORD</tspan><tspan>  Before / after state · tests · measures · feedback</tspan></text>
+  <rect x="1044" y="1082" width="276" height="70" rx="6" fill="#FFFFFF" stroke="#6D4F91" stroke-width="2"/>
+  <text x="1182" y="1106" text-anchor="middle" class="decision">SUCCESS + TOLERANCE?</text>
+  <text x="1182" y="1131" text-anchor="middle" class="small"><tspan font-weight="800">YES</tspan><tspan> → staged rollout</tspan></text>
+  <text x="1182" y="1149" text-anchor="middle" class="small"><tspan font-weight="800">NO</tspan><tspan> → restore prior state</tspan></text>
+  <path d="M 702 1176 L 702 1190" class="flow"/>
+
+  <!-- Phase 6 -->
+  <rect x="48" y="1200" width="1308" height="106" rx="7" fill="#DCEFD9" stroke="#477A3E" class="card"/>
+  <rect x="48" y="1200" width="224" height="106" rx="7" fill="#477A3E"/>
+  <text x="76" y="1241" class="phase-number">06</text>
+  <text x="132" y="1239" class="phase-title">ROLLOUT</text>
+  <text x="76" y="1271" class="owners">SERVICE · ADMIN</text>
+  <text x="76" y="1290" class="owners">CHANGE · BUSINESS</text>
+  <text x="300" y="1231" class="label">ACT</text>
+  <text x="300" y="1255" class="copy">Sequence waves, reconfirm evidence, communicate, apply, verify, and pause.</text>
+  <text x="300" y="1283" class="small"><tspan class="label">RECORD</tspan><tspan>  Wave log · verification · communications · active register</tspan></text>
+  <text x="948" y="1231" class="label">EXIT</text>
+  <text x="948" y="1255" class="copy">Assignments match the register;</text>
+  <text x="948" y="1278" class="copy">ownership is clear.</text>
+  <path d="M 702 1306 L 702 1320" class="flow"/>
+
+  <!-- Phase 7 -->
+  <rect x="48" y="1330" width="1308" height="106" rx="7" fill="#D7EAF0" stroke="#287080" class="card"/>
+  <rect x="48" y="1330" width="224" height="106" rx="7" fill="#287080"/>
+  <text x="76" y="1371" class="phase-number">07</text>
+  <text x="132" y="1369" class="phase-title">OPERATE</text>
+  <text x="76" y="1396" class="owners">SERVICE · BUDGET</text>
+  <text x="76" y="1414" class="owners">SECURITY · LICENSE</text>
+  <text x="76" y="1432" class="owners">BUSINESS</text>
+  <text x="300" y="1361" class="label">ACT</text>
+  <text x="300" y="1385" class="copy">Review, reconcile, resolve alerts, control changes, and retire stale profiles.</text>
+  <text x="300" y="1413" class="small"><tspan class="label">RECORD</tspan><tspan>  Reviews · incidents · changes · exceptions · trends</tspan></text>
+  <text x="948" y="1361" class="label">EXIT</text>
+  <text x="948" y="1385" class="copy">Verified provider state matches</text>
+  <text x="948" y="1408" class="copy">the active register.</text>
+  <path d="M 702 1436 L 702 1450" class="flow"/>
+
+  <!-- Monitoring triggers -->
+  <rect x="48" y="1460" width="1308" height="198" rx="7" fill="#FBF7E3" stroke="#8A711B" class="card"/>
+  <text x="76" y="1494" class="section">MONITOR &amp; RESPOND</text>
+  <text x="326" y="1494" class="small">Display freshness and coverage. An alert is not proof that usage stopped.</text>
+
+  <rect x="76" y="1515" width="386" height="105" rx="6" fill="#DCEAF7" stroke="#2D5F88" stroke-width="2"/>
+  <text x="98" y="1547" class="threshold">75% · EARLY WARNING</text>
+  <text x="98" y="1574" class="threshold-copy">Validate data → refresh forecast</text>
+  <text x="98" y="1598" class="threshold-copy">Notify owners → confirm need</text>
+
+  <rect x="509" y="1515" width="386" height="105" rx="6" fill="#F8DFC4" stroke="#A85B24" stroke-width="2"/>
+  <text x="531" y="1547" class="threshold">90% · CRITICAL</text>
+  <text x="531" y="1574" class="threshold-copy">Escalate → assess continuity</text>
+  <text x="531" y="1598" class="threshold-copy">Approve action → communicate</text>
+
+  <rect x="942" y="1515" width="386" height="105" rx="6" fill="#F5D9DC" stroke="#A33B48" stroke-width="2"/>
+  <text x="964" y="1547" class="threshold">100% · LIMIT REACHED</text>
+  <text x="964" y="1574" class="threshold-copy">Use tested enforcement, incident,</text>
+  <text x="964" y="1598" class="threshold-copy">exception, or rollback path</text>
+
+  <text x="76" y="1643" class="small"><tspan class="label">CADENCE</tspan><tspan>  Weekly · monthly · quarterly · event-driven</tspan></text>
+
+  <!-- Review and feedback -->
+  <rect x="48" y="1682" width="1308" height="110" rx="7" fill="#E9EDF2" stroke="#485769" class="card"/>
+  <text x="76" y="1715" class="section">REVIEW DECISION</text>
+  <text x="76" y="1744" class="small">Use reconciled quantitative evidence + user outcomes + current provider behavior.</text>
+  <rect x="700" y="1703" width="178" height="52" rx="6" fill="#D7EAF0" stroke="#287080" stroke-width="2"/>
+  <rect x="896" y="1703" width="178" height="52" rx="6" fill="#F7EDBD" stroke="#8A711B" stroke-width="2"/>
+  <rect x="1092" y="1703" width="220" height="52" rx="6" fill="#F5D9DC" stroke="#A33B48" stroke-width="2"/>
+  <text x="789" y="1736" text-anchor="middle" class="decision">RETAIN → OPERATE</text>
+  <text x="985" y="1736" text-anchor="middle" class="decision">REVISE → DESIGN</text>
+  <text x="1202" y="1736" text-anchor="middle" class="decision">ROLL BACK → BASELINE</text>
+  <text x="700" y="1777" class="small">Rollback restores captured provider state + prior active register and preserves history.</text>
+
+  <!-- Feedback loop -->
+  <path d="M 1312 1729 L 1372 1729 L 1372 687 L 1356 687" class="feedback"/>
+  <rect x="1324" y="994" width="48" height="190" rx="5" fill="#FFFFFF" stroke="#A33B48" stroke-width="2"/>
+  <text x="1355" y="1168" transform="rotate(-90 1355 1168)" class="small" fill="#A33B48">ROLLBACK / RE-BASELINE BEFORE RETRY</text>
+
+  <!-- Controlled record footer -->
+  <rect x="48" y="1812" width="1308" height="44" rx="6" fill="#17324D"/>
+  <text x="702" y="1840" text-anchor="middle" class="footer">CLOSE ONLY WHEN VERIFIED PROVIDER STATE AND THE ACTIVE REGISTER AGREE.</text>
+</svg>

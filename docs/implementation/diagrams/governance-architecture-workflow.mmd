@@ -1,0 +1,103 @@
+---
+title: AI Credits Governance Architecture and Workflow
+config:
+  theme: base
+  flowchart:
+    curve: basis
+    htmlLabels: true
+    nodeSpacing: 28
+    rankSpacing: 34
+    useMaxWidth: false
+  themeVariables:
+    background: "#FFFFFF"
+    fontFamily: "Atkinson Hyperlegible, Aptos, Arial, sans-serif"
+    fontSize: "18px"
+    lineColor: "#334155"
+    primaryTextColor: "#17202A"
+---
+flowchart TD
+    TITLE["<b>AI CREDITS GOVERNANCE</b><br/>Owned evidence → controlled change → verified operation"]
+
+    subgraph INPUTS["OWNED INPUTS · confirm authority, freshness, scope, and coverage"]
+        direction LR
+        I1["<b>Provider</b><br/>Usage · billing · settings · alerts"]
+        I2["<b>Finance</b><br/>Rates · charges · funding · tolerance"]
+        I3["<b>Identity & license</b><br/>Users · teams · organizations · SKUs"]
+        I4["<b>Business & risk</b><br/>Need · value · security · interruption"]
+    end
+
+    EVIDENCE["<b>EVIDENCE RULE</b><br/>Preserve source + timestamp + limitations · mark unavailable data <b>UNKNOWN</b><br/>Reconcile differences before a material decision"]
+
+    P1["<b>01 · PREPARE</b>  |  Service · Budget · Security · License<br/><b>Act:</b> set scope, roles, sources, handling, tests, success measures, and rollback<br/><b>Record:</b> scope · role matrix · source plan · test plan<br/><b>Gate:</b> owners accept authority, evidence handling, and decision rights"]
+
+    P2["<b>02 · BASELINE</b>  |  Service · Budget · License · Administrator<br/><b>Act:</b> collect records, preserve gaps, reconcile totals, and explain variance<br/><b>Record:</b> source register · baseline worksheet · reconciliation<br/><b>Gate:</b> required values reconcile, or limitations are formally accepted"]
+
+    P3["<b>03 · DESIGN</b>  |  Service · Business · Budget · Security · License<br/><b>Configure four distinct financial layers:</b><br/>Enterprise spend  |  Universal ULB  |  Cost-center ULB  |  Organization / SKU allocation<br/><b>Keep separate:</b> access-policy profiles · assignments · alerts · exceptions<br/><b>Gate:</b> every proposal has evidence, rationale, owner, duration, and review date"]
+
+    P4["<b>04 · APPROVE</b>  |  Budget · Security · License · Business · Sponsor<br/><b>Decide:</b> profile · assignment · exception · pilot · support · change record<br/><b>Record:</b> decision · approvers · impact · authorized change · rollback trigger"]
+
+    A{"<b>APPROVED FOR<br/>LIMITED CHANGE?</b>"}
+    HOLD["<b>RETURN / DEFER</b><br/>Name owner + reason<br/>Resolve evidence, eligibility, exposure, or interruption risk"]
+
+    P5["<b>05 · PILOT</b>  |  Pilot Lead · Administrator · Service · Support<br/><b>Act:</b> capture prior state, apply limited change, test actual behavior, monitor, reconcile<br/><b>Record:</b> before / after state · tests · measures · feedback<br/><b>Gate:</b> success and tolerance criteria are met"]
+
+    G{"<b>PILOT MEETS<br/>SUCCESS + TOLERANCE?</b>"}
+
+    P6["<b>06 · ROLLOUT</b>  |  Service · Administrator · Change · Business<br/><b>Act:</b> sequence waves, reconfirm evidence, communicate, apply, verify, and pause<br/><b>Record:</b> wave log · verification · communications · active register<br/><b>Gate:</b> assignments match the approved register and ownership is clear"]
+
+    P7["<b>07 · OPERATE</b>  |  Service · Budget · Security · License · Business<br/><b>Act:</b> review, reconcile, resolve alerts, control changes, and retire stale profiles<br/><b>Record:</b> reviews · incidents · changes · exceptions · trends<br/><b>Gate:</b> verified provider state matches the active register"]
+
+    MONITOR["<b>MONITOR & RESPOND</b>  |  display freshness and coverage<br/><b>75% Early warning:</b> validate data → refresh forecast → notify owners<br/><b>90% Critical:</b> escalate → assess continuity → approve and communicate action<br/><b>100% Limit reached:</b> use tested enforcement, incident, exception, or rollback path<br/><b>Cadence:</b> weekly · monthly · quarterly · event-driven"]
+
+    REVIEW{"<b>REVIEW DECISION</b><br/>Retain · Revise · Roll back"}
+
+    ROLLBACK["<b>ROLL BACK SAFELY</b><br/>Restore captured provider state + prior active register version<br/>Preserve decision, incident, test, communication, and reconciliation history"]
+
+    REGISTER["<b>CONTROLLED EVIDENCE TRAIL</b><br/>At every gate: owner · source · approval · profile version · assignment · test · exception · review date<br/><b>Close only when verified provider state and the active register agree.</b>"]
+
+    TITLE --> INPUTS
+    I1 & I2 & I3 & I4 --> EVIDENCE
+    EVIDENCE --> P1 --> P2 --> P3 --> P4 --> A
+    A -->|YES| P5
+    A -->|NO| HOLD --> P2
+    P5 --> G
+    G -->|YES| P6 --> P7 --> MONITOR --> REVIEW
+    G -->|NO| ROLLBACK
+    REVIEW -->|RETAIN| P7
+    REVIEW -->|REVISE| P3
+    REVIEW -->|ROLL BACK| ROLLBACK
+    ROLLBACK -->|RE-BASELINE BEFORE RETRY| P2
+    P7 -.->|KEEP CURRENT| REGISTER
+    ROLLBACK -.->|PRESERVE HISTORY| REGISTER
+
+    classDef title fill:#17324D,stroke:#17324D,color:#FFFFFF,stroke-width:3px,font-size:24px;
+    classDef source fill:#DCEAF7,stroke:#2D5F88,color:#17202A,stroke-width:2px;
+    classDef evidence fill:#E7F0F5,stroke:#315C72,color:#17202A,stroke-width:3px;
+    classDef prepare fill:#DDECF8,stroke:#2D5F88,color:#17202A,stroke-width:3px;
+    classDef baseline fill:#DDF0EA,stroke:#26735E,color:#17202A,stroke-width:3px;
+    classDef design fill:#F7EDBD,stroke:#8A711B,color:#17202A,stroke-width:3px;
+    classDef approve fill:#F8DFC4,stroke:#A85B24,color:#17202A,stroke-width:3px;
+    classDef pilot fill:#E8E0F3,stroke:#6D4F91,color:#17202A,stroke-width:3px;
+    classDef rollout fill:#DCEFD9,stroke:#477A3E,color:#17202A,stroke-width:3px;
+    classDef operate fill:#D7EAF0,stroke:#287080,color:#17202A,stroke-width:3px;
+    classDef monitor fill:#F7EDBD,stroke:#8A711B,color:#17202A,stroke-width:3px;
+    classDef decision fill:#FFFFFF,stroke:#17324D,color:#17202A,stroke-width:4px;
+    classDef rollback fill:#F5D9DC,stroke:#A33B48,color:#17202A,stroke-width:3px;
+    classDef record fill:#E9EDF2,stroke:#485769,color:#17202A,stroke-width:3px;
+
+    class TITLE title;
+    class I1,I2,I3,I4 source;
+    class EVIDENCE evidence;
+    class P1 prepare;
+    class P2 baseline;
+    class P3 design;
+    class P4 approve;
+    class P5 pilot;
+    class P6 rollout;
+    class P7 operate;
+    class MONITOR monitor;
+    class A,G,REVIEW decision;
+    class HOLD,ROLLBACK rollback;
+    class REGISTER record;
+
+    linkStyle default stroke:#334155,stroke-width:2.5px;
