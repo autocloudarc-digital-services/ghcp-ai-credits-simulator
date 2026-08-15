@@ -18,6 +18,8 @@ export default function ReportDownloadButton({
   const [error, setError] = useState<string | null>(null);
 
   const handleDownload = async () => {
+    if (!assessmentResult) return;
+
     setIsGenerating(true);
     setError(null);
     try {
@@ -43,11 +45,15 @@ export default function ReportDownloadButton({
     <div className="flex flex-col items-start gap-2">
       <button
         onClick={handleDownload}
-        disabled={isGenerating}
+        disabled={isGenerating || !assessmentResult}
         className="flex items-center gap-2 bg-teal-500 hover:bg-teal-400 disabled:bg-slate-600 disabled:cursor-not-allowed text-slate-900 font-medium px-4 py-2 rounded-md transition-colors"
       >
         {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-        {isGenerating ? 'Generating report…' : 'Download Executive Report (PDF)'}
+        {isGenerating
+          ? 'Generating report…'
+          : assessmentResult
+            ? 'Download Executive Report (PDF)'
+            : 'Complete assessment to download PDF'}
       </button>
       {error && <span className="text-sm text-red-400">{error}</span>}
     </div>

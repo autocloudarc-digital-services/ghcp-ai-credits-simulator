@@ -4,6 +4,7 @@ import { Session, SessionData } from 'express-session';
 import {
   getAICreditUsage,
   getCopilotLicenseInventory,
+  getCostCenterReportRow,
   getCostCenters,
   getEnterpriseAICreditUsage,
   getEnterpriseCopilotLicenseCounts,
@@ -513,6 +514,34 @@ async function runAssessment(
         })
       : [];
     const existingCostCenters = costCentersAvailable ? costCentersResult.value : [];
+    const activeCostCenters = existingCostCenters.filter((costCenter) => costCenter.state === 'active');
+    const reportingResults = await settleInBatches(
+      activeCostCenters,
+      4,
+      (costCenter) => getCostCenterReportRow(
+        enterpriseSlug,
+        costCenter,
+        session,
+        year,
+        month,
+        enterpriseBillingToken
+      )
+    );
+    const costCenterReporting = costCentersAvailable
+      ? {
+          enterprise: enterpriseSlug,
+          fetchedAt: now.toISOString(),
+          period: { year, month },
+          costCenters: reportingResults.flatMap((reportingResult) =>
+            reportingResult.status === 'fulfilled' ? [reportingResult.value] : []
+          ),
+          warnings: reportingResults.flatMap((reportingResult, index) =>
+            reportingResult.status === 'rejected'
+              ? [`${activeCostCenters[index].name}: ${getFailureMessage(reportingResult.reason)}`]
+              : []
+          ),
+        }
+      : null;
     const governanceDataWarnings: AssessmentResult['governanceDataWarnings'] = [];
 
     if (!budgetsAvailable) {
@@ -617,6 +646,7 @@ async function runAssessment(
       teams,
       users,
       teamMemberships,
+      costCenterReporting,
     };
 
     session.assessmentCompleted = true;

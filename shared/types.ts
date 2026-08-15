@@ -100,6 +100,7 @@ export interface AssessmentResult {
   teams?: GitHubTeamInventory[];
   users?: GitHubUserInventory[];
   teamMemberships?: GitHubTeamMembership[];
+  costCenterReporting?: CostCenterReportingSnapshot | null;
 }
 
 export interface GovernanceDataWarning {
@@ -184,6 +185,7 @@ export interface GitHubCostCenter {
   id: string;
   name: string;
   state: 'active' | 'deleted';
+  azureSubscription?: string | null;
   aiCreditPoolEnabled?: boolean;
   aiCreditPoolState?: {
     targetAmount: number | null;
@@ -195,6 +197,38 @@ export interface GitHubCostCenter {
 export interface GitHubCostCenterResource {
   type: string;
   name: string;
+}
+
+export interface CostCenterReportingMetrics {
+  assignedResources: number;
+  grossQuantity: number;
+  grossAmount: number;
+  discountAmount: number;
+  netAmount: number;
+  otherMeteredSpend: number;
+  usageLineItems: number;
+  totalMeteredSpend: number;
+}
+
+export interface CostCenterReportRow {
+  id: string;
+  name: string;
+  state: 'active' | 'deleted';
+  azureSubscription: string | null;
+  resources: GitHubCostCenterResource[];
+  aiCreditPoolEnabled: boolean;
+  poolTargetCredits: number;
+  poolCurrentCredits: number;
+  utilization: number | null;
+  metrics: CostCenterReportingMetrics;
+}
+
+export interface CostCenterReportingSnapshot {
+  enterprise: string;
+  fetchedAt: string;
+  period: { year: number; month: number };
+  costCenters: CostCenterReportRow[];
+  warnings: string[];
 }
 
 export interface Recommendation {

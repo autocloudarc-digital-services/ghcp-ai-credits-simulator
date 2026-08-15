@@ -1,7 +1,7 @@
 import axios, { AxiosError } from 'axios';
 import { Session } from 'express-session';
 import { getEnterpriseBillingToken } from '../config';
-import { GitHubBudget, GitHubCostCenter } from '../types';
+import { CostCenterReportRow, GitHubBudget, GitHubCostCenter } from '../types';
 import { getTokenFromSession } from './githubAuthService';
 
 const GITHUB_API_BASE_URL = 'https://api.github.com';
@@ -455,8 +455,22 @@ export interface AICreditUsageEntry {
   grossQuantity: number;
   discountQuantity: number;
   netQuantity: number;
+  grossAmount?: number;
+  discountAmount?: number;
+  netAmount?: number;
   userId?: string;
   login?: string;
+}
+
+export interface EnterpriseUsageSummaryEntry {
+  product: string;
+  sku: string;
+  netAmount: number;
+}
+
+export interface EnterpriseUsageSummary {
+  timePeriod?: { year: number; month: number };
+  usageItems: EnterpriseUsageSummaryEntry[];
 }
 
 /**
@@ -487,7 +501,8 @@ export async function getEnterpriseAICreditUsage(
   session: Session,
   year: number,
   month: number,
-  suppliedBillingToken?: string
+  suppliedBillingToken?: string,
+  costCenterId?: string
 ): Promise<AICreditUsageEntry[]> {
   const enterpriseBillingToken = suppliedBillingToken?.trim() || getEnterpriseBillingToken();
   if (!enterpriseBillingToken) {
@@ -502,10 +517,44 @@ export async function getEnterpriseAICreditUsage(
     enterprise,
     (validatedEnterprise) =>
       `/enterprises/${validatedEnterprise}/settings/billing/ai_credit/usage`,
-    { year, month },
+    { year, month, cost_center_id: costCenterId },
     enterpriseBillingToken
   );
   return data.usageItems ?? [];
+}
+
+/**
+ * Retrieves all metered GitHub usage for one enterprise cost center.
+ * GET /enterprises/{enterprise}/settings/billing/usage/summary
+ */
+export async function getEnterpriseUsageSummary(
+  enterprise: string,
+  session: Session,
+  year: number,
+  month: number,
+  costCenterId: string,
+  suppliedBillingToken?: string
+): Promise<EnterpriseUsageSummary> {
+  const enterpriseBillingToken = suppliedBillingToken?.trim() || getEnterpriseBillingToken();
+  if (!enterpriseBillingToken) {
+    throw new GitHubBillingServiceError(
+      'Enterprise usage summary requires GHCP_ENTERPRISE_BILLING_TOKEN.',
+      503
+    );
+  }
+
+  const data = await authenticatedGet<{
+    timePeriod?: { year: number; month: number };
+    usageItems?: EnterpriseUsageSummaryEntry[];
+  }>(
+    session,
+    enterprise,
+    (validatedEnterprise) =>
+      `/enterprises/${validatedEnterprise}/settings/billing/usage/summary`,
+    { year, month, cost_center_id: costCenterId },
+    enterpriseBillingToken
+  );
+  return { timePeriod: data.timePeriod, usageItems: data.usageItems ?? [] };
 }
 
 interface GitHubBudgetResponse {
@@ -532,6 +581,7 @@ interface GitHubCostCenterResponse {
   id: string;
   name: string;
   state?: 'active' | 'deleted';
+  azure_subscription?: string;
   ai_credit_pool_enabled?: boolean;
   ai_credit_pool_state?: {
     target_amount: number | null;
@@ -674,6 +724,7 @@ export async function getCostCenters(
     id: costCenter.id,
     name: costCenter.name,
     state: costCenter.state ?? 'active',
+    azureSubscription: costCenter.azure_subscription ?? null,
     aiCreditPoolEnabled: costCenter.ai_credit_pool_enabled,
     aiCreditPoolState: costCenter.ai_credit_pool_state
       ? {
@@ -683,6 +734,72 @@ export async function getCostCenters(
       : undefined,
     resources: costCenter.resources ?? [],
   }));
+}
+
+function sumNumbers<T>(items: T[], select: (item: T) => unknown): number {
+  return items.reduce((total, item) => total + (Number(select(item)) || 0), 0);
+}
+
+/**
+ * Joins AI-credit accounting and broader metered usage for one cost center.
+ */
+export async function getCostCenterReportRow(
+  enterprise: string,
+  costCenter: GitHubCostCenter,
+  session: Session,
+  year: number,
+  month: number,
+  suppliedBillingToken?: string
+): Promise<CostCenterReportRow> {
+  const [aiCreditUsage, usageSummary] = await Promise.all([
+    getEnterpriseAICreditUsage(
+      enterprise,
+      session,
+      year,
+      month,
+      suppliedBillingToken,
+      costCenter.id
+    ),
+    getEnterpriseUsageSummary(
+      enterprise,
+      session,
+      year,
+      month,
+      costCenter.id,
+      suppliedBillingToken
+    ),
+  ]);
+  const otherUsage = usageSummary.usageItems.filter(
+    (item) => !`${item.product ?? ''} ${item.sku ?? ''}`.toLowerCase().includes('ai credit')
+  );
+  const poolTargetCredits = Number(costCenter.aiCreditPoolState?.targetAmount) || 0;
+  const poolCurrentCredits = Number(costCenter.aiCreditPoolState?.currentAmount) || 0;
+  const netAmount = sumNumbers(aiCreditUsage, (item) => item.netAmount);
+  const otherMeteredSpend = sumNumbers(otherUsage, (item) => item.netAmount);
+
+  return {
+    id: costCenter.id,
+    name: costCenter.name,
+    state: costCenter.state,
+    azureSubscription: costCenter.azureSubscription ?? null,
+    resources: costCenter.resources,
+    aiCreditPoolEnabled: Boolean(costCenter.aiCreditPoolEnabled),
+    poolTargetCredits,
+    poolCurrentCredits,
+    utilization: poolTargetCredits > 0
+      ? Math.min((poolCurrentCredits / poolTargetCredits) * 100, 100)
+      : null,
+    metrics: {
+      assignedResources: costCenter.resources.length,
+      grossQuantity: sumNumbers(aiCreditUsage, (item) => item.grossQuantity),
+      grossAmount: sumNumbers(aiCreditUsage, (item) => item.grossAmount),
+      discountAmount: sumNumbers(aiCreditUsage, (item) => item.discountAmount),
+      netAmount,
+      otherMeteredSpend,
+      usageLineItems: usageSummary.usageItems.length,
+      totalMeteredSpend: netAmount + otherMeteredSpend,
+    },
+  };
 }
 
 /**

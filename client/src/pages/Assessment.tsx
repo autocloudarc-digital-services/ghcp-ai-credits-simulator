@@ -47,7 +47,7 @@ export default function Assessment() {
   };
 
   const pollAssessment = async (assessmentId: string) => {
-    const maxAttempts = 20;
+    const maxAttempts = 120;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       const statusRes = await axios.get(`/api/assessment/status/${assessmentId}`);
       if (statusRes.data.status === 'complete') {

@@ -1,11 +1,14 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { Building2, FileText } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { calculateGovernanceReadinessScore, generateRecommendations } from '../engine/creditCalculationEngine';
+import CostCenterReporting from '../components/report/CostCenterReporting';
 import ReportPreview from '../components/report/ReportPreview';
 import ReportDownloadButton from '../components/report/ReportDownloadButton';
 
 export default function Report() {
   const { simulatorConfig, assessmentResult, recommendations } = useAppStore();
+  const [activeView, setActiveView] = useState<'cost-centers' | 'executive'>('cost-centers');
 
   const effectiveRecommendations = useMemo(
     () => (recommendations.length > 0 ? recommendations : generateRecommendations(assessmentResult, simulatorConfig)),
@@ -19,26 +22,62 @@ export default function Report() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between flex-wrap gap-4">
+      <div>
         <div>
-          <h1 className="text-2xl font-semibold text-slate-100">Executive Report</h1>
+          <h1 className="text-2xl font-semibold text-slate-100">AI Credits Reporting</h1>
           <p className="text-sm text-slate-400">
-            Preview and download a tailored governance strategy report.
+            Reconcile cost-center showback, included value, and incremental chargeback.
           </p>
         </div>
-        <ReportDownloadButton
-          simulatorConfig={simulatorConfig}
-          assessmentResult={assessmentResult}
-          recommendations={effectiveRecommendations}
-        />
       </div>
 
-      <ReportPreview
-        simulatorConfig={simulatorConfig}
-        assessmentResult={assessmentResult}
-        recommendations={effectiveRecommendations}
-        governanceScore={governanceScore}
-      />
+      <div role="tablist" aria-label="Report views" className="inline-flex rounded-md border border-slate-700 bg-slate-950 p-1">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeView === 'cost-centers'}
+          onClick={() => setActiveView('cost-centers')}
+          className={`flex items-center gap-2 rounded px-3 py-2 text-sm font-medium ${
+            activeView === 'cost-centers' ? 'bg-teal-500 text-slate-950' : 'text-slate-400 hover:text-slate-100'
+          }`}
+        >
+          <Building2 className="h-4 w-4" /> Cost center reporting
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeView === 'executive'}
+          onClick={() => setActiveView('executive')}
+          className={`flex items-center gap-2 rounded px-3 py-2 text-sm font-medium ${
+            activeView === 'executive' ? 'bg-teal-500 text-slate-950' : 'text-slate-400 hover:text-slate-100'
+          }`}
+        >
+          <FileText className="h-4 w-4" /> Executive report
+        </button>
+      </div>
+
+      {activeView === 'cost-centers' ? (
+        <CostCenterReporting
+          snapshot={assessmentResult?.costCenterReporting ?? null}
+          includedCreditBudget={assessmentResult?.includedCreditPools[0]?.limit ?? 0}
+        />
+      ) : (
+        <div className="space-y-4">
+          <div className="flex justify-end">
+            <ReportDownloadButton
+              simulatorConfig={simulatorConfig}
+              assessmentResult={assessmentResult}
+              recommendations={effectiveRecommendations}
+            />
+          </div>
+          <ReportPreview
+            simulatorConfig={simulatorConfig}
+            assessmentResult={assessmentResult}
+            recommendations={effectiveRecommendations}
+            governanceScore={governanceScore}
+          />
+        </div>
+      )}
     </div>
   );
 }

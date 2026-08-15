@@ -22,7 +22,7 @@ const NAV_ITEMS = [
   { to: '/simulator', label: 'Simulator', icon: SlidersHorizontal, requirement: 'simulation' },
   { to: '/dashboard', label: 'Governance Insights', icon: LayoutDashboard, requirement: 'dashboard' },
   { to: '/recommendations', label: 'Recommendations', icon: ListChecks, requirement: 'recommendations' },
-  { to: '/report', label: 'Report', icon: FileText, requirement: 'report' },
+  { to: '/report', label: 'Reports', icon: FileText, requirement: 'report' },
 ];
 
 function WorkflowGate({ allowed, redirectTo, children }: { allowed: boolean; redirectTo: string; children: ReactNode }) {
@@ -37,7 +37,6 @@ export default function App() {
     resetWorkflow,
     hasConfirmedSimulation,
     hasReviewedDashboard,
-    hasReviewedRecommendations,
   } = useAppStore();
 
   useEffect(() => {
@@ -64,11 +63,7 @@ export default function App() {
     simulation: completedAssessment,
     dashboard: completedAssessment && hasConfirmedSimulation,
     recommendations: completedAssessment && hasConfirmedSimulation && hasReviewedDashboard,
-    report:
-      completedAssessment &&
-      hasConfirmedSimulation &&
-      hasReviewedDashboard &&
-      hasReviewedRecommendations,
+    report: true,
   };
 
   const lockReason = {
@@ -76,7 +71,7 @@ export default function App() {
     simulation: 'Complete an assessment first',
     dashboard: 'Confirm simulator inputs first',
     recommendations: 'Review the dashboard first',
-    report: 'Review recommendations first',
+    report: '',
   };
 
   return (
@@ -150,7 +145,7 @@ export default function App() {
           />
           <Route
             path="/report"
-            element={<WorkflowGate allowed={access.report} redirectTo={access.recommendations ? '/recommendations' : access.dashboard ? '/dashboard' : completedAssessment ? '/simulator' : '/'}><Report /></WorkflowGate>}
+            element={<Report />}
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>}
