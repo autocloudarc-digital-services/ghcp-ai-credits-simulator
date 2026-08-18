@@ -105,7 +105,8 @@ async function authenticatedGetAll<T>(
   session: Session,
   slug: string,
   buildPath: (validatedSlug: string) => string,
-  params?: Record<string, string | number | undefined>
+  params?: Record<string, string | number | undefined>,
+  credential?: string
 ): Promise<T[]> {
   const items: T[] = [];
   for (let page = 1; page <= MAX_PAGES; page++) {
@@ -113,7 +114,7 @@ async function authenticatedGetAll<T>(
       ...params,
       per_page: 100,
       page,
-    });
+    }, credential);
     items.push(...pageItems);
     if (pageItems.length < 100) return items;
   }
@@ -127,9 +128,10 @@ async function authenticatedGraphQL<T>(
   session: Session,
   operationName: string,
   query: string,
-  variables: Record<string, unknown>
+  variables: Record<string, unknown>,
+  credential?: string
 ): Promise<T> {
-  const token = getTokenFromSession(session);
+  const token = credential ?? getTokenFromSession(session);
   if (!token) {
     throw new GitHubBillingServiceError('No authenticated GitHub session found.', 401);
   }
@@ -276,15 +278,45 @@ interface GitHubTeamResponse {
   parent?: { id: number } | null;
 }
 
+interface GitHubEnterpriseTeamResponse {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string | null;
+  organization_selection_type?: 'disabled' | 'selected' | 'all';
+  group_id: string | null;
+  group_name?: string | null;
+}
+
+interface GitHubEnterpriseTeamMemberResponse {
+  id: number;
+  node_id: string;
+  login: string;
+  name?: string | null;
+  email?: string | null;
+}
+
+export interface GitHubEnterpriseTeam {
+  id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  organizationSelectionType: 'disabled' | 'selected' | 'all';
+  groupId: string | null;
+  groupName: string | null;
+}
+
 export async function getEnterpriseOrganizations(
   enterprise: string,
-  session: Session
+  session: Session,
+  suppliedBillingToken?: string
 ): Promise<GitHubOrganizationDetails[]> {
   if (!GITHUB_SLUG_PATTERN.test(enterprise)) {
     throw new GitHubBillingServiceError(`Invalid GitHub organization/enterprise slug: "${enterprise}"`, 400);
   }
 
   const organizations: GitHubOrganizationDetails[] = [];
+  const enterpriseCredential = suppliedBillingToken?.trim() || getEnterpriseBillingToken() || undefined;
   let cursor: string | null = null;
   for (let page = 1; page <= MAX_PAGES; page++) {
     const result: EnterpriseOrganizationsResponse = await authenticatedGraphQL<EnterpriseOrganizationsResponse>(
@@ -298,7 +330,8 @@ export async function getEnterpriseOrganizations(
           }
         }
       }`,
-      { slug: enterprise, cursor }
+      { slug: enterprise, cursor },
+      enterpriseCredential
     );
     if (!result.enterprise) {
       throw new GitHubBillingServiceError(`GitHub enterprise "${enterprise}" was not found or is not visible.`, 404);
@@ -323,13 +356,15 @@ export async function getEnterpriseOrganizations(
 
 export async function getEnterpriseMembers(
   enterprise: string,
-  session: Session
+  session: Session,
+  suppliedBillingToken?: string
 ): Promise<GitHubEnterpriseMember[]> {
   if (!GITHUB_SLUG_PATTERN.test(enterprise)) {
     throw new GitHubBillingServiceError(`Invalid GitHub organization/enterprise slug: "${enterprise}"`, 400);
   }
 
   const members: GitHubEnterpriseMember[] = [];
+  const enterpriseCredential = suppliedBillingToken?.trim() || getEnterpriseBillingToken() || undefined;
   let cursor: string | null = null;
   for (let page = 1; page <= MAX_PAGES; page++) {
     const result: EnterpriseMembersResponse = await authenticatedGraphQL<EnterpriseMembersResponse>(
@@ -347,7 +382,8 @@ export async function getEnterpriseMembers(
           }
         }
       }`,
-      { slug: enterprise, cursor }
+      { slug: enterprise, cursor },
+      enterpriseCredential
     );
     if (!result.enterprise) {
       throw new GitHubBillingServiceError(`GitHub enterprise "${enterprise}" was not found or is not visible.`, 404);
@@ -367,6 +403,79 @@ export async function getEnterpriseMembers(
     `GitHub GraphQL pagination exceeded ${MAX_PAGES} pages for enterprise members.`,
     422
   );
+}
+
+/**
+ * Retrieves enterprise-scoped teams using a classic PAT with read:enterprise.
+ * GET /enterprises/{enterprise}/teams
+ */
+export async function getEnterpriseTeams(
+  enterprise: string,
+  session: Session,
+  suppliedBillingToken?: string
+): Promise<GitHubEnterpriseTeam[]> {
+  const enterpriseBillingToken = suppliedBillingToken?.trim() || getEnterpriseBillingToken();
+  if (!enterpriseBillingToken) {
+    throw new GitHubBillingServiceError(
+      'Enterprise team inventory requires GHCP_ENTERPRISE_BILLING_TOKEN with read:enterprise.',
+      503
+    );
+  }
+
+  const teams = await authenticatedGetAll<GitHubEnterpriseTeamResponse>(
+    session,
+    enterprise,
+    (validatedEnterprise) => `/enterprises/${validatedEnterprise}/teams`,
+    undefined,
+    enterpriseBillingToken
+  );
+  return teams.map((team) => ({
+    id: team.id,
+    name: team.name,
+    slug: team.slug,
+    description: team.description ?? null,
+    organizationSelectionType: team.organization_selection_type ?? 'disabled',
+    groupId: team.group_id,
+    groupName: team.group_name ?? null,
+  }));
+}
+
+/**
+ * Retrieves membership for one enterprise-scoped team.
+ * GET /enterprises/{enterprise}/teams/{enterprise-team}/memberships
+ */
+export async function getEnterpriseTeamMembers(
+  enterprise: string,
+  teamId: number,
+  session: Session,
+  suppliedBillingToken?: string
+): Promise<GitHubEnterpriseMember[]> {
+  if (!Number.isSafeInteger(teamId) || teamId <= 0) {
+    throw new GitHubBillingServiceError(`Invalid GitHub enterprise team ID: "${teamId}"`, 400);
+  }
+  const enterpriseBillingToken = suppliedBillingToken?.trim() || getEnterpriseBillingToken();
+  if (!enterpriseBillingToken) {
+    throw new GitHubBillingServiceError(
+      'Enterprise team membership requires GHCP_ENTERPRISE_BILLING_TOKEN with read:enterprise.',
+      503
+    );
+  }
+
+  const members = await authenticatedGetAll<GitHubEnterpriseTeamMemberResponse>(
+    session,
+    enterprise,
+    (validatedEnterprise) =>
+      `/enterprises/${validatedEnterprise}/teams/${teamId}/memberships`,
+    undefined,
+    enterpriseBillingToken
+  );
+  return members.map((member) => ({
+    id: member.id,
+    nodeId: member.node_id,
+    login: member.login,
+    name: member.name ?? null,
+    email: member.email ?? null,
+  }));
 }
 
 export async function getOrganizationDetails(
@@ -410,7 +519,8 @@ export async function getOrganizationTeams(
   const teams = await authenticatedGetAll<GitHubTeamResponse>(
     session,
     org,
-    (validatedOrg) => `/orgs/${validatedOrg}/teams`
+    (validatedOrg) => `/orgs/${validatedOrg}/teams`,
+    { team_type: 'organization' }
   );
   return teams.map((team) => ({
     id: team.id,

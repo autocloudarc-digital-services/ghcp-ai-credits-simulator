@@ -125,15 +125,17 @@ export interface GitHubOrganizationInventory {
 
 export interface GitHubTeamInventory {
   id: number;
-  nodeId: string;
-  organization: string;
+  nodeId: string | null;
+  scope: 'enterprise' | 'organization';
+  organization: string | null;
   name: string;
   slug: string;
   description: string | null;
-  privacy: string;
-  permission: string;
+  privacy: string | null;
+  permission: string | null;
   parentTeamId: number | null;
-  memberCount: number;
+  memberCount: number | null;
+  organizationSelectionType: 'disabled' | 'selected' | 'all' | null;
 }
 
 export interface GitHubUserInventory {
@@ -144,7 +146,13 @@ export interface GitHubUserInventory {
   email: string | null;
   status: string;
   organizations: string[];
-  teams: Array<{ id: number; name: string; slug: string; organization: string }>;
+  teams: Array<{
+    id: number;
+    name: string;
+    slug: string;
+    scope: 'enterprise' | 'organization';
+    organization: string | null;
+  }>;
   creditsConsumed: number | null;
   percentOfTotal: number | null;
 }
@@ -153,7 +161,8 @@ export interface GitHubTeamMembership {
   teamId: number;
   userId: number;
   login: string;
-  organization: string;
+  scope: 'enterprise' | 'organization';
+  organization: string | null;
   role: 'member' | 'maintainer';
   state: 'active';
 }

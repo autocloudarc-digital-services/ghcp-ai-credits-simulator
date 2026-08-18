@@ -727,16 +727,17 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
             )}
             {teamInventory.length === 0 ? (
               <p className={`text-sm ${teamsWarning ? 'text-amber-300' : 'text-slate-500'}`}>
-                {teamWarningMessage || 'No teams were reported by the assessed organizations.'}
+                {teamWarningMessage || 'No enterprise or organization teams were reported.'}
               </p>
             ) : (
             <div className="overflow-x-auto rounded-md border border-slate-700">
-              <table className="w-full min-w-[1100px] text-left text-sm">
-                <caption className="sr-only">Organization team inventory and memberships</caption>
+              <table className="w-full min-w-[1180px] text-left text-sm">
+                <caption className="sr-only">Enterprise and organization team inventory and memberships</caption>
                 <thead className="bg-slate-900/70 text-slate-200">
                   <tr>
                     <th className="px-3 py-2 font-semibold">Team ID</th>
-                    <th className="px-3 py-2 font-semibold">Organization ID</th>
+                    <th className="px-3 py-2 font-semibold">Scope</th>
+                    <th className="px-3 py-2 font-semibold">Scope target</th>
                     <th className="px-3 py-2 font-semibold">Parent team ID</th>
                     <th className="px-3 py-2 font-semibold">Slug</th>
                     <th className="px-3 py-2 font-semibold">Name</th>
@@ -748,25 +749,35 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
                 </thead>
                 <tbody className="divide-y divide-slate-700 text-slate-200">
                   {teamInventory.map((team) => {
-                    const organizationId = organizationInventory.find(
-                      (organization) => organization.slug === team.organization
-                    )?.id;
+                    const scopeTarget = team.scope === 'enterprise'
+                      ? team.organizationSelectionType === 'all'
+                        ? 'All organizations'
+                        : team.organizationSelectionType === 'selected'
+                          ? 'Selected organizations'
+                          : 'Enterprise only'
+                      : team.organization;
                     return (
-                      <tr key={`${team.organization}:${team.id}`}>
+                      <tr key={`${team.scope}:${team.organization ?? 'enterprise'}:${team.id}`}>
                         <td className="px-3 py-3 font-numeric text-xs text-slate-400">{team.id}</td>
-                        <td className="px-3 py-3 font-numeric text-xs text-slate-400">{organizationId ?? 'Unavailable'}</td>
+                        <td className="px-3 py-3 capitalize text-slate-300">{team.scope}</td>
+                        <td className="max-w-64 break-words px-3 py-3 text-slate-300">{scopeTarget}</td>
                         <td className="px-3 py-3 font-numeric text-xs text-slate-400">{team.parentTeamId ?? 'None'}</td>
                         <td className="max-w-64 break-words px-3 py-3 text-slate-300">{team.slug}</td>
                         <td className="max-w-80 break-words px-3 py-3 font-medium">{team.name}</td>
-                        <td className="px-3 py-3 text-slate-300">{team.privacy}</td>
-                        <td className="px-3 py-3 text-slate-300">{team.permission}</td>
-                        <td className="px-3 py-3 text-right font-numeric">{team.memberCount.toLocaleString()}</td>
+                        <td className="px-3 py-3 text-slate-300">{team.privacy ?? 'Enterprise-managed'}</td>
+                        <td className="px-3 py-3 text-slate-300">{team.permission ?? 'Enterprise-managed'}</td>
                         <td className="px-3 py-3 text-right font-numeric">
-                          {teamMemberships.filter(
-                            (membership) => membership.teamId === team.id
-                              && membership.organization === team.organization
-                              && membership.role === 'maintainer'
-                          ).length.toLocaleString()}
+                          {team.memberCount?.toLocaleString() ?? 'Unavailable'}
+                        </td>
+                        <td className="px-3 py-3 text-right font-numeric">
+                          {team.scope === 'enterprise' || team.memberCount === null
+                            ? 'Unavailable'
+                            : teamMemberships.filter(
+                                (membership) => membership.teamId === team.id
+                                  && membership.scope === team.scope
+                                  && membership.organization === team.organization
+                                  && membership.role === 'maintainer'
+                              ).length.toLocaleString()}
                         </td>
                       </tr>
                     );
@@ -818,7 +829,10 @@ export default function AssessmentResults({ result, totalIncludedPool }: Assessm
                         <td className="max-w-72 break-words px-3 py-3 text-slate-300">{user.organizations.join(', ')}</td>
                         <td className="max-w-96 break-words px-3 py-3 text-slate-300">
                           {user.teams.length > 0
-                            ? user.teams.map((team) => `${team.organization}/${team.slug}`).join(', ')
+                            ? user.teams.map((team) => team.scope === 'enterprise'
+                                ? `Enterprise/${team.slug}`
+                                : `${team.organization}/${team.slug}`
+                              ).join(', ')
                             : 'None'}
                         </td>
                         <td className="px-3 py-3 text-right font-numeric">{user.creditsConsumed?.toLocaleString() ?? 'Not attributed'}</td>
