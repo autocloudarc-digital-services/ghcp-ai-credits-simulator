@@ -11,6 +11,7 @@ import {
   getEnterpriseMembers,
   getEnterpriseOrganizations,
   getEnterpriseTeamMembers,
+  getEnterpriseTeamOrganizations,
   getEnterpriseTeams,
   getExistingBudgets,
   getOrganizationDetails,
@@ -165,36 +166,66 @@ async function runAssessment(
 
     const orgsToAssess = organizations.length > 0 ? organizations : [enterpriseSlug];
     const [enterpriseOrganizationsResult, enterpriseMembersResult, enterpriseTeamsResult] = await Promise.allSettled([
-      getEnterpriseOrganizations(enterpriseSlug, session, enterpriseBillingToken),
-      getEnterpriseMembers(enterpriseSlug, session, enterpriseBillingToken),
+      getEnterpriseOrganizations(enterpriseSlug, session),
+      getEnterpriseMembers(enterpriseSlug, session),
       getEnterpriseTeams(enterpriseSlug, session, enterpriseBillingToken),
     ]);
-    const discoveredOrganizations = enterpriseOrganizationsResult.status === 'fulfilled'
+    const graphQLDiscoveredOrganizations = enterpriseOrganizationsResult.status === 'fulfilled'
       ? enterpriseOrganizationsResult.value
       : [];
-    const inventoryOrganizationSlugs = Array.from(new Map(
-      [...discoveredOrganizations.map((organization) => organization.login), ...orgsToAssess]
-        .map((organization) => [organization.toLowerCase(), organization])
-    ).values());
-    const discoveredOrganizationsBySlug = new Map(
-      discoveredOrganizations.map((organization) => [organization.login.toLowerCase(), organization])
-    );
     const enterpriseTeams = enterpriseTeamsResult.status === 'fulfilled'
       ? enterpriseTeamsResult.value
       : [];
-    const enterpriseTeamMemberResults = await settleInBatches(
-      enterpriseTeams,
-      5,
-      async (team) => ({
-        team,
-        members: await getEnterpriseTeamMembers(
-          enterpriseSlug,
-          team.id,
-          session,
-          enterpriseBillingToken
-        ),
-      })
+    const [enterpriseTeamMemberResults, enterpriseTeamOrganizationResults] = await Promise.all([
+      settleInBatches(
+        enterpriseTeams,
+        5,
+        async (team) => ({
+          team,
+          members: await getEnterpriseTeamMembers(
+            enterpriseSlug,
+            team.id,
+            session,
+            enterpriseBillingToken
+          ),
+        })
+      ),
+      settleInBatches(
+        enterpriseTeams,
+        5,
+        async (team) => ({
+          team,
+          organizations: await getEnterpriseTeamOrganizations(
+            enterpriseSlug,
+            team.id,
+            session,
+            enterpriseBillingToken
+          ),
+        })
+      ),
+    ]);
+    const assignedOrganizations = enterpriseTeamOrganizationResults.flatMap((result) =>
+      result.status === 'fulfilled' ? result.value.organizations : []
     );
+    const enterpriseTeamOrganizationFailures = enterpriseTeamOrganizationResults.flatMap(
+      (result, index) => result.status === 'rejected'
+        ? [`enterprise/${enterpriseTeams[index].slug}: ${getFailureMessage(result.reason)}`]
+        : []
+    );
+    const enterpriseTeamFallbackHasCoverage = enterpriseTeamsResult.status === 'fulfilled'
+      && enterpriseTeams.length > 0;
+    const enterpriseTeamMembershipFallbackAvailable = enterpriseTeamFallbackHasCoverage
+      && enterpriseTeamMemberResults.every((result) => result.status === 'fulfilled');
+    const enterpriseOrganizationFallbackAvailable = enterpriseTeamFallbackHasCoverage
+      && enterpriseTeamOrganizationResults.every((result) => result.status === 'fulfilled');
+    const discoveredOrganizationsBySlug = new Map(
+      [...graphQLDiscoveredOrganizations, ...assignedOrganizations]
+        .map((organization) => [organization.login.toLowerCase(), organization])
+    );
+    const inventoryOrganizationSlugs = Array.from(new Map(
+      [...Array.from(discoveredOrganizationsBySlug.values(), (organization) => organization.login), ...orgsToAssess]
+        .map((organization) => [organization.toLowerCase(), organization])
+    ).values());
 
     for (const org of orgsToAssess) {
       let usage;
@@ -294,6 +325,7 @@ async function runAssessment(
     const organizationInventoryFailures: string[] = [];
     const userInventoryFailures: string[] = [];
     const teamInventoryFailures: string[] = [];
+    const suppressibleOrganizationTeamFailures = new Set<string>();
 
     if (enterpriseMembersResult.status === 'fulfilled') {
       for (const member of enterpriseMembersResult.value) {
@@ -405,9 +437,14 @@ async function runAssessment(
         );
       }
       if (inventory.teamsResult.status === 'rejected') {
-        teamInventoryFailures.push(
-          `${inventory.org}: ${getFailureMessage(inventory.teamsResult.reason)}`
-        );
+        const failure = `${inventory.org}: ${getFailureMessage(inventory.teamsResult.reason)}`;
+        teamInventoryFailures.push(failure);
+        if (
+          inventory.teamsResult.reason instanceof GitHubBillingServiceError
+          && inventory.teamsResult.reason.status === 403
+        ) {
+          suppressibleOrganizationTeamFailures.add(failure);
+        }
       }
 
       for (const member of members) {
@@ -692,13 +729,22 @@ async function runAssessment(
         message: `Organization details are unavailable for ${organizationInventoryFailures.join(', ')}.`,
       });
     }
-    if (enterpriseOrganizationsResult.status === 'rejected') {
+    if (enterpriseOrganizationsResult.status === 'rejected' && !enterpriseOrganizationFallbackAvailable) {
       governanceDataWarnings.push({
         source: 'organizations',
-        message: `Enterprise organization discovery failed; showing submitted organizations only. ${getFailureMessage(enterpriseOrganizationsResult.reason)}`,
+        message: `Enterprise organization discovery failed. ${getFailureMessage(enterpriseOrganizationsResult.reason)}${
+          enterpriseTeamOrganizationFailures.length > 0
+            ? ` Enterprise team organization assignment fallback failed for ${enterpriseTeamOrganizationFailures.join(', ')}.`
+            : ''
+        }`,
+      });
+    } else if (enterpriseTeamOrganizationFailures.length > 0) {
+      governanceDataWarnings.push({
+        source: 'organizations',
+        message: `Enterprise team organization assignment inventory failed for ${enterpriseTeamOrganizationFailures.join(', ')}.`,
       });
     }
-    if (enterpriseMembersResult.status === 'rejected') {
+    if (enterpriseMembersResult.status === 'rejected' && !enterpriseTeamMembershipFallbackAvailable) {
       governanceDataWarnings.push({
         source: 'users',
         message: `Enterprise member discovery failed; showing members visible through organization and team APIs only. ${getFailureMessage(enterpriseMembersResult.reason)}`,
@@ -716,10 +762,15 @@ async function runAssessment(
         message: `Organization member inventory is unavailable for ${userInventoryFailures.join(', ')}.`,
       });
     }
-    if (teamInventoryFailures.length > 0) {
+    const reportableTeamInventoryFailures = enterpriseTeamsResult.status === 'fulfilled'
+      ? teamInventoryFailures.filter(
+          (failure) => !suppressibleOrganizationTeamFailures.has(failure)
+        )
+      : teamInventoryFailures;
+    if (reportableTeamInventoryFailures.length > 0) {
       governanceDataWarnings.push({
         source: 'teams',
-        message: `Team inventory is incomplete for ${teamInventoryFailures.join(', ')}.`,
+        message: `Team inventory is incomplete for ${reportableTeamInventoryFailures.join(', ')}.`,
       });
     }
 

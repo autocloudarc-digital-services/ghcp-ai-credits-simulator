@@ -128,10 +128,9 @@ async function authenticatedGraphQL<T>(
   session: Session,
   operationName: string,
   query: string,
-  variables: Record<string, unknown>,
-  credential?: string
+  variables: Record<string, unknown>
 ): Promise<T> {
-  const token = credential ?? getTokenFromSession(session);
+  const token = getTokenFromSession(session);
   if (!token) {
     throw new GitHubBillingServiceError('No authenticated GitHub session found.', 401);
   }
@@ -258,7 +257,7 @@ interface GitHubOrganizationDetailsResponse {
   id: number;
   node_id: string;
   login: string;
-  name: string | null;
+  name?: string | null;
 }
 
 interface GitHubMemberResponse {
@@ -308,15 +307,13 @@ export interface GitHubEnterpriseTeam {
 
 export async function getEnterpriseOrganizations(
   enterprise: string,
-  session: Session,
-  suppliedBillingToken?: string
+  session: Session
 ): Promise<GitHubOrganizationDetails[]> {
   if (!GITHUB_SLUG_PATTERN.test(enterprise)) {
     throw new GitHubBillingServiceError(`Invalid GitHub organization/enterprise slug: "${enterprise}"`, 400);
   }
 
   const organizations: GitHubOrganizationDetails[] = [];
-  const enterpriseCredential = suppliedBillingToken?.trim() || getEnterpriseBillingToken() || undefined;
   let cursor: string | null = null;
   for (let page = 1; page <= MAX_PAGES; page++) {
     const result: EnterpriseOrganizationsResponse = await authenticatedGraphQL<EnterpriseOrganizationsResponse>(
@@ -330,8 +327,7 @@ export async function getEnterpriseOrganizations(
           }
         }
       }`,
-      { slug: enterprise, cursor },
-      enterpriseCredential
+      { slug: enterprise, cursor }
     );
     if (!result.enterprise) {
       throw new GitHubBillingServiceError(`GitHub enterprise "${enterprise}" was not found or is not visible.`, 404);
@@ -356,15 +352,13 @@ export async function getEnterpriseOrganizations(
 
 export async function getEnterpriseMembers(
   enterprise: string,
-  session: Session,
-  suppliedBillingToken?: string
+  session: Session
 ): Promise<GitHubEnterpriseMember[]> {
   if (!GITHUB_SLUG_PATTERN.test(enterprise)) {
     throw new GitHubBillingServiceError(`Invalid GitHub organization/enterprise slug: "${enterprise}"`, 400);
   }
 
   const members: GitHubEnterpriseMember[] = [];
-  const enterpriseCredential = suppliedBillingToken?.trim() || getEnterpriseBillingToken() || undefined;
   let cursor: string | null = null;
   for (let page = 1; page <= MAX_PAGES; page++) {
     const result: EnterpriseMembersResponse = await authenticatedGraphQL<EnterpriseMembersResponse>(
@@ -382,8 +376,7 @@ export async function getEnterpriseMembers(
           }
         }
       }`,
-      { slug: enterprise, cursor },
-      enterpriseCredential
+      { slug: enterprise, cursor }
     );
     if (!result.enterprise) {
       throw new GitHubBillingServiceError(`GitHub enterprise "${enterprise}" was not found or is not visible.`, 404);
@@ -478,6 +471,43 @@ export async function getEnterpriseTeamMembers(
   }));
 }
 
+/**
+ * Retrieves organizations assigned to one enterprise-scoped team.
+ * GET /enterprises/{enterprise}/teams/{enterprise-team}/organizations
+ */
+export async function getEnterpriseTeamOrganizations(
+  enterprise: string,
+  teamId: number,
+  session: Session,
+  suppliedBillingToken?: string
+): Promise<GitHubOrganizationDetails[]> {
+  if (!Number.isSafeInteger(teamId) || teamId <= 0) {
+    throw new GitHubBillingServiceError(`Invalid GitHub enterprise team ID: "${teamId}"`, 400);
+  }
+  const enterpriseBillingToken = suppliedBillingToken?.trim() || getEnterpriseBillingToken();
+  if (!enterpriseBillingToken) {
+    throw new GitHubBillingServiceError(
+      'Enterprise team organization assignments require GHCP_ENTERPRISE_BILLING_TOKEN with read:enterprise.',
+      503
+    );
+  }
+
+  const organizations = await authenticatedGetAll<GitHubOrganizationDetailsResponse>(
+    session,
+    enterprise,
+    (validatedEnterprise) =>
+      `/enterprises/${validatedEnterprise}/teams/${teamId}/organizations`,
+    undefined,
+    enterpriseBillingToken
+  );
+  return organizations.map((organization) => ({
+    id: organization.id,
+    nodeId: organization.node_id,
+    login: organization.login,
+    name: organization.name ?? null,
+  }));
+}
+
 export async function getOrganizationDetails(
   org: string,
   session: Session
@@ -491,7 +521,7 @@ export async function getOrganizationDetails(
     id: organization.id,
     nodeId: organization.node_id,
     login: organization.login,
-    name: organization.name,
+    name: organization.name ?? null,
   };
 }
 
