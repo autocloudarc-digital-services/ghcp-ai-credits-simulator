@@ -1,0 +1,126 @@
+{
+  "date": "2026-09-10",
+  "basis": "Authorized live assessment, pseudonymized replay in unchanged application UI",
+  "confidentialValues": "Opaque screenshot overlays; no raw screenshots included",
+  "productionWrites": 0,
+  "navigationOverride": false,
+  "simulation": "Derived in isolated presentation session, not a provider outcome",
+  "registerState": "empty",
+  "screenshots": [
+    {
+      "id": "01-assessment-overview",
+      "title": "Connect the enterprise context",
+      "caption": "Live assessment workflow. Inputs and account details are masked; no credentials were transferred to the capture browser.",
+      "file": "screenshots/01-assessment-overview.png"
+    },
+    {
+      "id": "02-assessment-consumption",
+      "title": "Understand consumption and source coverage",
+      "caption": "Observed assessment view. Confidential amounts and identities are covered. Missing-source warnings remain visible; empty charts are not populated with invented data.",
+      "file": "screenshots/02-assessment-consumption.png"
+    },
+    {
+      "id": "03-assessment-pool",
+      "title": "Separate the included pool from metered budgets",
+      "caption": "Included pool and governance configuration. Values are confidential; the captured state is not evidence that provider controls are enforced.",
+      "file": "screenshots/03-assessment-pool.png"
+    },
+    {
+      "id": "04-assessment-budgets",
+      "title": "Governance inventory / Budgets",
+      "caption": "Live inventory, first visible rows. Identifiers are pseudonymous; amounts and private values are redacted. Unknown and unavailable data remain unknown.",
+      "file": "screenshots/04-assessment-budgets.png"
+    },
+    {
+      "id": "04-assessment-costCenters",
+      "title": "Governance inventory / Cost centers",
+      "caption": "Live inventory, first visible rows. Identifiers are pseudonymous; amounts and private values are redacted. Unknown and unavailable data remain unknown.",
+      "file": "screenshots/04-assessment-costCenters.png"
+    },
+    {
+      "id": "04-assessment-organizations",
+      "title": "Governance inventory / Organizations",
+      "caption": "Live inventory, first visible rows. Identifiers are pseudonymous; amounts and private values are redacted. Unknown and unavailable data remain unknown.",
+      "file": "screenshots/04-assessment-organizations.png"
+    },
+    {
+      "id": "04-assessment-teams",
+      "title": "Governance inventory / Teams",
+      "caption": "Live inventory, first visible rows. Identifiers are pseudonymous; amounts and private values are redacted. Unknown and unavailable data remain unknown.",
+      "file": "screenshots/04-assessment-teams.png"
+    },
+    {
+      "id": "04-assessment-users",
+      "title": "Governance inventory / Users",
+      "caption": "Live inventory, first visible rows. Identifiers are pseudonymous; amounts and private values are redacted. Unknown and unavailable data remain unknown.",
+      "file": "screenshots/04-assessment-users.png"
+    },
+    {
+      "id": "05-simulator-license",
+      "title": "Model license pools and credit exposure",
+      "caption": "Planning inputs restored from the live workflow. These may include assumptions requiring confirmation; projected outcomes are not observed provider enforcement.",
+      "file": "screenshots/05-simulator-license.png"
+    },
+    {
+      "id": "06-simulator-population",
+      "title": "Allocate developer populations",
+      "caption": "Population allocation view. Confidential input values and calculated outputs are masked. No changes are saved to the live account.",
+      "file": "screenshots/06-simulator-population.png"
+    },
+    {
+      "id": "07-simulator-scenarios",
+      "title": "Compare options without changing provider controls",
+      "caption": "What-if workspace. No saved scenario set was imported for this capture; the empty state is retained rather than implying a completed comparison.",
+      "file": "screenshots/07-simulator-scenarios.png"
+    },
+    {
+      "id": "08-simulator-snapshot",
+      "title": "Snapshot the current planning configuration",
+      "caption": "Presentation-only interaction: the current configuration was snapshotted in the isolated browser. It is not an approved scenario or a production write.",
+      "file": "screenshots/08-simulator-snapshot.png"
+    },
+    {
+      "id": "09-governance-insights",
+      "title": "Bring the planning signals together",
+      "caption": "Derived planning view, opened in the isolated session. Readiness and STOP/CONTINUE indicators are simulator output, not verified provider decisions.",
+      "file": "screenshots/09-governance-insights.png"
+    },
+    {
+      "id": "10-governance-flow",
+      "title": "Explain the credit-control sequence",
+      "caption": "The two-dimensional flow is the app's readable fallback. It explains modeled behavior; actual enforcement still requires current provider evidence.",
+      "file": "screenshots/10-governance-flow.png"
+    },
+    {
+      "id": "11-recommendations",
+      "title": "Translate modeled exposure into actions",
+      "caption": "Recommendations are generated from the captured assessment and planning inputs. They are proposals, not approvals, executed changes, or guaranteed savings.",
+      "file": "screenshots/11-recommendations.png"
+    },
+    {
+      "id": "13-report-cost-centers",
+      "title": "Connect usage to accountability",
+      "caption": "Cost-center reporting from the captured live snapshot. Private names, subscription identifiers, quantities, and financial amounts are redacted.",
+      "file": "screenshots/13-report-cost-centers.png"
+    },
+    {
+      "id": "14-report-detail-0",
+      "title": "Inspect allocation and chargeback context",
+      "caption": "Reporting detail. Default allocations are planning suggestions, not evidence of an approved allocation plan.",
+      "file": "screenshots/14-report-detail-0.png"
+    },
+    {
+      "id": "15-report-executive",
+      "title": "Prepare the executive narrative",
+      "caption": "Executive preview based on the captured assessment and planning state. PDF generation and saved-report retrieval are not triggered during this showcase.",
+      "file": "screenshots/15-report-executive.png"
+    },
+    {
+      "id": "16-report-register",
+      "title": "Keep evidence and decisions visible",
+      "caption": "Active Register with the live account's existing access. Empty or unavailable states are retained; no records, approvals, or evidence have been fabricated.",
+      "file": "screenshots/16-report-register.png"
+    }
+  ],
+  "errors": []
+}
