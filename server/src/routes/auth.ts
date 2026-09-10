@@ -56,16 +56,20 @@ router.get('/github/callback', async (req, res, next) => {
 // GET /auth/status - lets the client know (without ever exposing the token)
 // whether the current session is authenticated.
 router.get('/status', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store');
   res.json({
-    connected: isAuthenticated(req.session),
+    connected: isAuthenticated(req.session) && Boolean(req.session.githubUserId),
+    accountId: req.session.githubUserId ?? null,
     enterprise: req.session.enterprise ?? null,
   });
 });
 
 // POST /auth/logout - revoke the token with GitHub and clear session state.
-router.post('/logout', async (req, res) => {
+router.post('/logout', async (req, res, next) => {
   await revokeToken(req.session);
-  req.session.destroy(() => {
+  req.session.destroy((error) => {
+    if (error) { next(new Error('Could not revoke the stored session. Retry disconnecting.')); return; }
+    res.clearCookie('connect.sid');
     res.json({ success: true });
   });
 });

@@ -9,6 +9,7 @@ import {
   FileText,
   LockKeyhole,
   Sparkles,
+  RefreshCw,
 } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import Simulator from './pages/Simulator';
@@ -16,6 +17,7 @@ import Assessment from './pages/Assessment';
 import Recommendations from './pages/Recommendations';
 import Report from './pages/Report';
 import { useAppStore } from './store/appStore';
+import { loadWorkflow, flushWorkflow, stopWorkflowPersistence } from './lib/workflowPersistence';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Assessment', icon: Search, requirement: 'assessment' },
@@ -37,24 +39,31 @@ export default function App() {
     resetWorkflow,
     hasConfirmedSimulation,
     hasReviewedDashboard,
+    persistenceStatus,
+    persistenceError,
   } = useAppStore();
 
   useEffect(() => {
+    let active = true;
     axios
       .get('/auth/status')
-      .then((response) => {
+      .then(async (response) => {
+        if (!active) return;
         if (response.data.connected) {
           setIsConnected(true, response.data.enterprise);
+          await loadWorkflow().catch(() => {});
         } else {
           setIsConnected(false);
           resetWorkflow();
         }
       })
       .catch(() => {
+        if (!active) return;
         setIsConnected(false);
         resetWorkflow();
       })
-      .finally(() => setHasCheckedAuthentication(true));
+      .finally(() => { if (active) setHasCheckedAuthentication(true); });
+    return () => { active = false; stopWorkflowPersistence(); };
   }, [resetWorkflow, setIsConnected]);
 
   const completedAssessment = assessmentResult !== null;
@@ -124,6 +133,15 @@ export default function App() {
       </aside>
 
       <main className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        {persistenceStatus !== 'idle' && <div className="mb-4 flex flex-wrap items-center gap-3 text-xs text-slate-400" role="status" aria-live="polite">
+          <span>{persistenceError ?? (persistenceStatus === 'saving' ? 'Saving...' : persistenceStatus === 'loading' ? 'Loading saved data...' : 'Saved to PostgreSQL')}</span>
+          {persistenceError && <>
+            <button type="button" className="flex items-center gap-1 text-teal-400" onClick={() => { void flushWorkflow().catch(() => {}); }}><RefreshCw className="h-3 w-3" /> Retry save</button>
+            <button type="button" className="flex items-center gap-1 text-teal-400" onClick={() => {
+              if (window.confirm('Reload saved data and discard unsaved changes in this tab?')) void loadWorkflow().catch(() => {});
+            }}><RefreshCw className="h-3 w-3" /> Reload saved data</button>
+          </>}
+        </div>}
         {!hasCheckedAuthentication ? (
           <div className="flex min-h-[50vh] items-center justify-center text-sm text-slate-400">
             Validating GitHub session…

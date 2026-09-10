@@ -12,6 +12,7 @@ declare module 'express-session' {
     tokenExpiresIn?: number;
     refreshToken?: string;
     assessmentCompleted?: boolean;
+    githubUserId?: string;
   }
 }
 
@@ -119,6 +120,9 @@ export async function exchangeCodeForToken(
       return { success: false, error: 'GitHub did not return an access token.' };
     }
 
+    const identity = await axios.get(`${GITHUB_API_BASE_URL}/user`, { timeout: 10000, headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/vnd.github+json' } });
+    if (!Number.isSafeInteger(identity.data.id) || identity.data.id <= 0) throw new Error('GitHub identity could not be verified.');
+    (session as Session & Partial<import('express-session').SessionData>).githubUserId = String(identity.data.id);
     (session as any).encryptedToken = encryptToken(accessToken);
     (session as any).refreshToken = response.data.refresh_token;
     (session as any).tokenObtainedAt = Date.now();
@@ -218,5 +222,5 @@ export async function revokeToken(session: Session): Promise<void> {
 }
 
 export function isAuthenticated(session: Session): boolean {
-  return Boolean((session as any).encryptedToken);
+  return Boolean(getTokenFromSession(session));
 }

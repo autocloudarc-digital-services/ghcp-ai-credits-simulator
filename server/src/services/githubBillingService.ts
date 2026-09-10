@@ -92,8 +92,29 @@ async function authenticatedGet<T>(
         await sleep(2 ** attempt * 250);
         continue;
       }
+      let accessHint = '';
+      if (status === 403) {
+        const headers = axiosErr.response?.headers;
+        const payload = axiosErr.response?.data as { message?: unknown } | undefined;
+        const message = typeof payload?.message === 'string' ? payload.message : '';
+        if (String(headers?.['x-ratelimit-remaining']) === '0' || /rate limit/i.test(message)) {
+          accessHint = ' GitHub rate limiting denied this request; wait for the limit to reset before retrying.';
+        } else if (String(headers?.['x-github-sso']).startsWith('required') || /SAML|single sign.on/i.test(message)) {
+          accessHint = ' GitHub requires SAML SSO authorization for this credential and organization.';
+        } else if (/OAuth.*restric|third.party.*restric/i.test(message)) {
+          accessHint = ' Organization OAuth app access restrictions block this request; an organization owner must approve the app.';
+        } else if (/not accessible by integration/i.test(message)) {
+          accessHint = ' GitHub App permissions or installation access do not cover this organization resource.';
+        } else if (/not accessible by personal access token/i.test(message)) {
+          accessHint = ' The personal access token lacks permission or resource-owner access for this endpoint.';
+        } else if (/^\/orgs\/[^/]+\/members$/.test(path)) {
+          accessHint = ' Verify organization membership and read:org access (or GitHub App Members: read). Enterprise ownership alone does not grant organization membership.';
+        } else if (/^\/orgs\/[^/]+\/copilot\/billing$/.test(path)) {
+          accessHint = ' Organization Copilot billing requires an organization owner and read:org or manage_billing:copilot for an OAuth app or classic PAT.';
+        }
+      }
       throw new GitHubBillingServiceError(
-        `GitHub API request to ${path} failed: ${axiosErr.message}`,
+        `GitHub API request to ${path} failed: ${axiosErr.message}${accessHint}`,
         status
       );
     }
@@ -642,8 +663,12 @@ export async function getEnterpriseAICreditUsage(
   year: number,
   month: number,
   suppliedBillingToken?: string,
-  costCenterId?: string
+  costCenterId?: string,
+  organization?: string
 ): Promise<AICreditUsageEntry[]> {
+  if (organization !== undefined && !GITHUB_SLUG_PATTERN.test(organization)) {
+    throw new GitHubBillingServiceError('Invalid GitHub organization filter.', 400);
+  }
   const enterpriseBillingToken = suppliedBillingToken?.trim() || getEnterpriseBillingToken();
   if (!enterpriseBillingToken) {
     throw new GitHubBillingServiceError(
@@ -652,15 +677,21 @@ export async function getEnterpriseAICreditUsage(
     );
   }
 
-  const data = await authenticatedGet<{ usageItems?: AICreditUsageEntry[] }>(
+  const data = await authenticatedGet<{ usageItems?: AICreditUsageEntry[]; organization?: string }>(
     session,
     enterprise,
     (validatedEnterprise) =>
       `/enterprises/${validatedEnterprise}/settings/billing/ai_credit/usage`,
-    { year, month, cost_center_id: costCenterId },
+    { year, month, cost_center_id: costCenterId, organization },
     enterpriseBillingToken
   );
-  return data.usageItems ?? [];
+  if (!Array.isArray(data.usageItems)) {
+    throw new GitHubBillingServiceError('Enterprise AI credit usage response is incomplete; usageItems is missing.', 502);
+  }
+  if (organization && data.organization !== undefined && (typeof data.organization !== 'string' || data.organization.toLowerCase() !== organization.toLowerCase())) {
+    throw new GitHubBillingServiceError('Enterprise AI credit usage response does not match the requested organization.', 502);
+  }
+  return data.usageItems;
 }
 
 /**
@@ -752,6 +783,71 @@ interface GitHubBillingUsageItem {
 export interface CopilotLicenseInventory {
   count: number;
   sku: string;
+}
+
+export interface EnterpriseCopilotSeatInventory {
+  totalBySku: Record<string, number>;
+  organizationAssignedBySku: Record<string, number>;
+  enterpriseOnlyBySku: Record<string, number>;
+  byOrganization: Record<string, Record<string, number>>;
+}
+
+export async function getEnterpriseCopilotSeatInventory(
+  enterprise: string,
+  session: Session,
+  suppliedBillingToken?: string
+): Promise<EnterpriseCopilotSeatInventory> {
+  const credential = suppliedBillingToken?.trim() || getEnterpriseBillingToken();
+  if (!credential) throw new GitHubBillingServiceError('Enterprise Copilot seats require GHCP_ENTERPRISE_BILLING_TOKEN with read:enterprise or manage_billing:copilot.', 503);
+  const users = new Map<number, { sku: string; organizations: Set<string> }>();
+  let expectedTotal: number | undefined;
+  let complete = false;
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const data = await authenticatedGet<{
+      total_seats?: number;
+      seats?: { assignee?: { id: number } | null; organization?: { login: string } | null; plan_type?: string }[];
+    }>(session, enterprise, slug => `/enterprises/${slug}/copilot/billing/seats`, { per_page: 100, page }, credential);
+    if (!Number.isSafeInteger(data.total_seats) || data.total_seats! < 0 || !Array.isArray(data.seats) || data.seats.length > 100) {
+      throw new GitHubBillingServiceError('Enterprise Copilot seat response is incomplete.', 502);
+    }
+    if (expectedTotal !== undefined && expectedTotal !== data.total_seats) {
+      throw new GitHubBillingServiceError('Enterprise Copilot seat total changed during pagination; retry the assessment.', 409);
+    }
+    expectedTotal = data.total_seats;
+    for (const seat of data.seats) {
+      if (!seat.assignee || !Number.isSafeInteger(seat.assignee.id) || seat.assignee.id <= 0 || !['business', 'enterprise'].includes(seat.plan_type ?? '')) {
+        throw new GitHubBillingServiceError('Enterprise Copilot seats contain an unknown assignee or plan; included entitlement cannot be inferred.', 422);
+      }
+      if (seat.organization !== null && seat.organization !== undefined && (typeof seat.organization.login !== 'string' || !GITHUB_SLUG_PATTERN.test(seat.organization.login))) {
+        throw new GitHubBillingServiceError('Enterprise Copilot seat organization is invalid.', 502);
+      }
+      const sku = `copilot-${seat.plan_type}`;
+      const existing = users.get(seat.assignee.id);
+      if (existing && existing.sku !== sku) throw new GitHubBillingServiceError('Enterprise Copilot seats contain conflicting plans for one user; entitlement remains unverified.', 422);
+      const user = existing ?? { sku, organizations: new Set<string>() };
+      if (seat.organization) user.organizations.add(seat.organization.login.toLowerCase());
+      users.set(seat.assignee.id, user);
+    }
+    if (data.seats.length < 100) { complete = true; break; }
+  }
+  if (!complete || users.size !== expectedTotal) {
+    throw new GitHubBillingServiceError('Enterprise Copilot seat coverage does not match total_seats; no complete license inventory is available.', 422);
+  }
+  const totalBySku: Record<string, number> = {};
+  const organizationAssignedBySku: Record<string, number> = {};
+  const enterpriseOnlyBySku: Record<string, number> = {};
+  const byOrganization = new Map<string, Record<string, number>>();
+  for (const user of users.values()) {
+    totalBySku[user.sku] = (totalBySku[user.sku] ?? 0) + 1;
+    const partition = user.organizations.size ? organizationAssignedBySku : enterpriseOnlyBySku;
+    partition[user.sku] = (partition[user.sku] ?? 0) + 1;
+    for (const org of user.organizations) {
+      const counts = byOrganization.get(org) ?? {};
+      counts[user.sku] = (counts[user.sku] ?? 0) + 1;
+      byOrganization.set(org, counts);
+    }
+  }
+  return { totalBySku, organizationAssignedBySku, enterpriseOnlyBySku, byOrganization: Object.fromEntries(byOrganization) };
 }
 
 /**

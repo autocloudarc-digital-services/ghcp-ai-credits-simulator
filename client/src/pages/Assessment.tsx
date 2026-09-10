@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import axios from 'axios';
-import { Github, LogOut, ShieldCheck } from 'lucide-react';
+import { Github, LogOut, ShieldCheck, RefreshCw, History } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/appStore';
 import ApiConfigForm from '../components/assessment/ApiConfigForm';
 import AssessmentResults from '../components/assessment/AssessmentResults';
 import { calculateIncludedPool } from '../engine/creditCalculationEngine';
 import { AssessmentConfig } from '../types';
+import { flushWorkflow, stopWorkflowPersistence } from '../lib/workflowPersistence';
 
 async function startAssessment(config: AssessmentConfig): Promise<string> {
   try {
@@ -31,6 +32,28 @@ export default function Assessment() {
     simulatorConfig,
   } = useAppStore();
   const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<Array<{ id: string; status: string; created_at: string; input: { enterpriseSlug: string } }>>([]);
+  const [selectedAssessment, setSelectedAssessment] = useState('');
+
+  const refreshHistory = async () => {
+    try { setHistory((await axios.get('/api/assessment/history')).data); }
+    catch { setError('Saved assessment history could not be loaded.'); }
+  };
+  useEffect(() => {
+    if (isConnected && !isAssessing) void refreshHistory();
+    if (!isConnected) { setHistory([]); setSelectedAssessment(''); }
+  }, [isConnected, isAssessing]);
+
+  const restoreAssessment = async () => {
+    const selected = history.find(item => item.id === selectedAssessment);
+    if (!selected || !window.confirm('Restore this assessment and reset the current simulator review progress?')) return;
+    try {
+      const response = await axios.get(`/api/assessment/results/${selected.id}`);
+      completeAssessment(response.data, selected.input.enterpriseSlug, selected.id);
+      await flushWorkflow();
+      setError(null);
+    } catch { setError('Could not restore and save the selected assessment.'); }
+  };
 
   const handleConnect = () => {
     window.location.href = '/auth/github';
@@ -38,11 +61,14 @@ export default function Assessment() {
 
   const handleLogout = async () => {
     try {
+      await flushWorkflow();
       await axios.post('/auth/logout');
-    } finally {
+      stopWorkflowPersistence();
       setIsConnected(false);
       resetWorkflow();
       navigate('/');
+    } catch {
+      setError('Could not save changes or disconnect. Retry when the server is available.');
     }
   };
 
@@ -70,7 +96,8 @@ export default function Assessment() {
     try {
       const assessmentId = await startAssessment(config);
       const result = await pollAssessment(assessmentId);
-      completeAssessment(result, connectedEnterprise ?? enterpriseSlug);
+      completeAssessment(result, connectedEnterprise ?? enterpriseSlug, assessmentId);
+      await flushWorkflow();
     } catch (err) {
       setError(
         axios.isAxiosError(err)
@@ -129,6 +156,18 @@ export default function Assessment() {
           assessment configuration below.
         </div>
       )}
+
+      {isConnected && <div className="flex flex-wrap items-end gap-2">
+        <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-slate-400">
+          Recent assessments
+          <select aria-label="Saved assessment" value={selectedAssessment} onChange={event => setSelectedAssessment(event.target.value)} className="h-9 w-full min-w-0 rounded-md border border-slate-700 bg-slate-800 px-2 text-sm text-slate-100">
+            <option value="">Select a saved assessment</option>
+            {history.map(item => <option key={item.id} value={item.id} disabled={item.status !== 'complete'}>{item.input.enterpriseSlug} / {new Date(item.created_at).toLocaleString()} / {item.status}</option>)}
+          </select>
+        </label>
+        <button type="button" title="Refresh assessment history" aria-label="Refresh assessment history" onClick={() => { void refreshHistory(); }} className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-700"><RefreshCw className="h-4 w-4" /></button>
+        <button type="button" disabled={!selectedAssessment || isAssessing} onClick={() => { void restoreAssessment(); }} className="flex h-9 items-center gap-2 rounded-md border border-slate-700 px-3 text-sm disabled:opacity-40"><History className="h-4 w-4" /> Restore</button>
+      </div>}
 
       <ApiConfigForm
         onSubmit={handleAssess}

@@ -1,0 +1,216 @@
+{
+    "targetPercent": 90,
+    "maxIterations": 10,
+    "requirements": [
+        {
+            "id": "R01",
+            "source": "User loop request",
+            "requirement": "Discoverable bounded instruction, skill, prompt, and agent",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R02",
+            "source": "Guide J.5",
+            "requirement": "Persistent PostgreSQL named volume and health checks",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R03",
+            "source": "Guide J.1",
+            "requirement": "Repeatable migrations and non-destructive restart durability",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R04",
+            "source": "Guide J.2",
+            "requirement": "All nine typed records and canonical logical keys",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R05",
+            "source": "Guide J.2",
+            "requirement": "Stable identity with separate provider evidence",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R06",
+            "source": "Guide 4; J.2",
+            "requirement": "Named owner, delegate, support, approval and rollback gates",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R07",
+            "source": "Guide 1-7",
+            "requirement": "Seven phases with bounded forward transitions",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R08",
+            "source": "Guide J.3",
+            "requirement": "Provenance, timestamps, unknowns, freshness and evidence",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R09",
+            "source": "Guide 3.1",
+            "requirement": "Integer ULB values, precedence and tenant reset evidence",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R10",
+            "source": "Guide 1.1; J.4",
+            "requirement": "Entitlement baseline purpose and observed cycle/reset fields",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R11",
+            "source": "Guide 3.4; J.4",
+            "requirement": "Included-usage cap and downstream link without Stop usage",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R12",
+            "source": "Guide J.3",
+            "requirement": "Numeric USD metered budget with evidence-gated Stop usage",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R13",
+            "source": "Guide J.3",
+            "requirement": "SKUs, ordered thresholds, recipients and response SLA",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R14",
+            "source": "Guide 3.4.2",
+            "requirement": "Separate numeric license forecast and ISO currency",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R15",
+            "source": "Guide 5",
+            "requirement": "P-01, P-01a, P-02, P-03, P-04, P-05 evidence records",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R16",
+            "source": "Guide 6; J.4",
+            "requirement": "Rollout configured/effective verification and pause gates",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R17",
+            "source": "Guide 7; Appendix D",
+            "requirement": "Monitoring and retain/revise/rollback decision overlays",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R18",
+            "source": "Guide J.4",
+            "requirement": "Time-bounded exceptions cannot remain active when expired",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R19",
+            "source": "Guide Read first; J.5",
+            "requirement": "Authenticated deny-by-default role and tenant access",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R20",
+            "source": "Guide J.5",
+            "requirement": "Atomic writes, optimistic locking and append-only revisions",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R21",
+            "source": "Guide 2; J.1",
+            "requirement": "Create, inspect, revise and filter records in existing Reports UI",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R22",
+            "source": "User preservation request",
+            "requirement": "Existing reports, navigation and simulator preserved",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R23",
+            "source": "Guide J.1; J.5",
+            "requirement": "Timestamped JSON and canonical CSV exports with history",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R24",
+            "source": "Guide J.1; J.5",
+            "requirement": "Immutable signed phase-exit snapshots",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R25",
+            "source": "Guide Appendix F",
+            "requirement": "Documented backup and verified restore procedure",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R26",
+            "source": "Guide Appendix E",
+            "requirement": "Preserve original evidence and distinguish calculated/forecast/observed",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R27",
+            "source": "Guide 3.2",
+            "requirement": "Validated provider user-to-cost-center allocation with no stale assignments",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R28",
+            "source": "Guide 4-6",
+            "requirement": "Real named approvals and provider P-01 through P-05 pilot outcomes",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R29",
+            "source": "User loop request",
+            "requirement": "Video guidance independently retrieved and mapped",
+            "verified": false,
+            "evidence": []
+        },
+        {
+            "id": "R30",
+            "source": "User loop request",
+            "requirement": "Ten logged iterations or verified 90 percent stop with passing safety gates",
+            "verified": false,
+            "evidence": []
+        }
+    ]
+}

@@ -7,12 +7,18 @@ import { csrf } from 'lusca';
 import authRoutes from './routes/auth';
 import assessmentRoutes from './routes/assessment';
 import reportRoutes from './routes/report';
+import registerRoutes from './register/routes';
+import workflowRoutes from './routes/workflow';
+import { PostgresSessionStore } from './persistence/sessionStore';
 import { requireAuth } from './middleware/requireAuth';
 import { getClientOrigin, getSessionSecret } from './config';
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3001;
 const CLIENT_ORIGIN = getClientOrigin();
+const sessionStore = new PostgresSessionStore(getSessionSecret());
+const sessionCleanup = setInterval(() => { void sessionStore.prune().catch(() => console.error('Expired-session cleanup failed.')); }, 60 * 60 * 1000);
+sessionCleanup.unref();
 
 app.use(
   cors({
@@ -20,11 +26,12 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
 
 app.use(
   session({
     secret: getSessionSecret(),
+    store: sessionStore,
     resave: false,
     saveUninitialized: false,
     cookie: {
@@ -55,6 +62,8 @@ const authRateLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 30, standardH
 app.use('/auth', authRateLimiter, authRoutes);
 app.use('/api/assessment', requireAuth, assessmentRoutes);
 app.use('/api/report', requireAuth, reportRoutes);
+app.use('/api/register', requireAuth, registerRoutes);
+app.use('/api/workflow', requireAuth, workflowRoutes);
 
 if (process.env.NODE_ENV === 'production') {
   const clientDistPath = path.resolve(__dirname, '../../client/dist');

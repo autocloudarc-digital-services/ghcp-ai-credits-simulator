@@ -1,0 +1,37 @@
+name: ghcp-active-register
+services:
+  postgres:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: register_owner
+      POSTGRES_DB: active_register
+      POSTGRES_PASSWORD: ${REGISTER_DB_PASSWORD:?Run node scripts/register-db.mjs up}
+    volumes:
+      - register_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U register_owner -d active_register"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    networks: [register]
+  gateway:
+    image: postgrest/postgrest:v12.2.12
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://register_authenticator:${REGISTER_DB_PASSWORD}@postgres:5432/active_register
+      PGRST_DB_SCHEMAS: register
+      PGRST_JWT_SECRET: ${REGISTER_JWT_SECRET:?Run node scripts/register-db.mjs up}
+      PGRST_DB_MAX_ROWS: 10000
+    ports:
+      - "127.0.0.1:${REGISTER_GATEWAY_PORT:-3302}:3000"
+    networks: [register, gateway]
+networks:
+  register:
+    internal: true
+  gateway:
+volumes:
+  register_data:

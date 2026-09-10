@@ -58,11 +58,12 @@ export function getAllocationStorageKey(enterprise: string): string {
 export function loadAllocationPlan(
   enterprise: string,
   costCenters: CostCenterReportRow[],
-  defaultBudget: number
+  defaultBudget: number,
+  plans: Record<string, AllocationPlan> = {}
 ): AllocationPlan {
   const defaultPercentages = createDefaultPercentages(costCenters);
   try {
-    const saved = JSON.parse(localStorage.getItem(getAllocationStorageKey(enterprise)) ?? 'null');
+    const saved = plans[getAllocationStorageKey(enterprise)];
     const savedBudget = Number(saved?.budget);
     return {
       budget: Number.isFinite(savedBudget) && savedBudget > 0 ? savedBudget : defaultBudget || '',

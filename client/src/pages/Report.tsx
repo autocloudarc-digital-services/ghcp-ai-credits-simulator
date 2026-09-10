@@ -1,14 +1,15 @@
 import { useMemo, useState } from 'react';
-import { Building2, FileText } from 'lucide-react';
+import { Building2, ClipboardList, FileText } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { calculateGovernanceReadinessScore, generateRecommendations } from '../engine/creditCalculationEngine';
 import CostCenterReporting from '../components/report/CostCenterReporting';
 import ReportPreview from '../components/report/ReportPreview';
 import ReportDownloadButton from '../components/report/ReportDownloadButton';
+import ActiveRegister from '../components/report/ActiveRegister';
 
 export default function Report() {
   const { simulatorConfig, assessmentResult, recommendations } = useAppStore();
-  const [activeView, setActiveView] = useState<'cost-centers' | 'executive'>('cost-centers');
+  const [activeView, setActiveView] = useState<'cost-centers' | 'executive' | 'register'>('cost-centers');
 
   const effectiveRecommendations = useMemo(
     () => (recommendations.length > 0 ? recommendations : generateRecommendations(assessmentResult, simulatorConfig)),
@@ -31,7 +32,7 @@ export default function Report() {
         </div>
       </div>
 
-      <div role="tablist" aria-label="Report views" className="inline-flex rounded-md border border-slate-700 bg-slate-950 p-1">
+      <div role="tablist" aria-label="Report views" className="inline-flex flex-wrap rounded-md border border-slate-700 bg-slate-950 p-1">
         <button
           type="button"
           role="tab"
@@ -54,6 +55,10 @@ export default function Report() {
         >
           <FileText className="h-4 w-4" /> Executive report
         </button>
+        <button type="button" role="tab" aria-selected={activeView === 'register'} onClick={() => setActiveView('register')}
+          className={`flex items-center gap-2 rounded px-3 py-2 text-sm font-medium ${activeView === 'register' ? 'bg-teal-500 text-slate-950' : 'text-slate-400 hover:text-slate-100'}`}>
+          <ClipboardList className="h-4 w-4" /> Active Register
+        </button>
       </div>
 
       {activeView === 'cost-centers' ? (
@@ -61,7 +66,7 @@ export default function Report() {
           snapshot={assessmentResult?.costCenterReporting ?? null}
           includedCreditBudget={assessmentResult?.includedCreditPools[0]?.limit ?? 0}
         />
-      ) : (
+      ) : activeView === 'register' ? <ActiveRegister /> : (
         <div className="space-y-4">
           <div className="flex justify-end">
             <ReportDownloadButton

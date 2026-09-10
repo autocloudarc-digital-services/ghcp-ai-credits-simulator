@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
+import type { AllocationPlan } from '../lib/costCenterReporting';
 import {
   AssessmentResult,
   Recommendation,
@@ -28,6 +28,11 @@ export const defaultSimulatorConfig: SimulatorConfig = {
 };
 
 interface AppState {
+  allocationPlans: Record<string, AllocationPlan>;
+  setAllocationPlan: (key: string, plan: AllocationPlan) => void;
+  assessmentId: string | null;
+  persistenceStatus: 'idle' | 'loading' | 'saving' | 'saved' | 'error';
+  persistenceError: string | null;
   // Simulator
   simulatorConfig: SimulatorConfig;
   simulatorResult: SimulatorResult | null;
@@ -60,7 +65,7 @@ interface AppState {
   setIsAssessing: (val: boolean) => void;
   setIsConnected: (val: boolean, enterprise?: string) => void;
   setRecommendations: (recs: Recommendation[]) => void;
-  completeAssessment: (result: AssessmentResult, enterpriseName: string) => void;
+  completeAssessment: (result: AssessmentResult, enterpriseName: string, assessmentId: string) => void;
   confirmSimulation: (result: SimulatorResult) => void;
   markDashboardReviewed: () => void;
   markRecommendationsReviewed: () => void;
@@ -68,7 +73,12 @@ interface AppState {
   toggle3DVisualizer: () => void;
 }
 
-export const useAppStore = create<AppState>()(persist((set) => ({
+export const useAppStore = create<AppState>()((set) => ({
+  allocationPlans: {},
+  setAllocationPlan: (key, plan) => set(state => ({ allocationPlans: { ...state.allocationPlans, [key]: plan } })),
+  assessmentId: null,
+  persistenceStatus: 'idle',
+  persistenceError: null,
   simulatorConfig: defaultSimulatorConfig,
   simulatorResult: null,
   scenarios: [],
@@ -119,10 +129,16 @@ export const useAppStore = create<AppState>()(persist((set) => ({
   setAssessmentResult: (result) => set({ assessmentResult: result }),
   setIsAssessing: (val) => set({ isAssessing: val }),
   setIsConnected: (val, enterprise) =>
-    set({ isConnected: val, connectedEnterprise: enterprise ?? null }),
+    set({ isConnected: val, connectedEnterprise: enterprise ?? null, ...(!val ? {
+      assessmentId: null, assessmentResult: null, simulatorConfig: defaultSimulatorConfig, allocationPlans: {},
+      simulatorResult: null, scenarios: [], recommendations: [], use3DVisualizer: true,
+      hasConfirmedSimulation: false, hasReviewedDashboard: false, hasReviewedRecommendations: false,
+      persistenceStatus: 'idle' as const, persistenceError: null,
+    } : {}) }),
   setRecommendations: (recs) => set({ recommendations: recs }),
-  completeAssessment: (result, enterpriseName) =>
+  completeAssessment: (result, enterpriseName, assessmentId) =>
     set((state) => ({
+      assessmentId,
       assessmentResult: result,
       simulatorConfig: {
         ...state.simulatorConfig,
@@ -148,6 +164,7 @@ export const useAppStore = create<AppState>()(persist((set) => ({
   markRecommendationsReviewed: () => set({ hasReviewedRecommendations: true }),
   resetWorkflow: () =>
     set({
+      assessmentId: null,
       assessmentResult: null,
       simulatorResult: null,
       scenarios: [],
@@ -157,18 +174,4 @@ export const useAppStore = create<AppState>()(persist((set) => ({
       hasReviewedRecommendations: false,
     }),
   toggle3DVisualizer: () => set((state) => ({ use3DVisualizer: !state.use3DVisualizer })),
-}), {
-  name: 'ghcp-ai-credits-workflow',
-  storage: createJSONStorage(() => sessionStorage),
-  partialize: (state) => ({
-    simulatorConfig: state.simulatorConfig,
-    simulatorResult: state.simulatorResult,
-    scenarios: state.scenarios,
-    assessmentResult: state.assessmentResult,
-    recommendations: state.recommendations,
-    hasConfirmedSimulation: state.hasConfirmedSimulation,
-    hasReviewedDashboard: state.hasReviewedDashboard,
-    hasReviewedRecommendations: state.hasReviewedRecommendations,
-    use3DVisualizer: state.use3DVisualizer,
-  }),
 }));

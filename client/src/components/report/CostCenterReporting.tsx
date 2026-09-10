@@ -29,6 +29,8 @@ import {
   YAxis,
 } from 'recharts';
 import { CostCenterReportingSnapshot } from '../../types';
+import { useAppStore } from '../../store/appStore';
+import { flushWorkflow } from '../../lib/workflowPersistence';
 import {
   buildConsolidatedReport,
   calculateAllocationRows,
@@ -54,19 +56,20 @@ export default function CostCenterReporting({
   snapshot,
   includedCreditBudget,
 }: CostCenterReportingProps) {
+  const { allocationPlans, setAllocationPlan } = useAppStore();
   const costCenters = snapshot?.costCenters ?? [];
   const [selectedCostCenterId, setSelectedCostCenterId] = useState(costCenters[0]?.id ?? '');
   const [plan, setPlan] = useState(() => snapshot
-    ? loadAllocationPlan(snapshot.enterprise, costCenters, includedCreditBudget)
+    ? loadAllocationPlan(snapshot.enterprise, costCenters, includedCreditBudget, allocationPlans)
     : { budget: includedCreditBudget || '' as const, percentages: {} }
   );
   const [saveStatus, setSaveStatus] = useState('');
 
   useEffect(() => {
     if (!snapshot) return;
-    setPlan(loadAllocationPlan(snapshot.enterprise, snapshot.costCenters, includedCreditBudget));
+    setPlan(loadAllocationPlan(snapshot.enterprise, snapshot.costCenters, includedCreditBudget, allocationPlans));
     setSelectedCostCenterId(snapshot.costCenters[0]?.id ?? '');
-  }, [snapshot, includedCreditBudget]);
+  }, [snapshot, includedCreditBudget, allocationPlans]);
 
   if (!snapshot) {
     return (
@@ -148,10 +151,12 @@ export default function CostCenterReporting({
     setSaveStatus('');
   };
 
-  const savePlan = () => {
+  const savePlan = async () => {
     if (!validAllocation) return;
-    localStorage.setItem(getAllocationStorageKey(snapshot.enterprise), JSON.stringify(plan));
-    setSaveStatus('Allocation plan saved in this browser.');
+    setAllocationPlan(getAllocationStorageKey(snapshot.enterprise), plan);
+    setSaveStatus('Saving allocation plan...');
+    try { await flushWorkflow(); setSaveStatus('Allocation plan saved to PostgreSQL.'); }
+    catch { setSaveStatus('Allocation plan is not saved. Retry when the server is available.'); }
   };
 
   const downloadReport = () => {

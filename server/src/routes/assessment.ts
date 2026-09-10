@@ -1,6 +1,8 @@
 import { randomUUID } from 'crypto';
 import { Router } from 'express';
 import { Session, SessionData } from 'express-session';
+import { z } from 'zod';
+import { accountId, createAssessment, getAssessment, latestAssessment, listAssessments, updateAssessment } from '../persistence/applicationStore';
 import {
   getAICreditUsage,
   getCopilotLicenseInventory,
@@ -8,6 +10,7 @@ import {
   getCostCenters,
   getEnterpriseAICreditUsage,
   getEnterpriseCopilotLicenseCounts,
+  getEnterpriseCopilotSeatInventory,
   getEnterpriseMembers,
   getEnterpriseOrganizations,
   getEnterpriseTeamMembers,
@@ -29,14 +32,7 @@ import {
 
 const router = Router();
 
-interface AssessmentJob {
-  ownerSessionId: string;
-  status: 'pending' | 'complete' | 'failed';
-  result?: AssessmentResult;
-  error?: string;
-}
-
-const jobs = new Map<string, AssessmentJob>();
+router.use((_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
 
 const STANDARD_INCLUDED_CREDITS = {
   'copilot-business': 1900,
@@ -144,14 +140,15 @@ function getFailureMessage(reason: unknown): string {
 
 async function runAssessment(
   jobId: string,
+  owner: string,
   enterpriseSlug: string,
   organizations: string[],
   periodDays: number,
   session: Session & Partial<SessionData>,
   enterpriseBillingToken?: string
 ) {
-  const job = jobs.get(jobId);
-  if (!job) return;
+  const heartbeat = setInterval(() => { void updateAssessment(owner, jobId, {}).catch(() => {}); }, 30000);
+  heartbeat.unref();
 
   try {
     const now = new Date();
@@ -163,6 +160,7 @@ async function runAssessment(
     const includedUsageByOrganization = new Map<string, number>();
     const userTotals = new Map<string, number>();
     const unavailableUsageOrganizations: string[] = [];
+    const forbiddenUsageOrganizations: string[] = [];
 
     const orgsToAssess = organizations.length > 0 ? organizations : [enterpriseSlug];
     const [enterpriseOrganizationsResult, enterpriseMembersResult, enterpriseTeamsResult] = await Promise.allSettled([
@@ -232,11 +230,19 @@ async function runAssessment(
       try {
         usage = await getAICreditUsage(org, session, year, month);
       } catch (error) {
-        if (error instanceof GitHubBillingServiceError && error.status === 404) {
-          unavailableUsageOrganizations.push(org);
-          continue;
+        if (error instanceof GitHubBillingServiceError && (error.status === 403 || error.status === 404)) {
+          try {
+            usage = await getEnterpriseAICreditUsage(
+              enterpriseSlug, session, year, month, enterpriseBillingToken, undefined, org
+            );
+          } catch {
+            if (error.status === 403) forbiddenUsageOrganizations.push(org);
+            unavailableUsageOrganizations.push(org);
+            continue;
+          }
+        } else {
+          throw error;
         }
-        throw error;
       }
       byOrganization[org] = usage.reduce((total, item) => total + item.grossQuantity, 0);
       includedUsageByOrganization.set(
@@ -294,6 +300,15 @@ async function runAssessment(
     const enterpriseUsage = enterpriseUsageResult?.status === 'fulfilled'
       ? enterpriseUsageResult.value
       : null;
+    if (enterpriseUsage === null && forbiddenUsageOrganizations.length > 0) {
+      throw new GitHubBillingServiceError(
+        `Organization AI credit usage was forbidden (403) for ${forbiddenUsageOrganizations.join(', ')} using the OAuth session. `
+        + 'The enterprise billing credential does not grant this OAuth session organization billing access. '
+        + 'Enterprise AI credit usage was also unavailable; a complete usage total cannot be calculated. '
+        + (enterpriseUsageResult?.status === 'rejected' ? getFailureMessage(enterpriseUsageResult.reason) : ''),
+        403
+      );
+    }
     if (enterpriseUsage) {
       for (const model of Object.keys(byModel)) delete byModel[model];
       for (const entry of enterpriseUsage) {
@@ -589,10 +604,27 @@ async function runAssessment(
       .reduce((total, counts) => total + (counts.get('copilot-business') ?? 0), 0);
     const organizationEnterpriseLicenses = Array.from(licenseCountsByOrganization.values())
       .reduce((total, counts) => total + (counts.get('copilot-enterprise') ?? 0), 0);
-    const businessLicenseCount = organizationBusinessLicenses
-      + (enterpriseLicenseCounts.get('copilot-business') ?? 0);
-    const enterpriseLicenseCount = organizationEnterpriseLicenses
-      + (enterpriseLicenseCounts.get('copilot-enterprise') ?? 0);
+    let seatInventory: Awaited<ReturnType<typeof getEnterpriseCopilotSeatInventory>> | null = null;
+    let seatInventoryFailure: string | null = null;
+    if (unavailableLicenseOrganizations.length > 0 || enterpriseLicenseResult?.status === 'rejected') {
+      try {
+        seatInventory = await getEnterpriseCopilotSeatInventory(enterpriseSlug, session, enterpriseBillingToken);
+        licenseCountsByOrganization.clear();
+        for (const org of inventoryOrganizationSlugs) licenseCountsByOrganization.set(org.toLowerCase(), new Map());
+        for (const [org, counts] of Object.entries(seatInventory.byOrganization)) {
+          licenseCountsByOrganization.set(org, new Map(Object.entries(counts)));
+        }
+        enterpriseLicenseCounts.clear();
+        for (const [sku, count] of Object.entries(seatInventory.enterpriseOnlyBySku)) enterpriseLicenseCounts.set(sku, count);
+        unavailableLicenseOrganizations.length = 0;
+      } catch (error) { seatInventoryFailure = getFailureMessage(error); }
+    }
+    const businessLicenseCount = seatInventory
+      ? seatInventory.totalBySku['copilot-business'] ?? 0
+      : organizationBusinessLicenses + (enterpriseLicenseCounts.get('copilot-business') ?? 0);
+    const enterpriseLicenseCount = seatInventory
+      ? seatInventory.totalBySku['copilot-enterprise'] ?? 0
+      : organizationEnterpriseLicenses + (enterpriseLicenseCounts.get('copilot-enterprise') ?? 0);
     const totalLicenseCount = businessLicenseCount + enterpriseLicenseCount;
     const enterpriseIncludedUsage = enterpriseUsageResult?.status === 'fulfilled'
       ? enterpriseUsageResult.value.reduce(
@@ -632,14 +664,15 @@ async function runAssessment(
               licenseCountsByOrganization.get(budget.scopeTarget.toLowerCase())?.get(skuKey) ??
               (licenseCountsByOrganization.has(budget.scopeTarget.toLowerCase()) ? 0 : null);
           } else if (skuKey && isEnterpriseScope && unavailableLicenseOrganizations.length === 0) {
-            organizationLicenseCount = Array.from(licenseCountsByOrganization.values())
-              .reduce((total, countsBySku) => total + (countsBySku.get(skuKey) ?? 0), 0);
+            organizationLicenseCount = seatInventory ? seatInventory.organizationAssignedBySku[skuKey] ?? 0
+              : Array.from(licenseCountsByOrganization.values())
+                .reduce((total, countsBySku) => total + (countsBySku.get(skuKey) ?? 0), 0);
           }
 
           return {
             ...budget,
             enterpriseLicenseCount:
-              skuKey && enterpriseLicenseResult?.status === 'fulfilled'
+              skuKey && (seatInventory || enterpriseLicenseResult?.status === 'fulfilled')
                 ? enterpriseLicenseCounts.get(skuKey) ?? 0
                 : null,
             organizationLicenseCount,
@@ -699,9 +732,10 @@ async function runAssessment(
         `organization inventory is unavailable for ${unavailableLicenseOrganizations.join(', ')}`
       );
     }
-    if (!enterpriseLicenseResult || enterpriseLicenseResult.status === 'rejected') {
+    if (!seatInventory && (!enterpriseLicenseResult || enterpriseLicenseResult.status === 'rejected')) {
       licenseWarnings.push('enterprise-assigned inventory is unavailable');
     }
+    if (seatInventoryFailure) licenseWarnings.push(`enterprise seat fallback failed: ${seatInventoryFailure}`);
     if (licenseWarnings.length > 0) {
       governanceDataWarnings.push({
         source: 'licenses',
@@ -709,9 +743,17 @@ async function runAssessment(
       });
     }
     const includedCreditWarnings: string[] = [];
-    if (unavailableUsageOrganizations.length > 0) {
+    if (forbiddenUsageOrganizations.length > 0) {
       includedCreditWarnings.push(
-        `organization usage attribution is unavailable for ${unavailableUsageOrganizations.join(', ')}`
+        `organization billing access was denied (403) for ${forbiddenUsageOrganizations.join(', ')} using the OAuth session; `
+        + 'enterprise usage supplies the total, but organization attribution remains unavailable. '
+        + 'Verify organization administrator access and authorization for the OAuth account to retrieve that breakdown'
+      );
+    }
+    const otherUnavailableUsageOrganizations = unavailableUsageOrganizations.filter(org => !forbiddenUsageOrganizations.includes(org));
+    if (otherUnavailableUsageOrganizations.length > 0) {
+      includedCreditWarnings.push(
+        `organization usage attribution is unavailable for ${otherUnavailableUsageOrganizations.join(', ')}`
       );
     }
     if (!enterpriseUsageResult || enterpriseUsageResult.status === 'rejected') {
@@ -759,7 +801,8 @@ async function runAssessment(
     if (userInventoryFailures.length > 0) {
       governanceDataWarnings.push({
         source: 'users',
-        message: `Organization member inventory is unavailable for ${userInventoryFailures.join(', ')}.`,
+        message: `Organization member inventory is unavailable for ${userInventoryFailures.join(', ')}. `
+          + 'Enterprise team assignments are not a complete organization member list; unavailable member counts remain unknown.',
       });
     }
     const reportableTeamInventoryFailures = enterpriseTeamsResult.status === 'fulfilled'
@@ -802,19 +845,17 @@ async function runAssessment(
       costCenterReporting,
     };
 
-    session.assessmentCompleted = true;
-    await new Promise<void>((resolve, reject) => {
-      session.save((error) => (error ? reject(error) : resolve()));
-    });
-    jobs.set(jobId, { ownerSessionId: job.ownerSessionId, status: 'complete', result });
+    await updateAssessment(owner, jobId, { status: 'complete', result });
   } catch (err) {
     const message = err instanceof GitHubBillingServiceError ? err.message : 'Assessment failed unexpectedly.';
-    jobs.set(jobId, { ownerSessionId: job.ownerSessionId, status: 'failed', error: message });
+    await updateAssessment(owner, jobId, { status: 'failed', error: message });
+  } finally {
+    clearInterval(heartbeat);
   }
 }
 
 // POST /api/assessment/start - begin an assessment for the given enterprise/orgs.
-router.post('/start', (req, res) => {
+router.post('/start', async (req, res, next) => {
   const { enterpriseSlug, organizations, periodDays, enterpriseBillingToken } = req.body ?? {};
 
   if (typeof enterpriseSlug !== 'string' || enterpriseSlug.trim().length === 0) {
@@ -837,34 +878,44 @@ router.post('/start', (req, res) => {
   }
   delete req.body.enterpriseBillingToken;
 
-  const jobId = randomUUID();
-  req.session.assessmentCompleted = false;
-  jobs.set(jobId, { ownerSessionId: req.sessionID, status: 'pending' });
+  const slug = z.string().trim().regex(/^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,37}[a-zA-Z0-9])?$/);
+  const input = z.object({ enterpriseSlug: slug, organizations: z.array(slug).min(1).max(100), periodDays: z.number().int().min(1).max(90).default(30) }).safeParse({ enterpriseSlug, organizations, periodDays });
+  if (!input.success) { res.status(400).json({ message: 'Invalid enterprise, organizations, or assessment period.' }); return; }
+  try {
+    const owner = accountId(req.session);
+    const jobId = randomUUID();
+    await createAssessment(owner, jobId, input.data);
+    void runAssessment(jobId, owner, input.data.enterpriseSlug, input.data.organizations, input.data.periodDays, req.session, suppliedBillingToken || undefined)
+      .catch(() => console.error('Assessment persistence failed; the job lease will expire.'));
+    res.status(202).json({ assessmentId: jobId });
+  } catch (error) { next(error); }
+});
 
-  const resolvedEnterprise = enterpriseSlug.trim();
-  const orgs = organizations;
-  const days = typeof periodDays === 'number' && periodDays > 0 ? periodDays : 30;
+router.get('/history', async (req, res, next) => {
+  try { res.json(await listAssessments(accountId(req.session))); } catch (error) { next(error); }
+});
 
-  // Fire and forget; client polls /status/:id and /results/:id.
-  void runAssessment(jobId, resolvedEnterprise, orgs, days, req.session, suppliedBillingToken || undefined);
-
-  res.status(202).json({ assessmentId: jobId });
+router.get('/latest', async (req, res, next) => {
+  try { res.json(await latestAssessment(accountId(req.session))); } catch (error) { next(error); }
 });
 
 // GET /api/assessment/status/:id - check assessment job status.
-router.get('/status/:id', (req, res) => {
-  const job = jobs.get(req.params.id);
-  if (!job || job.ownerSessionId !== req.sessionID) {
+router.get('/status/:id', async (req, res, next) => {
+  try {
+  const job = z.string().uuid().safeParse(req.params.id).success ? await getAssessment(accountId(req.session), req.params.id) : null;
+  if (!job) {
     res.status(404).json({ message: 'Assessment not found.' });
     return;
   }
   res.json({ status: job.status, error: job.error });
+  } catch (error) { next(error); }
 });
 
 // GET /api/assessment/results/:id - fetch completed assessment results.
-router.get('/results/:id', (req, res) => {
-  const job = jobs.get(req.params.id);
-  if (!job || job.ownerSessionId !== req.sessionID) {
+router.get('/results/:id', async (req, res, next) => {
+  try {
+  const job = z.string().uuid().safeParse(req.params.id).success ? await getAssessment(accountId(req.session), req.params.id) : null;
+  if (!job) {
     res.status(404).json({ message: 'Assessment not found.' });
     return;
   }
@@ -873,6 +924,7 @@ router.get('/results/:id', (req, res) => {
     return;
   }
   res.json(job.result);
+  } catch (error) { next(error); }
 });
 
 export default router;

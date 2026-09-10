@@ -2,16 +2,29 @@
   "name": "ghcp-ai-credits-simulator",
   "version": "1.0.0",
   "private": true,
-  "workspaces": ["client", "server", "shared"],
+  "workspaces": [
+    "client",
+    "server",
+    "shared"
+  ],
   "scripts": {
     "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
     "dev:client": "npm run dev --workspace=client",
     "dev:server": "npm run dev --workspace=server",
     "build": "npm run build --workspace=client && npm run build --workspace=server",
     "build:client": "npm run build --workspace=client",
-    "build:server": "npm run build --workspace=server"
+    "build:server": "npm run build --workspace=server",
+    "register:db:up": "node scripts/register-db.mjs up",
+    "register:db:migrate": "node scripts/register-db.mjs migrate",
+    "register:db:status": "node scripts/register-db.mjs status",
+    "register:test": "npm run build:server && node --test scripts/register-test.mjs scripts/register-api-test.mjs",
+    "register:check": "node scripts/register-check.mjs",
+    "register:db:backup": "node scripts/register-db.mjs backup",
+    "register:db:verify-recovery": "node scripts/register-db.mjs verify-recovery",
+    "persistence:test": "npm run build:server && REGISTER_INTEGRATION=1 node --test scripts/persistence-test.mjs scripts/assessment-test.mjs"
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "js-yaml": "^5.4.1"
   }
 }
