@@ -65,7 +65,14 @@ function fingerprint(database = "active_register") {
       "-d",
       database,
       "-c",
-      "SELECT jsonb_build_array((SELECT md5(COALESCE(string_agg(to_jsonb(record_row)::text,'' ORDER BY id),'')) FROM register.records record_row),(SELECT md5(COALESCE(string_agg(to_jsonb(history_row)::text,'' ORDER BY record_id,revision),'')) FROM register.revisions history_row));",
+      `SELECT jsonb_build_object(
+        'records', (SELECT md5(COALESCE(string_agg(to_jsonb(record_row)::text,'' ORDER BY id),'')) FROM register.records record_row),
+        'revisions', (SELECT md5(COALESCE(string_agg(to_jsonb(history_row)::text,'' ORDER BY record_id,revision),'')) FROM register.revisions history_row),
+        'sessions', (SELECT md5(COALESCE(string_agg(to_jsonb(session_row)::text,'' ORDER BY id),'')) FROM register.application_sessions session_row),
+        'assessments', (SELECT md5(COALESCE(string_agg(to_jsonb(job_row)::text,'' ORDER BY id),'')) FROM register.assessment_jobs job_row),
+        'workflows', (SELECT md5(COALESCE(string_agg(to_jsonb(workflow_row)::text,'' ORDER BY owner_id),'')) FROM register.workflows workflow_row),
+        'reports', (SELECT md5(COALESCE(string_agg(to_jsonb(report_row)::text,'' ORDER BY id),'')) FROM register.generated_reports report_row)
+      );`,
     ],
     undefined,
     true,
@@ -118,7 +125,7 @@ function verifyRecovery() {
   assert.equal(
     fingerprint(),
     original,
-    "Register and history must survive container recreation.",
+    "All register and application tables must survive container recreation. Run recovery checks without concurrent application writes.",
   );
   const restoreDatabase = `register_restore_${randomBytes(8).toString("hex")}`;
   compose([
@@ -158,7 +165,7 @@ function verifyRecovery() {
     assert.equal(
       fingerprint(restoreDatabase),
       original,
-      "Restored register and history must match the source.",
+      "All restored register and application tables must match the source.",
     );
     console.log(
       "PASS: container recreation durability and isolated backup restore.",

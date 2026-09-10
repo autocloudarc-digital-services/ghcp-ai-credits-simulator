@@ -41,6 +41,7 @@ export default function App() {
     hasReviewedDashboard,
     persistenceStatus,
     persistenceError,
+    hydrationVersion,
   } = useAppStore();
 
   useEffect(() => {
@@ -146,7 +147,7 @@ export default function App() {
           <div className="flex min-h-[50vh] items-center justify-center text-sm text-slate-400">
             Validating GitHub session…
           </div>
-        ) : <Routes>
+        ) : <Routes key={hydrationVersion}>
           <Route path="/" element={<Assessment />} />
           <Route path="/assessment" element={<Navigate to="/" replace />} />
           <Route

@@ -89,6 +89,54 @@ stack is not a production HA deployment. Runtime database credentials cannot dir
 insert, update, or delete tables; saves use the audited function. Database owners
 remain privileged, so this is not protection against a malicious database administrator.
 
+## Application Persistence
+
+The same PostgreSQL volume also stores application data in account-scoped tables:
+
+| Table | Persistent data |
+| --- | --- |
+| `register.application_sessions` | AES-256-GCM encrypted login sessions, including OAuth and refresh tokens, with expiry |
+| `register.assessment_jobs` | Assessment inputs without billing tokens, status, results, warnings, and capture timestamps |
+| `register.workflows` | Simulator inputs and results, up to four scenarios, review progress, recommendations, visualization preference, assessment reference, and cost-center allocation plans |
+| `register.generated_reports` | PDF bytes, filename, creation time, and the generating input snapshot with assessment reference |
+
+Application ownership uses the numeric GitHub ID verified during OAuth sign-in.
+It is separate from register tenant roles; a register reader does not gain edit
+rights by saving a personal workflow. PostgreSQL row-level policies isolate
+accounts. Workflow revisions reject concurrent edits and stale-account saves.
+Browser caches are no longer the source of saved workflow or allocation data.
+Recent assessments can be restored in Assessment, and recent PDFs can be
+downloaded again in the Executive report view. History lists show the newest
+100 entries; older records remain stored and available by their existing IDs.
+
+Start or migrate PostgreSQL before starting Express. Run `npm run persistence:test`
+for session, storage, API, and assessment regression checks. Database outages
+fail requests explicitly; there is no in-memory storage fallback. Interrupted
+assessment leases expire after two minutes without a heartbeat and are reported
+as failed when queried. Rerun these assessments with the required credentials.
+
+Use a stable `SESSION_SECRET` or `GHCP_SESSION_SECRET` of at least 32 characters.
+Production requires an explicit secret. Development generates a restricted,
+ignored `.local/session-secret` when neither variable is set. Keep that secret
+and the gateway secrets securely backed up separately from the database. Losing
+or rotating the session secret invalidates existing encrypted sessions but does
+not delete saved account data. Sessions expire after eight hours of inactivity;
+expired rows are pruned hourly. Disconnect destroys the stored session, while
+saved assessments, workflows, reports, and register history remain.
+
+One-time assessment billing tokens are never persisted. Environment credentials
+and the local register role map remain configuration, not database records.
+Existing in-memory jobs and PDFs cannot be recovered after their old process
+exits. Old unscoped browser caches are not automatically imported into a signed-in
+account; run a new assessment and resave prior allocation plans as needed.
+
+The existing backup command includes all six register and application tables.
+`npm run register:db:verify-recovery` compares all six tables after container
+recreation and an isolated backup restore. Run it without concurrent writes.
+Backups contain sensitive assessment data and encrypted credentials; protect
+them and establish an operator-managed retention and off-host backup policy.
+There is no automatic deletion of assessment or report history.
+
 ## Evidence Entry
 
 Evidence and tests are structured JSON arrays in the record editor. For example,

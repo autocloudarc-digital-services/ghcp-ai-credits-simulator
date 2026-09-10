@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useAppStore } from '../store/appStore';
+import { defaultSimulatorConfig, useAppStore } from '../store/appStore';
 
 function snapshot() {
   const state = useAppStore.getState();
@@ -18,6 +18,7 @@ let revision = 0;
 let saved = '';
 let saving: Promise<void> | undefined;
 let ready = false;
+let accountId = '';
 
 export function stopWorkflowPersistence() {
   generation += 1;
@@ -38,7 +39,7 @@ export async function flushWorkflow() {
       if (serialized === saved) break;
       useAppStore.setState({ persistenceStatus: 'saving', persistenceError: null });
       try {
-        const response = await axios.put('/api/workflow', { expectedRevision: revision, document });
+        const response = await axios.put('/api/workflow', { accountId, expectedRevision: revision, document });
         if (current !== generation) return;
         revision = response.data.revision;
         saved = serialized;
@@ -64,13 +65,18 @@ export async function loadWorkflow() {
     const response = await axios.get('/api/workflow');
     if (current !== generation) return;
     const { document, assessment, latestAssessment } = response.data;
+    accountId = response.data.accountId;
     revision = response.data.revision;
+    useAppStore.setState({ simulatorConfig: defaultSimulatorConfig, simulatorResult: null, scenarios: [], assessmentId: null,
+      assessmentResult: null, recommendations: [], allocationPlans: {}, use3DVisualizer: true,
+      hasConfirmedSimulation: false, hasReviewedDashboard: false, hasReviewedRecommendations: false });
     if (document) {
       if (document.simulatorResult?.projectedExhaustionDay === null) document.simulatorResult.projectedExhaustionDay = Infinity;
       for (const scenario of document.scenarios) if (scenario.result?.projectedExhaustionDay === null) scenario.result.projectedExhaustionDay = Infinity;
       useAppStore.setState({ ...document, allocationPlans: document.allocationPlans ?? {}, assessmentResult: assessment?.result ?? null });
     }
     else if (latestAssessment) useAppStore.getState().completeAssessment(latestAssessment.result, latestAssessment.input.enterpriseSlug, latestAssessment.id);
+    useAppStore.setState(state => ({ hydrationVersion: state.hydrationVersion + 1 }));
     saved = document ? JSON.stringify(snapshot()) : '';
     ready = true;
     unsubscribe = useAppStore.subscribe((state) => {

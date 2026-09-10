@@ -60,6 +60,11 @@ The repository is an npm workspace with separate client, server, and shared
 packages. The Vite development server proxies `/auth` and `/api` requests to
 Express, so the browser uses one origin during local and Codespaces development.
 
+Run `npm run register:db:up` before starting the application. PostgreSQL stores
+sessions, assessments, workflows, allocation plans, reports, and register history.
+See [storage setup and recovery](docs/active-register.md#application-persistence)
+for credentials, ownership, migration boundaries, and backup procedures.
+
 ```mermaid
 flowchart LR
     User[Browser user]
@@ -78,7 +83,7 @@ flowchart LR
         Auth[Authentication routes]
         Assessment[Assessment routes and jobs]
         Report[Report routes and PDF renderer]
-        Memory[(In-memory sessions, jobs, and reports)]
+        Memory[(PostgreSQL sessions, jobs, workflows, and reports)]
     end
 
     Shared[Shared TypeScript contracts]
@@ -673,13 +678,16 @@ variables, committed files, or command output.
 Locked steps remain visible in the navigation with their prerequisite. Direct
 navigation to a locked route redirects to the earliest incomplete step. Starting
 a new assessment invalidates simulator confirmation and all downstream output.
-Disconnecting resets the complete workflow.
+Disconnecting clears this browser's workflow view and destroys its login session;
+the account's saved database records remain available after reconnecting.
 
-Zustand automatically saves assessed data, simulator configuration, and workflow
-progress in browser `sessionStorage`. A refresh in the same browser tab restores
-progress after the server validates the OAuth session. Closing the tab clears
-the browser copy. Assessment jobs, authenticated sessions, and generated reports
-remain in server memory.
+Zustand automatically saves simulator configuration, scenarios, recommendations,
+review progress, and visualization preferences through the authenticated workflow
+API. Allocation plans use the existing Save action. PostgreSQL stores assessment
+results and encrypted sessions independently. Refreshing or reconnecting restores
+the verified account's saved workflow. Save errors and revision conflicts are
+displayed explicitly. Recent assessments can be restored, and saved PDFs can be
+downloaded again from the Executive report view.
 
 ## API Reference
 
@@ -695,7 +703,11 @@ remain in server memory.
 | `GET` | `/api/assessment/status/:id` | Yes | Poll assessment status |
 | `GET` | `/api/assessment/results/:id` | Yes | Retrieve completed assessment results |
 | `POST` | `/api/report/generate` | Assessment session | Generate and stream an executive PDF |
-| `GET` | `/api/report/download/:id` | Owner session | Download a cached report by identifier |
+| `GET` | `/api/report/download/:id` | Owner account | Download a stored report by identifier |
+| `GET` | `/api/assessment/history` | Owner account | List recent assessment metadata |
+| `GET` | `/api/assessment/latest` | Owner account | Retrieve the latest completed assessment |
+| `GET` | `/api/report/history` | Owner account | List recent stored report metadata |
+| `GET`, `PUT` | `/api/workflow` | Owner account | Load or revision-check saved workflow state |
 
 State-changing requests require the CSRF token returned by
 `/auth/csrf-token` in the `X-CSRF-Token` request header. The client configures
@@ -787,14 +799,15 @@ ghcp-ai-credits-simulator/
 
 ## Current Limitations
 
-* Express uses its default in-memory session store
-* Assessment jobs and generated PDF buffers are process-local and disappear on
-  restart
-* Browser workflow autosave uses per-tab `sessionStorage` and is not durable
-  across closed tabs or browsers
-* The application has no database, distributed cache, job queue, or durable
-  report storage
-* The repository does not currently include an automated test suite
+* PostgreSQL and the private gateway must be available; no memory-only fallback exists
+* The local database stack is not a production high-availability deployment
+* Interrupted assessments require a rerun; transient billing tokens are never
+  stored for a durable background-job retry
+* Backup scheduling, off-host storage, and data-retention policies require operator setup
+* Old process-local jobs and PDFs cannot be recovered after the old process exits;
+  unscoped legacy browser caches are not automatically imported into an account
+* The focused automated tests cover persistence and governance behavior, not
+  production provider approvals or complete live-enterprise authorization
 * Live assessment depends on GitHub API availability, permissions, and response
   compatibility
 

@@ -11,14 +11,15 @@ router.get('/', async (req, res, next) => {
     const workflow = await getWorkflow(owner);
     const latest = await latestAssessment(owner);
     const linked = workflow?.document.assessmentId ? await getAssessment(owner, workflow.document.assessmentId) : null;
-    res.json({ revision: workflow?.revision ?? 0, document: workflow?.document ?? null, assessment: linked?.status === 'complete' ? linked : null, latestAssessment: latest });
+    res.json({ accountId: owner, revision: workflow?.revision ?? 0, document: workflow?.document ?? null, assessment: linked?.status === 'complete' ? linked : null, latestAssessment: latest });
   } catch (error) { next(error); }
 });
 router.put('/', async (req, res, next) => {
-  const parsed = z.object({ expectedRevision: z.number().int().nonnegative(), document: workflowSchema }).strict().safeParse(req.body);
+  const parsed = z.object({ accountId: z.string().regex(/^[1-9][0-9]{0,19}$/), expectedRevision: z.number().int().nonnegative(), document: workflowSchema }).strict().safeParse(req.body);
   if (!parsed.success || containsCredentialField(req.body)) { res.status(400).json({ message: 'Invalid saved workflow. Credentials cannot be saved in workflow data.' }); return; }
   try {
     const owner = accountId(req.session);
+    if (parsed.data.accountId !== owner) { res.status(409).json({ message: 'The signed-in account changed. Reload before saving.' }); return; }
     if (parsed.data.document.assessmentId) {
       const assessment = await getAssessment(owner, parsed.data.document.assessmentId);
       if (assessment?.status !== 'complete') { res.status(400).json({ message: 'The selected assessment is not available to this account.' }); return; }

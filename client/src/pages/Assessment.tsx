@@ -61,7 +61,8 @@ export default function Assessment() {
 
   const handleLogout = async () => {
     try {
-      await flushWorkflow();
+      try { await flushWorkflow(); }
+      catch { if (!window.confirm('Changes are not saved. Disconnect and discard unsaved changes in this tab?')) return; }
       await axios.post('/auth/logout');
       stopWorkflowPersistence();
       setIsConnected(false);

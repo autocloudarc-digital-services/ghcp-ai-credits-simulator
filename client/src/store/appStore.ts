@@ -28,6 +28,7 @@ export const defaultSimulatorConfig: SimulatorConfig = {
 };
 
 interface AppState {
+  hydrationVersion: number;
   allocationPlans: Record<string, AllocationPlan>;
   setAllocationPlan: (key: string, plan: AllocationPlan) => void;
   assessmentId: string | null;
@@ -74,6 +75,7 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>()((set) => ({
+  hydrationVersion: 0,
   allocationPlans: {},
   setAllocationPlan: (key, plan) => set(state => ({ allocationPlans: { ...state.allocationPlans, [key]: plan } })),
   assessmentId: null,

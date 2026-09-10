@@ -8,6 +8,173 @@ const {
 } = require("../server/dist/persistence/sessionStore.js");
 const { persistenceClient } = require("../server/dist/persistence/client.js");
 test(
+  "fresh Express instances restore encrypted sessions and retain CSRF and logout protection",
+  { skip: process.env.REGISTER_INTEGRATION !== "1" },
+  async () => {
+    const express = require("express");
+    const request = require("supertest");
+    const session = require("express-session");
+    const { csrf } = require("lusca");
+    const secret = "fixture-only-session-key-at-least-32-characters";
+    const build = () => {
+      const app = express();
+      app.use(express.json());
+      app.use(
+        session({
+          secret,
+          store: new PostgresSessionStore(secret),
+          resave: false,
+          saveUninitialized: false,
+          cookie: { maxAge: 60000 },
+        }),
+      );
+      app.use(csrf());
+      app.get("/fixture", (req, res) => {
+        req.session.githubUserId = "987654321";
+        res.json({ csrf: res.locals._csrf });
+      });
+      app.get("/who", (req, res) =>
+        res.json({ owner: req.session.githubUserId ?? null }),
+      );
+      app.post("/logout", (req, res, next) =>
+        req.session.destroy((error) =>
+          error ? next(error) : res.sendStatus(204),
+        ),
+      );
+      app.use((error, _req, res, _next) =>
+        res
+          .status(error.status ?? 403)
+          .json({ message: "Fixture request rejected" }),
+      );
+      return app;
+    };
+    const first = await request(build()).get("/fixture").expect(200);
+    const cookie = first.headers["set-cookie"][0].split(";")[0];
+    const restarted = build();
+    assert.equal(
+      (await request(restarted).get("/who").set("Cookie", cookie).expect(200))
+        .body.owner,
+      "987654321",
+    );
+    await request(restarted)
+      .post("/logout")
+      .set("Cookie", cookie)
+      .send({})
+      .expect(403);
+    await request(restarted)
+      .post("/logout")
+      .set("Cookie", cookie)
+      .set("X-CSRF-Token", first.body.csrf)
+      .send({})
+      .expect(204);
+    assert.equal(
+      (await request(build()).get("/who").set("Cookie", cookie).expect(200))
+        .body.owner,
+      null,
+    );
+  },
+);
+
+test(
+  "report API stores authoritative assessment snapshots and re-downloads only for the owner",
+  { skip: process.env.REGISTER_INTEGRATION !== "1" },
+  async (context) => {
+    const express = require("express");
+    const request = require("supertest");
+    const data = require("../server/dist/persistence/applicationStore.js");
+    const renderer = require("../server/dist/services/reportGenerationService.js");
+    const bytes = Buffer.from("%PDF-1.7 fixture report");
+    context.mock.method(renderer, "generateReportPdf", async (snapshot) => {
+      assert.equal(snapshot.assessmentResult.totalCreditsConsumed, 42);
+      return bytes;
+    });
+    const app = express();
+    app.use(express.json());
+    app.use((req, _res, next) => {
+      req.session = { githubUserId: req.headers["x-fixture-account"] };
+      next();
+    });
+    app.use(require("../server/dist/routes/report.js").default);
+    app.use((error, _req, res, _next) =>
+      res.status(error.status ?? 500).json({ message: error.message }),
+    );
+    const owner = `5${Date.now()}`;
+    const other = `4${Date.now()}`;
+    const id = randomUUID();
+    await data.createAssessment(owner, id, {
+      enterpriseSlug: "fixture",
+      organizations: ["fixture"],
+      periodDays: 30,
+    });
+    await data.updateAssessment(owner, id, {
+      status: "complete",
+      result: { totalCreditsConsumed: 42 },
+    });
+    const input = {
+      assessmentId: id,
+      assessmentResult: { totalCreditsConsumed: 999 },
+      recommendations: [],
+      simulatorConfig: {
+        enterpriseName: "Fixture",
+        licenseCountBusiness: 1,
+        licenseCountEnterprise: 0,
+        licenseCountCloudAgent: 0,
+        licenseCountSpark: 0,
+        billingCycleStartDate: "2026-09-01",
+        currentDayOfCycle: 1,
+        populationAllocation: {
+          universalUlb: 1,
+          overageUsers: 0,
+          abundantUsers: 0,
+          exponentialUsers: 0,
+        },
+      },
+    };
+    await request(app)
+      .post("/generate")
+      .set("x-fixture-account", other)
+      .send(input)
+      .expect(409);
+    const generated = await request(app)
+      .post("/generate")
+      .set("x-fixture-account", owner)
+      .send(input)
+      .expect(200);
+    const reportId = generated.headers["x-report-id"];
+    assert.equal(
+      (await data.getReport(owner, reportId)).input.assessmentId,
+      id,
+    );
+    assert.equal(
+      (await data.getReport(owner, reportId)).input.assessmentResult
+        .totalCreditsConsumed,
+      42,
+    );
+    assert.deepEqual(
+      (
+        await request(app)
+          .get(`/download/${reportId}`)
+          .set("x-fixture-account", owner)
+          .expect(200)
+      ).body,
+      bytes,
+    );
+    await request(app)
+      .get(`/download/${reportId}`)
+      .set("x-fixture-account", other)
+      .expect(404);
+    assert.equal(
+      (
+        await request(app)
+          .get("/history")
+          .set("x-fixture-account", owner)
+          .expect(200)
+      ).body[0].id,
+      reportId,
+    );
+  },
+);
+test(
   "workflow API validates ownership, credentials, and revisions",
   { skip: process.env.REGISTER_INTEGRATION !== "1" },
   async () => {
@@ -79,12 +246,18 @@ test(
     await request(app)
       .put("/")
       .set("x-fixture-account", other)
-      .send({ expectedRevision: 0, document })
+      .send({ accountId: other, expectedRevision: 0, document })
       .expect(400);
+    await request(app)
+      .put("/")
+      .set("x-fixture-account", other)
+      .send({ accountId: owner, expectedRevision: 0, document })
+      .expect(409);
     await request(app)
       .put("/")
       .set("x-fixture-account", owner)
       .send({
+        accountId: owner,
         expectedRevision: 0,
         document: { ...document, enterpriseBillingToken: "fixture-token" },
       })
@@ -92,7 +265,7 @@ test(
     await request(app)
       .put("/")
       .set("x-fixture-account", owner)
-      .send({ expectedRevision: 0, document })
+      .send({ accountId: owner, expectedRevision: 0, document })
       .expect(200);
     const loaded = (
       await request(app).get("/").set("x-fixture-account", owner).expect(200)
@@ -107,7 +280,7 @@ test(
     await request(app)
       .put("/")
       .set("x-fixture-account", owner)
-      .send({ expectedRevision: 0, document })
+      .send({ accountId: owner, expectedRevision: 0, document })
       .expect(409);
     assert.ok(!JSON.stringify(loaded).includes("fixture-token"));
   },
