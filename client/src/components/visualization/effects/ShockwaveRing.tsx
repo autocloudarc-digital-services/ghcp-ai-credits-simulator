@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Mesh } from 'three';
+import { BufferGeometry, Mesh, MeshBasicMaterial } from 'three';
 
 interface ShockwaveRingProps {
   position: [number, number, number];
@@ -8,15 +8,14 @@ interface ShockwaveRingProps {
 }
 
 export default function ShockwaveRing({ position, color = '#ef4444' }: ShockwaveRingProps) {
-  const ringRef = useRef<Mesh>(null);
+  const ringRef = useRef<Mesh<BufferGeometry, MeshBasicMaterial>>(null);
 
   useFrame(({ clock }) => {
     if (ringRef.current) {
       const t = (clock.getElapsedTime() % 1.5) / 1.5;
       const scale = 0.5 + t * 2.5;
       ringRef.current.scale.set(scale, scale, scale);
-      const material = ringRef.current.material as any;
-      material.opacity = 1 - t;
+      ringRef.current.material.opacity = 1 - t;
     }
   });
 

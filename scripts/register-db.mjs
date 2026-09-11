@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import {
+  appendFileSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -22,8 +23,15 @@ if (!existsSync(envFile)) {
   mkdirSync(directory, { recursive: true, mode: 0o700 });
   writeFileSync(
     envFile,
-    `REGISTER_DB_PASSWORD=${randomBytes(32).toString("hex")}\nREGISTER_JWT_SECRET=${randomBytes(48).toString("hex")}\nREGISTER_GATEWAY_PORT=3302\n`,
+    `REGISTER_DB_PASSWORD=${randomBytes(32).toString("hex")}\nREGISTER_AUTHENTICATOR_PASSWORD=${randomBytes(32).toString("hex")}\nREGISTER_JWT_SECRET=${randomBytes(48).toString("hex")}\nREGISTER_GATEWAY_PORT=3302\n`,
     { mode: 0o600, flag: "wx" },
+  );
+}
+if (!/^REGISTER_AUTHENTICATOR_PASSWORD=/m.test(readFileSync(envFile, "utf8"))) {
+  appendFileSync(
+    envFile,
+    `REGISTER_AUTHENTICATOR_PASSWORD=${randomBytes(32).toString("hex")}\n`,
+    { mode: 0o600 },
   );
 }
 const base = [
@@ -205,6 +213,21 @@ function migrate() {
       readFileSync(resolve(migrations, name), "utf8"),
     );
   }
+  compose([
+    "exec",
+    "-T",
+    "postgres",
+    "psql",
+    "-X",
+    "-v",
+    "ON_ERROR_STOP=1",
+    "-U",
+    "register_owner",
+    "-d",
+    "active_register",
+    "-c",
+    "NOTIFY pgrst, 'reload schema';",
+  ]);
 }
 if (action === "up") {
   compose(["up", "-d", "--wait", "postgres"]);

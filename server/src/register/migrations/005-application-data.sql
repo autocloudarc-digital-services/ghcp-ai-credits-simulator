@@ -66,5 +66,4 @@ END;
 $$;
 REVOKE ALL ON FUNCTION register.save_workflow(jsonb, integer) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION register.save_workflow(jsonb, integer) TO application_data;
-NOTIFY pgrst, 'reload schema';
 COMMIT;

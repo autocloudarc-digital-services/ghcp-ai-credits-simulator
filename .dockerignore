@@ -1,0 +1,16 @@
+.git
+.github
+.devcontainer
+.local
+.env
+.env.*
+**/node_modules
+**/dist
+**/.vite
+**/*.log
+**/*.tgz
+coverage
+docs
+scripts/*.mjs
+compose*.yaml
+report.*.json

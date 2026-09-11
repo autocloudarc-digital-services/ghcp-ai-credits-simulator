@@ -1,4 +1,4 @@
-\getenv register_password POSTGRES_PASSWORD
+\getenv register_password REGISTER_AUTHENTICATOR_PASSWORD
 BEGIN;
 SELECT pg_advisory_xact_lock(84017001);
 SELECT 'CREATE ROLE register_authenticator NOINHERIT LOGIN'
@@ -47,5 +47,4 @@ CREATE POLICY tenant_revisions ON register.revisions FOR SELECT TO register_api
   USING (tenant_id = current_setting('request.jwt.claims',true)::jsonb->>'tenant');
 GRANT SELECT ON register.records, register.revisions TO register_api;
 REVOKE INSERT, UPDATE, DELETE ON register.records, register.revisions FROM register_api;
-NOTIFY pgrst, 'reload schema';
 COMMIT;

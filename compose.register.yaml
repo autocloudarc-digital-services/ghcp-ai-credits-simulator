@@ -7,6 +7,7 @@ services:
       POSTGRES_USER: register_owner
       POSTGRES_DB: active_register
       POSTGRES_PASSWORD: ${REGISTER_DB_PASSWORD:?Run node scripts/register-db.mjs up}
+      REGISTER_AUTHENTICATOR_PASSWORD: ${REGISTER_AUTHENTICATOR_PASSWORD:?Run node scripts/register-db.mjs up}
     volumes:
       - register_data:/var/lib/postgresql/data
     healthcheck:
@@ -22,7 +23,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      PGRST_DB_URI: postgres://register_authenticator:${REGISTER_DB_PASSWORD}@postgres:5432/active_register
+      PGRST_DB_URI: postgres://register_authenticator:${REGISTER_AUTHENTICATOR_PASSWORD}@postgres:5432/active_register
       PGRST_DB_SCHEMAS: register
       PGRST_JWT_SECRET: ${REGISTER_JWT_SECRET:?Run node scripts/register-db.mjs up}
       PGRST_DB_MAX_ROWS: 10000

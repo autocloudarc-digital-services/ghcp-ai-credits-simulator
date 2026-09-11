@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Mesh } from 'three';
+import { BufferGeometry, Mesh, MeshStandardMaterial } from 'three';
 import { Text } from '@react-three/drei';
 
 interface DecisionDiamondProps {
@@ -9,15 +9,14 @@ interface DecisionDiamondProps {
 }
 
 export default function DecisionDiamond({ position, utilization }: DecisionDiamondProps) {
-  const meshRef = useRef<Mesh>(null);
+  const meshRef = useRef<Mesh<BufferGeometry, MeshStandardMaterial>>(null);
   const flashing = utilization > 0.8;
 
   useFrame(({ clock }) => {
     if (meshRef.current) {
       meshRef.current.rotation.y = clock.getElapsedTime() * 0.4;
       if (flashing) {
-        const material = meshRef.current.material as any;
-        material.emissiveIntensity = 0.6 + Math.sin(clock.getElapsedTime() * 6) * 0.4;
+        meshRef.current.material.emissiveIntensity = 0.6 + Math.sin(clock.getElapsedTime() * 6) * 0.4;
       }
     }
   });

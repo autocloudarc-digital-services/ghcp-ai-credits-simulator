@@ -43,16 +43,29 @@ and an executive PDF report.
 > Do not use real enterprise credentials in an untrusted fork or shared
 > development environment.
 
+## Deployment and Development
+
+| Goal                       |Supported path                                                     |
+|                             |                                                                    |
+| Deploy production on Azure |[Azure Production Deployment](docs/azure-deployment.md)            |
+| Develop or test changes    |[Contributor Guide](docs/contributor-guide.md)                     |
+| Operate local persistence  |[Active Register](docs/active-register.md#application-persistence) |
+
+Production is provisioned only through the protected GitHub Actions workflow.
+It deploys the approved lean Azure topology with private PostgreSQL, private Key
+Vault, managed identities, Microsoft Entra admission, and a staged
+internal-before-public Container Apps rollout.
+
 ## Application Capabilities
 
-| Area | Capability |
-| --- | --- |
-| Assessment | Retrieves authenticated GitHub billing, budget, and cost-center data for an enterprise |
-| Simulator | Models license pools, user populations, burn rates based on what-if scenarios |
-| Governance Insights | Summarizes projected credit posture, overage, population, and governance readiness |
-| Visualization | Shows AI Credit flow through an interactive React Three Fiber scene with a 2D fallback |
-| Recommendations | Produces governance actions based on simulated and assessed conditions |
-| Report | Previews and generates a downloadable PDF executive report |
+| Area                |Capability                                                                             |
+|                      |                                                                                        |
+| Assessment          |Retrieves authenticated GitHub billing, budget, and cost-center data for an enterprise |
+| Simulator           |Models license pools, user populations, burn rates based on what-if scenarios          |
+| Governance Insights |Summarizes projected credit posture, overage, population, and governance readiness     |
+| Visualization       |Shows AI Credit flow through an interactive React Three Fiber scene with a 2D fallback |
+| Recommendations     |Produces governance actions based on simulated and assessed conditions                 |
+| Report              |Previews and generates a downloadable PDF executive report                             |
 
 ## Architecture
 
@@ -108,47 +121,47 @@ flowchart LR
 
 ### Technology Stack
 
-| Layer | Technologies |
-| --- | --- |
-| Client | React 18, TypeScript, Vite, React Router, Tailwind CSS |
-| State and validation | Zustand, React Hook Form, Zod |
-| Visualization | Recharts, React Three Fiber, Drei, Three.js, Framer Motion |
-| Server | Node.js, Express, TypeScript |
-| Integration | Axios, GitHub OAuth, GitHub billing APIs |
-| Reporting | React PDF Renderer |
-| Security | Express Session, Lusca CSRF protection, Express Rate Limit, AES-256-GCM token encryption |
+| Layer                |Technologies                                                                             |
+|                       |                                                                                          |
+| Client               |React 18, TypeScript, Vite, React Router, Tailwind CSS                                   |
+| State and validation |Zustand, React Hook Form, Zod                                                            |
+| Visualization        |Recharts, React Three Fiber, Drei, Three.js, Framer Motion                               |
+| Server               |Node.js, Express, TypeScript                                                             |
+| Integration          |Axios, GitHub OAuth, GitHub billing APIs                                                 |
+| Reporting            |React PDF Renderer                                                                       |
+| Security             |Express Session, Lusca CSRF protection, Express Rate Limit, AES-256-GCM token encryption |
 
 ## Prerequisites
 
 ### Required Tools
 
-| Requirement | Purpose |
-| --- | --- |
-| GitHub account | Clone or fork the repository and create a Codespace |
-| Git | Clone, branch, and preserve changes |
-| Node.js 20 or 22 LTS | Run the client and server toolchains |
-| npm | Install and run the workspace packages |
-| Modern browser | Run the React UI and WebGL visualization |
-| VS Code 1.101 or later | Load the configured MCP servers and extension providers |
-| CSV Viewer VS Code extension (`mefisto04.csv-viewer`) | Preview, filter, and sort naming-standard CSV catalogs in a tabular grid |
-| GitHub Copilot access | Use GitHub, Azure, and Fabric MCP tools in Copilot Chat agent mode |
-| Azure account with an active subscription | Authenticate Azure MCP and access Azure resources |
-| Microsoft Fabric access | Use live Fabric and OneLake operations when tenant access is required |
+| Requirement                                           |Purpose                                                                  |
+|                                                        |                                                                          |
+| GitHub account                                        |Clone or fork the repository and create a Codespace                      |
+| Git                                                   |Clone, branch, and preserve changes                                      |
+| Node.js 20 or 22 LTS                                  |Run the client and server toolchains                                     |
+| npm                                                   |Install and run the workspace packages                                   |
+| Modern browser                                        |Run the React UI and WebGL visualization                                 |
+| VS Code 1.101 or later                                |Load the configured MCP servers and extension providers                  |
+| CSV Viewer VS Code extension (`mefisto04.csv-viewer`) |Preview, filter, and sort naming-standard CSV catalogs in a tabular grid |
+| GitHub Copilot access                                 |Use GitHub, Azure, and Fabric MCP tools in Copilot Chat agent mode       |
+| Azure account with an active subscription             |Authenticate Azure MCP and access Azure resources                        |
+| Microsoft Fabric access                               |Use live Fabric and OneLake operations when tenant access is required    |
 
 GitHub OAuth credentials are required because a completed live assessment is
 the prerequisite for every downstream operation.
 
 ### Permissions and Access
 
-| Activity | Requirement |
-| --- | --- |
-| Use GitHub Codespaces | Codespaces must be enabled for your account or organization |
-| Create a fork | Permission to fork into a personal or approved organization account |
-| Run a live assessment | GitHub OAuth credentials and access to the target enterprise data |
-| Use the GitHub MCP server | GitHub account authorization and an organization policy that permits MCP |
-| Use the Azure MCP server | Microsoft Entra authentication and least-privilege Azure RBAC assignments |
-| Use live Fabric MCP operations | Fabric tenant access and permissions for the target workspace and items |
-| Push changes | Write access to your fork or the source repository |
+| Activity                       |Requirement                                                               |
+|                                 |                                                                           |
+| Use GitHub Codespaces          |Codespaces must be enabled for your account or organization               |
+| Create a fork                  |Permission to fork into a personal or approved organization account       |
+| Run a live assessment          |GitHub OAuth credentials and access to the target enterprise data         |
+| Use the GitHub MCP server      |GitHub account authorization and an organization policy that permits MCP  |
+| Use the Azure MCP server       |Microsoft Entra authentication and least-privilege Azure RBAC assignments |
+| Use live Fabric MCP operations |Fabric tenant access and permissions for the target workspace and items   |
+| Push changes                   |Write access to your fork or the source repository                        |
 
 If organization policy restricts Codespaces, public forwarded ports, OAuth
 applications, or third-party npm packages, confirm access with an administrator
@@ -194,10 +207,11 @@ requested resources.
 The Dev Container installs Microsoft's official Azure MCP Server and Microsoft
 Fabric MCP Server extensions:
 
-| Server | VS Code extension | Configuration model |
-| --- | --- | --- |
-| Azure MCP Server | `ms-azuretools.vscode-azure-mcp-server` | Extension-managed local MCP server with Microsoft Entra authentication |
-| Microsoft Fabric MCP Server | `fabric.vscode-fabric-mcp-server` | Extension-managed local MCP server with Fabric settings and automatic updates |
+| Server           |VS Code extension                       |Configuration model                                                    |
+|                   |                                         |                                                                        |
+| Azure MCP Server |`ms-azuretools.vscode-azure-mcp-server` |Extension-managed local MCP server with Microsoft Entra authentication |
+| Microsoft Fabric MCP Server
+|                           | `fabric.vscode-fabric-mcp-server`                   | Extension-managed local MCP server with Fabric settings and automatic updates |
 
 Extensions are used for Azure and Fabric because Microsoft recommends their VS
 Code extensions and distributes server updates and settings through them. The
@@ -278,11 +292,12 @@ origin is the Vite app, and Vite proxies `/auth` and `/api` to Express.
 1. Disable webhooks for now because this app does not consume webhook events.
 1. Configure these least-privilege app permissions:
 
-| Permission category | Setting | Reason |
-| --- | --- | --- |
-| Repository permissions | No access | The backend does not call repository endpoints |
-| Organization permissions | Administration: Read-only | Required for organization AI Credit usage and usage-summary endpoints |
-| Account permissions | No access | The backend does not call user billing endpoints; Plan access is not required |
+| Permission category    |Setting   |Reason                                         |
+|                         |           |                                                |
+| Repository permissions |No access |The backend does not call repository endpoints |
+| Organization permissions
+|                       | Administration: Read-only| Required for organization AI Credit usage and usage-summary endpoints     |
+| Account permissions   | No access               | The backend does not call user billing endpoints; Plan access is not required |
 
 Leave every other repository, organization, and account permission set to No
 access. The app only reads billing data and does not need write access.
@@ -297,13 +312,13 @@ access. The app only reads billing data and does not need write access.
 4. Authorize the app as a user who meets the role requirements for every API
   used by the assessment:
 
-| Assessment data | Required role |
-| --- | --- |
-| Organization AI Credit usage and usage summary | Organization administrator |
-| Organization Copilot license inventory | Organization owner |
-| Enterprise-direct Copilot license billing usage | Enterprise administrator or billing manager |
-| Enterprise budgets | Enterprise administrator or billing manager |
-| Enterprise cost centers | Enterprise owner, billing manager, or organization owner |
+| Assessment data                                 |Required role                                            |
+|                                                  |                                                          |
+| Organization AI Credit usage and usage summary  |Organization administrator                               |
+| Organization Copilot license inventory          |Organization owner                                       |
+| Enterprise-direct Copilot license billing usage |Enterprise administrator or billing manager              |
+| Enterprise budgets                              |Enterprise administrator or billing manager              |
+| Enterprise cost centers                         |Enterprise owner, billing manager, or organization owner |
 
 For a complete assessment, use an enterprise owner or administrator who also
 administers the target organization, or a billing manager who has the required
@@ -343,10 +358,10 @@ For Codespaces, do not use `GITHUB_APP_CLIENT_ID` or
 `GITHUB_` prefix and rejects Codespaces secrets that use it. Store the values
 under these aliases. The server reads the aliases directly in Codespaces:
 
-| GitHub App value | Codespaces secret name | Local and production variable |
-| --- | --- | --- |
-| Client ID | `GHCP_APP_CLIENT_ID` | `GITHUB_APP_CLIENT_ID` |
-| Client Secret | `GHCP_APP_CLIENT_SECRET` | `GITHUB_APP_CLIENT_SECRET` |
+| GitHub App value |Codespaces secret name   |Local and production variable |
+|                   |                          |                               |
+| Client ID        |`GHCP_APP_CLIENT_ID`     |`GITHUB_APP_CLIENT_ID`        |
+| Client Secret    |`GHCP_APP_CLIENT_SECRET` |`GITHUB_APP_CLIENT_SECRET`    |
 
 Enterprise budgets and cost centers require a separate personal access token
 (classic) with the `manage_billing:enterprise` scope. Create it as an
@@ -359,12 +374,12 @@ No additional environment variables are required because a PAT carries all of
 its granted scopes in the same bearer credential. Each endpoint still enforces
 the token owner's GitHub role in addition to the token scope.
 
-| Configured capability | Current use | Endpoint family |
-| --- | --- | --- |
-| Copilot (`manage_billing:copilot`) | Reserved | Enterprise and organization Copilot seat and policy management |
-| `manage_billing:enterprise` | Active | Enterprise budgets, cost centers, and direct-license billing usage |
-| OAuth `read:org` | Active | Read-only organization Copilot seat details |
-| `user` | Reserved | Authenticated user profile, email, and follow data |
+| Configured capability              |Current use |Endpoint family                                                    |
+|                                     |             |                                                                    |
+| Copilot (`manage_billing:copilot`) |Reserved    |Enterprise and organization Copilot seat and policy management     |
+| `manage_billing:enterprise`        |Active      |Enterprise budgets, cost centers, and direct-license billing usage |
+| OAuth `read:org`                   |Active      |Read-only organization Copilot seat details                        |
+| `user`                             |Reserved    |Authenticated user profile, email, and follow data                 |
 
 The current server sends this credential only to GitHub API URLs assembled from
 fixed enterprise billing paths. Future features must add explicit endpoint
@@ -379,14 +394,14 @@ Use the following storage and runtime mapping. GitHub Actions secrets are not
 automatically available in Codespaces, so create Codespaces secrets in the
 location specified below.
 
-| Runtime variable | Store in Codespaces as | How to provide it |
-| --- | --- | --- |
-| `GITHUB_APP_CLIENT_ID` | `GHCP_APP_CLIENT_ID` | Read directly by the server |
-| `GITHUB_APP_CLIENT_SECRET` | `GHCP_APP_CLIENT_SECRET` | Read directly by the server |
-| `GHCP_ENTERPRISE_BILLING_TOKEN` | `GHCP_ENTERPRISE_BILLING_TOKEN` | Read directly by the server |
-| `SESSION_SECRET` | `GHCP_SESSION_SECRET` | Generate once and read directly by the server |
-| `CLIENT_ORIGIN` | Do not store | Derived automatically from Codespaces metadata |
-| `CALLBACK_URL` | Do not store | Derived automatically from `CLIENT_ORIGIN` |
+| Runtime variable                |Store in Codespaces as          |How to provide it                              |
+|                                  |                                 |                                                |
+| `GITHUB_APP_CLIENT_ID`          |`GHCP_APP_CLIENT_ID`            |Read directly by the server                    |
+| `GITHUB_APP_CLIENT_SECRET`      |`GHCP_APP_CLIENT_SECRET`        |Read directly by the server                    |
+| `GHCP_ENTERPRISE_BILLING_TOKEN` |`GHCP_ENTERPRISE_BILLING_TOKEN` |Read directly by the server                    |
+| `SESSION_SECRET`                |`GHCP_SESSION_SECRET`           |Generate once and read directly by the server  |
+| `CLIENT_ORIGIN`                 |Do not store                    |Derived automatically from Codespaces metadata |
+| `CALLBACK_URL`                  |Do not store                    |Derived automatically from `CLIENT_ORIGIN`     |
 
 Generate a strong `GHCP_SESSION_SECRET` value on a trusted machine:
 
@@ -463,13 +478,13 @@ Organization usage can still complete when enterprise budget or cost-center
 data is unavailable. The assessment marks those governance sources unavailable
 and does not interpret them as empty.
 
-## Choose Your Setup Path
+## Choose Your Development Setup
 
-| Path | Typical setup time | Best for |
-| --- | --- | --- |
-| GitHub Codespaces | 5-10 minutes | Avoiding local runtime, proxy, or endpoint-security constraints |
-| Local VS Code | 5-10 minutes | Developers with a working Node.js and npm environment |
-| Local PowerShell | 5-10 minutes | Windows users who prefer explicit environment configuration |
+| Path              |Typical setup time |Best for                                                        |
+|                    |                    |                                                                 |
+| GitHub Codespaces |5-10 minutes       |Avoiding local runtime, proxy, or endpoint-security constraints |
+| Local VS Code     |5-10 minutes       |Developers with a working Node.js and npm environment           |
+| Local PowerShell  |5-10 minutes       |Windows users who prefer explicit environment configuration     |
 
 ## GitHub Codespaces Setup
 
@@ -639,16 +654,16 @@ Set `CLIENT_ORIGIN` or `CALLBACK_URL` only to override the local defaults.
 
 ### Environment Variables
 
-| Runtime variable | Codespaces stored name | Required | Default | Description |
-| --- | --- | --- | --- | --- |
-| `GITHUB_APP_CLIENT_ID` | `GHCP_APP_CLIENT_ID` | For OAuth | Empty | Client ID used to start GitHub authorization |
-| `GITHUB_APP_CLIENT_SECRET` | `GHCP_APP_CLIENT_SECRET` | For OAuth | Empty | Client secret used to exchange the authorization code |
-| `GHCP_ENTERPRISE_BILLING_TOKEN` | `GHCP_ENTERPRISE_BILLING_TOKEN` | Enterprise governance data | Empty | Classic PAT with `manage_billing:enterprise`, used only for budgets and cost centers |
-| `SESSION_SECRET` | `GHCP_SESSION_SECRET` | Production and OAuth | Insecure development value | Signs session cookies and derives the OAuth token encryption key |
-| `CALLBACK_URL` | Derived, not stored | No | `{CLIENT_ORIGIN}/auth/github/callback` | OAuth redirect URI through the Vite proxy |
-| `CLIENT_ORIGIN` | Derived, not stored | No | Localhost or Codespaces port `5173` origin | Allowed browser origin for CORS |
-| `PORT` | Not stored | No | `3001` | Express server port |
-| `NODE_ENV` | Not stored | No | Development | Enables secure cookies and static client serving in production |
+| Runtime variable                |Codespaces stored name          |Required                   |Default                                    |Description                                                                          |
+|                                  |                                 |                            |                                            |                                                                                      |
+| `GITHUB_APP_CLIENT_ID`          |`GHCP_APP_CLIENT_ID`            |For OAuth                  |Empty                                      |Client ID used to start GitHub authorization                                         |
+| `GITHUB_APP_CLIENT_SECRET`      |`GHCP_APP_CLIENT_SECRET`        |For OAuth                  |Empty                                      |Client secret used to exchange the authorization code                                |
+| `GHCP_ENTERPRISE_BILLING_TOKEN` |`GHCP_ENTERPRISE_BILLING_TOKEN` |Enterprise governance data |Empty                                      |Classic PAT with `manage_billing:enterprise`, used only for budgets and cost centers |
+| `SESSION_SECRET`                |`GHCP_SESSION_SECRET`           |Production and OAuth       |Insecure development value                 |Signs session cookies and derives the OAuth token encryption key                     |
+| `CALLBACK_URL`                  |Derived, not stored             |No                         |`{CLIENT_ORIGIN}/auth/github/callback`     |OAuth redirect URI through the Vite proxy                                            |
+| `CLIENT_ORIGIN`                 |Derived, not stored             |No                         |Localhost or Codespaces port `5173` origin |Allowed browser origin for CORS                                                      |
+| `PORT`                          |Not stored                      |No                         |`3001`                                     |Express server port                                                                  |
+| `NODE_ENV`                      |Not stored                      |No                         |Development                                |Enables secure cookies and static client serving in production                       |
 
 The Codespaces stored-name column applies only to GitHub Codespaces, where the
 server reads the aliases directly. Local and production processes use the
@@ -691,23 +706,23 @@ downloaded again from the Executive report view.
 
 ## API Reference
 
-| Method | Route | Authentication | Purpose |
-| --- | --- | --- | --- |
-| `GET` | `/healthz` | No | Return server health |
-| `GET` | `/auth/csrf-token` | No | Issue the current session CSRF token |
-| `GET` | `/auth/github` | No | Start GitHub OAuth authorization |
-| `GET` | `/auth/github/callback` | OAuth callback | Exchange the authorization code and create a session |
-| `GET` | `/auth/status` | No | Report whether the current session is connected |
-| `POST` | `/auth/logout` | Session | Revoke the token and destroy the session |
-| `POST` | `/api/assessment/start` | Yes | Start an asynchronous enterprise assessment |
-| `GET` | `/api/assessment/status/:id` | Yes | Poll assessment status |
-| `GET` | `/api/assessment/results/:id` | Yes | Retrieve completed assessment results |
-| `POST` | `/api/report/generate` | Assessment session | Generate and stream an executive PDF |
-| `GET` | `/api/report/download/:id` | Owner account | Download a stored report by identifier |
-| `GET` | `/api/assessment/history` | Owner account | List recent assessment metadata |
-| `GET` | `/api/assessment/latest` | Owner account | Retrieve the latest completed assessment |
-| `GET` | `/api/report/history` | Owner account | List recent stored report metadata |
-| `GET`, `PUT` | `/api/workflow` | Owner account | Load or revision-check saved workflow state |
+| Method       |Route                         |Authentication     |Purpose                                              |
+|               |                               |                    |                                                      |
+| `GET`        |`/healthz`                    |No                 |Return server health                                 |
+| `GET`        |`/auth/csrf-token`            |No                 |Issue the current session CSRF token                 |
+| `GET`        |`/auth/github`                |No                 |Start GitHub OAuth authorization                     |
+| `GET`        |`/auth/github/callback`       |OAuth callback     |Exchange the authorization code and create a session |
+| `GET`        |`/auth/status`                |No                 |Report whether the current session is connected      |
+| `POST`       |`/auth/logout`                |Session            |Revoke the token and destroy the session             |
+| `POST`       |`/api/assessment/start`       |Yes                |Start an asynchronous enterprise assessment          |
+| `GET`        |`/api/assessment/status/:id`  |Yes                |Poll assessment status                               |
+| `GET`        |`/api/assessment/results/:id` |Yes                |Retrieve completed assessment results                |
+| `POST`       |`/api/report/generate`        |Assessment session |Generate and stream an executive PDF                 |
+| `GET`        |`/api/report/download/:id`    |Owner account      |Download a stored report by identifier               |
+| `GET`        |`/api/assessment/history`     |Owner account      |List recent assessment metadata                      |
+| `GET`        |`/api/assessment/latest`      |Owner account      |Retrieve the latest completed assessment             |
+| `GET`        |`/api/report/history`         |Owner account      |List recent stored report metadata                   |
+| `GET`, `PUT` |`/api/workflow`               |Owner account      |Load or revision-check saved workflow state          |
 
 State-changing requests require the CSRF token returned by
 `/auth/csrf-token` in the `X-CSRF-Token` request header. The client configures
@@ -732,44 +747,38 @@ Secrets and OAuth tokens must never be committed. Review the security model,
 GitHub application permissions, session storage, dependency posture, logging,
 and data retention before deployment.
 
-## Production Build
+## Production Deployment
 
-Build both workspaces from the repository root:
+The supported production target is the Azure-only lean topology defined in
+`infra/` and deployed by `.github/workflows/azure-deploy.yml`. It uses a
+protected environment, GitHub Actions OIDC, Microsoft Entra group admission,
+private PostgreSQL and Key Vault access, immutable image digests, and a manual
+migration job.
 
-```bash
-npm run build
-```
-
-The production Express server serves the compiled client from `client/dist`:
-
-```bash
-export NODE_ENV="production"
-export SESSION_SECRET="your-production-secret"
-export GITHUB_APP_CLIENT_ID="your-client-id"
-export GITHUB_APP_CLIENT_SECRET="your-client-secret"
-export GHCP_ENTERPRISE_BILLING_TOKEN="your-classic-pat"
-export CALLBACK_URL="https://your-host.example/auth/github/callback"
-export CLIENT_ORIGIN="https://your-host.example"
-npm run start --workspace=server
-```
-
-Production hosting also requires TLS, durable session storage, centralized
-secret management, observability, dependency scanning, and an explicit scaling
-and data-retention design.
+Follow [Azure Production Deployment](docs/azure-deployment.md) for topology,
+cost gates, required authority, environment configuration, migration, restore,
+rollback, interrupted runs, and teardown. Direct Bicep deployment is unsupported
+because it bypasses the workflow's pre-provision checks.
 
 ## Useful Commands
 
-| Command | Purpose |
-| --- | --- |
-| `npm install` | Install all npm workspace dependencies |
-| `npm run dev` | Start client and server development processes |
-| `npm run dev:client` | Start only the Vite client |
-| `npm run dev:server` | Start only the Express server |
-| `npm run build` | Build client and server |
-| `npm run build:client` | Build only the client |
-| `npm run build:server` | Build only the server |
-| `npm run preview --workspace=client` | Preview the compiled client |
-| `npm run start --workspace=server` | Start the compiled Express server |
+| Command                               |Purpose                                           |
+|                                        |                                                   |
+| `npm install`                         |Install all npm workspace dependencies            |
+| `npm run dev`                         |Start client and server development processes     |
+| `npm run dev:client`                  |Start only the Vite client                        |
+| `npm run dev:server`                  |Start only the Express server                     |
+| `npm run build`                       |Build client and server                           |
+| `npm run build:client`                |Build only the client                             |
+| `npm run build:server`                |Build only the server                             |
+| `npm run runtime:test`                |Run production runtime and authentication tests   |
+| `npm run register:test`               |Run Active Register unit and API tests            |
+| `npm run persistence:test`            |Run PostgreSQL integration tests                  |
+| `npm run register:db:up`              |Start and migrate the local persistence stack     |
+| `npm run register:db:verify-recovery` |Verify local backup and restore behavior          |
+| `npm run container:build`             |Build production application and migration images |
+| `npm run preview --workspace=client`  |Preview the compiled client                       |
+| `npm run start --workspace=server`    |Start the compiled Express server                 |
 
 ## Project Layout
 
@@ -790,7 +799,11 @@ ghcp-ai-credits-simulator/
 │       ├── routes/                 Auth, assessment, and report routes
 │       └── services/               GitHub and PDF integration services
 ├── shared/                         Cross-workspace TypeScript contracts
+├── infra/                          Lean Azure Bicep modules
+├── Dockerfile                      Application and migration image targets
+├── compose.register.yaml           Local PostgreSQL and PostgREST stack
 ├── .devcontainer/                  Codespaces and VS Code container setup
+├── .github/workflows/              Protected production deployment workflow
 ├── .env.example                    Environment variable reference
 ├── package.json                    Root npm workspace scripts
 ├── tsconfig.json                   Shared TypeScript defaults
@@ -811,9 +824,10 @@ ghcp-ai-credits-simulator/
 * Live assessment depends on GitHub API availability, permissions, and response
   compatibility
 
-These constraints make the current implementation suitable for development,
-demonstration, and design exploration. Address them before multi-user or
-production deployment.
+The protected Azure deployment addresses the hosting, secret, network, identity,
+and observability boundaries for its approved lean topology. The reliability
+and retention limits above still apply and require a separate cost review before
+they are expanded.
 
 ## Troubleshooting
 
@@ -889,18 +903,9 @@ browser policy and GPU acceleration settings can affect Three.js rendering.
 
 ## Contributing
 
-Create a focused branch, keep secrets out of source control, and validate the
-full build before opening a pull request:
-
-```bash
-git switch -c feature/your-change
-npm install
-npm run build
-git status --short
-```
-
-Include setup or behavior documentation when a change affects environment
-variables, GitHub permissions, API contracts, calculations, or user workflows.
+Follow the [Contributor Guide](docs/contributor-guide.md) for local persistence,
+Codespaces, runtime configuration, validation, backup, migration, and review
+requirements.
 
 ## License
 

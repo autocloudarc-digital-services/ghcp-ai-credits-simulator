@@ -6,6 +6,7 @@ import { getGitHubAppCredentials, getSessionSecret } from '../config';
 declare module 'express-session' {
   interface SessionData {
     oauthState?: string;
+    oauthCodeVerifier?: string;
     encryptedToken?: { iv: string; authTag: string; data: string };
     enterprise?: string;
     tokenObtainedAt?: number;
@@ -19,7 +20,22 @@ declare module 'express-session' {
 const GITHUB_OAUTH_AUTHORIZE_URL = 'https://github.com/login/oauth/authorize';
 const GITHUB_OAUTH_TOKEN_URL = 'https://github.com/login/oauth/access_token';
 const GITHUB_API_BASE_URL = 'https://api.github.com';
-const OAUTH_SCOPE = 'read:enterprise,read:org';
+
+function sessionData(session: Session): Session & Partial<import('express-session').SessionData> {
+  return session as Session & Partial<import('express-session').SessionData>;
+}
+
+function clearOAuthAttempt(session: Session): void {
+  const data = sessionData(session);
+  delete data.oauthState;
+  delete data.oauthCodeVerifier;
+}
+
+function matchingState(expected: string, received: string): boolean {
+  const expectedBytes = Buffer.from(expected);
+  const receivedBytes = Buffer.from(received);
+  return expectedBytes.length === receivedBytes.length && crypto.timingSafeEqual(expectedBytes, receivedBytes);
+}
 
 /**
  * Derives a stable 32-byte AES key from the SESSION_SECRET environment
@@ -70,13 +86,18 @@ export function getAuthorizationUrl(session: Session): string {
   }
 
   const state = crypto.randomBytes(32).toString('hex');
-  (session as any).oauthState = state;
+  const codeVerifier = crypto.randomBytes(64).toString('base64url');
+  const codeChallenge = crypto.createHash('sha256').update(codeVerifier).digest('base64url');
+  const data = sessionData(session);
+  data.oauthState = state;
+  data.oauthCodeVerifier = codeVerifier;
 
   const params = new URLSearchParams({
     client_id: clientId,
     redirect_uri: callbackUrl,
-    scope: OAUTH_SCOPE,
     state,
+    code_challenge: codeChallenge,
+    code_challenge_method: 'S256',
   });
 
   return `${GITHUB_OAUTH_AUTHORIZE_URL}?${params.toString()}`;
@@ -92,14 +113,16 @@ export async function exchangeCodeForToken(
   state: string,
   session: Session
 ): Promise<{ success: boolean; error?: string }> {
-  const sessionState = (session as any).oauthState;
-  if (!sessionState || sessionState !== state) {
+  const data = sessionData(session);
+  const sessionState = data.oauthState;
+  const codeVerifier = data.oauthCodeVerifier;
+  if (!sessionState || !codeVerifier || !matchingState(sessionState, state)) {
+    clearOAuthAttempt(session);
     return { success: false, error: 'Invalid or missing OAuth state parameter (possible CSRF attempt).' };
   }
 
-  const { clientId, clientSecret, callbackUrl } = getGitHubAppCredentials();
-
   try {
+    const { clientId, clientSecret, callbackUrl } = getGitHubAppCredentials();
     const response = await axios.post(
       GITHUB_OAUTH_TOKEN_URL,
       {
@@ -107,6 +130,7 @@ export async function exchangeCodeForToken(
         client_secret: clientSecret,
         code,
         redirect_uri: callbackUrl,
+        code_verifier: codeVerifier,
       },
       { headers: { Accept: 'application/json' } }
     );
@@ -127,11 +151,12 @@ export async function exchangeCodeForToken(
     (session as any).refreshToken = response.data.refresh_token;
     (session as any).tokenObtainedAt = Date.now();
     (session as any).tokenExpiresIn = response.data.expires_in;
-    delete (session as any).oauthState;
 
     return { success: true };
   } catch (err) {
     return { success: false, error: 'Failed to exchange authorization code for an access token.' };
+  } finally {
+    clearOAuthAttempt(session);
   }
 }
 
@@ -218,7 +243,7 @@ export async function revokeToken(session: Session): Promise<void> {
   delete (session as any).enterprise;
   delete (session as any).tokenObtainedAt;
   delete (session as any).tokenExpiresIn;
-  delete (session as any).oauthState;
+  clearOAuthAttempt(session);
 }
 
 export function isAuthenticated(session: Session): boolean {

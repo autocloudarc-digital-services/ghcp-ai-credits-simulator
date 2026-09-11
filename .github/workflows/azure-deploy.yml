@@ -1,0 +1,601 @@
+name: Azure production deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      approved_public_retail_ceiling_usd:
+        description: Enter 209.51 to acknowledge the approved monthly public-retail ceiling.
+        required: true
+        type: string
+      change_reason:
+        description: Deployment reason recorded with the protected environment approval.
+        required: true
+        type: string
+      verified_monthly_estimate_usd:
+        description: Enter the current negotiated monthly estimate, which must not exceed 209.51 USD.
+        required: true
+        type: string
+
+concurrency:
+  group: azure-production
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate release candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Verify cost acknowledgement
+        env:
+          APPROVED_CEILING: ${{ inputs.approved_public_retail_ceiling_usd }}
+          VERIFIED_ESTIMATE: ${{ inputs.verified_monthly_estimate_usd }}
+        run: |
+          set -euo pipefail
+          if [[ "$APPROVED_CEILING" != '209.51' ]]; then
+            echo 'The approved public-retail ceiling must be acknowledged exactly as 209.51.' >&2
+            exit 1
+          fi
+          node -e '
+            const estimate = Number(process.env.VERIFIED_ESTIMATE);
+            if (!Number.isFinite(estimate) || estimate <= 0 || estimate > 209.51) {
+              throw new Error("The verified monthly estimate must be greater than zero and no more than 209.51 USD.");
+            }
+          '
+
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm clean-install
+
+      - name: Run focused runtime tests
+        run: npm run runtime:test
+
+      - name: Build application
+        run: npm run build
+
+      - name: Lint client
+        run: npm run lint --workspace=client
+
+      - name: Run register tests
+        run: npm run register:test
+
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --workspaces --include-workspace-root
+
+      - name: Compile Bicep
+        run: |
+          set -euo pipefail
+          az bicep install
+          az bicep build --file infra/subscription.bicep --stdout >/dev/null
+
+      - name: Build production images
+        run: |
+          set -euo pipefail
+          docker build --target app --tag ghcp-ai-credits-simulator:validation .
+          docker build --target migration --tag ghcp-ai-credits-migration:validation .
+
+  deploy:
+    name: Deploy production
+    needs: validate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    environment:
+      name: production
+      url: ${{ steps.verify.outputs.application_origin }}
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      APP_IMAGE_REPOSITORY: ${{ vars.APP_IMAGE_REPOSITORY }}
+      APPLICATION_IDENTITY_NAME: ${{ vars.APPLICATION_IDENTITY_NAME }}
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      CONTAINER_APP_NAME: ${{ vars.CONTAINER_APP_NAME }}
+      CONTAINER_APPS_ENVIRONMENT_NAME: ${{ vars.CONTAINER_APPS_ENVIRONMENT_NAME }}
+      CONTAINER_APPS_SUBNET_NAME: ${{ vars.CONTAINER_APPS_SUBNET_NAME }}
+      CONTAINER_APPS_SUBNET_PREFIX: ${{ vars.CONTAINER_APPS_SUBNET_PREFIX }}
+      CONTAINER_REGISTRY_NAME: ${{ vars.CONTAINER_REGISTRY_NAME }}
+      COST_CENTER: ${{ vars.COST_CENTER }}
+      DEPLOYMENT_PRINCIPAL_ID: ${{ vars.DEPLOYMENT_PRINCIPAL_ID }}
+      ENTRA_ALLOWED_GROUP_OBJECT_ID: ${{ vars.ENTRA_ALLOWED_GROUP_OBJECT_ID }}
+      ENTRA_CLIENT_ID: ${{ vars.ENTRA_CLIENT_ID }}
+      GITHUB_APP_CLIENT_ID: ${{ vars.GH_APP_CLIENT_ID }}
+      KEY_VAULT_NAME: ${{ vars.KEY_VAULT_NAME }}
+      LOCATION: ${{ vars.AZURE_LOCATION }}
+      LOG_ANALYTICS_WORKSPACE_NAME: ${{ vars.LOG_ANALYTICS_WORKSPACE_NAME }}
+      MIGRATION_IDENTITY_NAME: ${{ vars.MIGRATION_IDENTITY_NAME }}
+      MIGRATION_IMAGE_REPOSITORY: ${{ vars.MIGRATION_IMAGE_REPOSITORY }}
+      MIGRATION_JOB_NAME: ${{ vars.MIGRATION_JOB_NAME }}
+      OWNER: ${{ vars.OWNER }}
+      POSTGRES_ADMINISTRATOR_LOGIN: ${{ vars.POSTGRES_ADMINISTRATOR_LOGIN }}
+      POSTGRES_DATABASE_NAME: ${{ vars.POSTGRES_DATABASE_NAME }}
+      POSTGRES_SERVER_NAME: ${{ vars.POSTGRES_SERVER_NAME }}
+      POSTGRES_SUBNET_NAME: ${{ vars.POSTGRES_SUBNET_NAME }}
+      POSTGRES_SUBNET_PREFIX: ${{ vars.POSTGRES_SUBNET_PREFIX }}
+      POSTGREST_IMAGE_REPOSITORY: ${{ vars.POSTGREST_IMAGE_REPOSITORY }}
+      POSTGREST_SOURCE_IMAGE: ${{ vars.POSTGREST_SOURCE_IMAGE }}
+      PRIVATE_ENDPOINTS_SUBNET_NAME: ${{ vars.PRIVATE_ENDPOINTS_SUBNET_NAME }}
+      PRIVATE_ENDPOINTS_SUBNET_PREFIX: ${{ vars.PRIVATE_ENDPOINTS_SUBNET_PREFIX }}
+      RESOURCE_GROUP_NAME: ${{ vars.AZURE_RESOURCE_GROUP_NAME }}
+      VIRTUAL_NETWORK_NAME: ${{ vars.VIRTUAL_NETWORK_NAME }}
+      VIRTUAL_NETWORK_PREFIX: ${{ vars.VIRTUAL_NETWORK_PREFIX }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Verify deployment configuration
+        run: |
+          set -euo pipefail
+          required=(
+            APP_IMAGE_REPOSITORY APPLICATION_IDENTITY_NAME AZURE_CLIENT_ID
+            AZURE_SUBSCRIPTION_ID AZURE_TENANT_ID CONTAINER_APP_NAME
+            CONTAINER_APPS_ENVIRONMENT_NAME CONTAINER_APPS_SUBNET_NAME
+            CONTAINER_APPS_SUBNET_PREFIX CONTAINER_REGISTRY_NAME COST_CENTER
+            DEPLOYMENT_PRINCIPAL_ID ENTRA_ALLOWED_GROUP_OBJECT_ID
+            ENTRA_CLIENT_ID GITHUB_APP_CLIENT_ID LOCATION
+            KEY_VAULT_NAME LOG_ANALYTICS_WORKSPACE_NAME MIGRATION_IDENTITY_NAME
+            MIGRATION_IMAGE_REPOSITORY MIGRATION_JOB_NAME OWNER
+            POSTGRES_ADMINISTRATOR_LOGIN POSTGRES_DATABASE_NAME
+            POSTGRES_SERVER_NAME POSTGRES_SUBNET_NAME POSTGRES_SUBNET_PREFIX
+            POSTGREST_IMAGE_REPOSITORY POSTGREST_SOURCE_IMAGE
+            PRIVATE_ENDPOINTS_SUBNET_NAME PRIVATE_ENDPOINTS_SUBNET_PREFIX
+            RESOURCE_GROUP_NAME VIRTUAL_NETWORK_NAME VIRTUAL_NETWORK_PREFIX
+          )
+          for variable in "${required[@]}"; do
+            if [[ -z "${!variable:-}" ]]; then
+              echo "Missing protected production variable: $variable" >&2
+              exit 1
+            fi
+          done
+          if [[ "$LOCATION" != 'eastus2' ]]; then
+            echo 'AZURE_LOCATION must remain eastus2 for the approved deployment.' >&2
+            exit 1
+          fi
+          if [[ ! "$POSTGREST_SOURCE_IMAGE" =~ @sha256:[a-f0-9]{64}$ ]]; then
+            echo 'POSTGREST_SOURCE_IMAGE must use an immutable sha256 digest.' >&2
+            exit 1
+          fi
+
+      - name: Sign in to Azure with OIDC
+        uses: azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Run read-only Azure preflight
+        run: |
+          set -euo pipefail
+          account="$(az account show --output json)"
+          jq -e \
+            --arg subscription "$AZURE_SUBSCRIPTION_ID" \
+            --arg tenant "$AZURE_TENANT_ID" \
+            '.id == $subscription and .tenantId == $tenant and .state == "Enabled"' \
+            <<<"$account" >/dev/null
+
+          providers=(
+            Microsoft.App Microsoft.Authorization Microsoft.ContainerRegistry
+            Microsoft.DBforPostgreSQL Microsoft.Insights Microsoft.KeyVault
+            Microsoft.ManagedIdentity Microsoft.Network Microsoft.OperationalInsights
+          )
+          for provider in "${providers[@]}"; do
+            state="$(az provider show --namespace "$provider" --query registrationState --output tsv)"
+            if [[ "$state" != 'Registered' ]]; then
+              echo "Required resource provider is not registered: $provider ($state)" >&2
+              exit 1
+            fi
+          done
+
+          roles="$(az role assignment list \
+            --assignee "$DEPLOYMENT_PRINCIPAL_ID" \
+            --include-inherited \
+            --scope "/subscriptions/$AZURE_SUBSCRIPTION_ID" \
+            --output json)"
+          has_owner="$(jq 'any(.[]; .roleDefinitionName == "Owner")' <<<"$roles")"
+          has_contributor="$(jq 'any(.[]; .roleDefinitionName == "Contributor")' <<<"$roles")"
+          has_role_admin="$(jq 'any(.[]; .roleDefinitionName == "User Access Administrator" or .roleDefinitionName == "Role Based Access Control Administrator")' <<<"$roles")"
+          if [[ "$has_owner" != 'true' && ( "$has_contributor" != 'true' || "$has_role_admin" != 'true' ) ]]; then
+            echo 'Deployment identity requires Owner, or Contributor plus role-assignment authority, at subscription scope.' >&2
+            exit 1
+          fi
+
+          deployment_service_principal="$(az ad sp show --id "$AZURE_CLIENT_ID" --output json)"
+          jq -e --arg object_id "$DEPLOYMENT_PRINCIPAL_ID" \
+            '.id == $object_id and .accountEnabled == true' \
+            <<<"$deployment_service_principal" >/dev/null
+
+          graph_service_principal="$(az ad sp show \
+            --id '00000003-0000-0000-c000-000000000000' \
+            --output json)"
+          graph_service_principal_id="$(jq -r '.id' <<<"$graph_service_principal")"
+          graph_assignments="$(az rest --method get \
+            --url "https://graph.microsoft.com/v1.0/servicePrincipals/$DEPLOYMENT_PRINCIPAL_ID/appRoleAssignments" \
+            --output json)"
+          graph_permissions="$(jq -n \
+            --arg resource "$graph_service_principal_id" \
+            --argjson assignments "$graph_assignments" \
+            --argjson graph "$graph_service_principal" \
+            '[
+              $assignments.value[]
+              | select(.resourceId == $resource) as $assignment
+              | $graph.appRoles[]
+              | select(.id == $assignment.appRoleId)
+              | .value
+            ]')"
+          jq -e '
+            index("Application.ReadWrite.OwnedBy") != null
+              or index("Application.ReadWrite.All") != null
+          ' <<<"$graph_permissions" >/dev/null
+
+          entra_app="$(az ad app show --id "$ENTRA_CLIENT_ID" --output json)"
+          jq -e '.signInAudience == "AzureADMyOrg"' <<<"$entra_app" >/dev/null
+          if ! jq -e 'index("Application.ReadWrite.All") != null' \
+            <<<"$graph_permissions" >/dev/null; then
+            entra_app_object_id="$(jq -r '.id' <<<"$entra_app")"
+            entra_app_owners="$(az rest --method get \
+              --url "https://graph.microsoft.com/v1.0/applications/$entra_app_object_id/owners?%24select=id" \
+              --output json)"
+            jq -e --arg owner "$DEPLOYMENT_PRINCIPAL_ID" \
+              'any(.value[]; .id == $owner)' <<<"$entra_app_owners" >/dev/null
+          fi
+          entra_service_principal="$(az ad sp show --id "$ENTRA_CLIENT_ID" --output json)"
+          jq -e '.accountEnabled == true and .appRoleAssignmentRequired == true' \
+            <<<"$entra_service_principal" >/dev/null
+          entra_group="$(az ad group show --group "$ENTRA_ALLOWED_GROUP_OBJECT_ID" --output json)"
+          jq -e '.securityEnabled == true' <<<"$entra_group" >/dev/null
+          entra_service_principal_id="$(jq -r '.id' <<<"$entra_service_principal")"
+          group_assignments="$(az rest --method get \
+            --url "https://graph.microsoft.com/v1.0/servicePrincipals/$entra_service_principal_id/appRoleAssignedTo" \
+            --output json)"
+          jq -e --arg group "$ENTRA_ALLOWED_GROUP_OBJECT_ID" \
+            'any(.value[]; .principalId == $group)' <<<"$group_assignments" >/dev/null
+
+          sku_data="$(az postgres flexible-server list-skus --location "$LOCATION" --output json)"
+          jq -e 'any(.[].supportedFlexibleServerEditions[]?.supportedServerSkus[]?; .name == "Standard_B2ms" and .status == null)' <<<"$sku_data" >/dev/null
+          jq -e 'any(.[].supportedServerVersions[]?; .name == "17" and .status == null)' <<<"$sku_data" >/dev/null
+
+          az consumption budget list --scope "/subscriptions/$AZURE_SUBSCRIPTION_ID" --output none
+          az lock list --scope "/subscriptions/$AZURE_SUBSCRIPTION_ID" --output json \
+            | jq -e 'all(.[]; .level != "ReadOnly")' >/dev/null
+
+          if [[ "$(az group exists --name "$RESOURCE_GROUP_NAME")" == 'true' ]]; then
+            az resource list --resource-group "$RESOURCE_GROUP_NAME" \
+              --query '[].{name:name,type:type,location:location}' --output table
+            az lock list --resource-group "$RESOURCE_GROUP_NAME" --output json \
+              | jq -e 'all(.[]; .level != "ReadOnly")' >/dev/null
+          fi
+
+      - name: Prepare protected deployment parameters
+        env:
+          ENTERPRISE_BILLING_TOKEN: ${{ secrets.GH_ENTERPRISE_BILLING_TOKEN }}
+          ENTRA_CLIENT_SECRET: ${{ secrets.ENTRA_CLIENT_SECRET }}
+          GITHUB_APP_CLIENT_SECRET: ${{ secrets.GH_APP_CLIENT_SECRET }}
+          POSTGRES_ADMINISTRATOR_PASSWORD: ${{ secrets.POSTGRES_ADMINISTRATOR_PASSWORD }}
+          POSTGRES_AUTHENTICATOR_PASSWORD: ${{ secrets.POSTGRES_AUTHENTICATOR_PASSWORD }}
+          REGISTER_ACCESS_JSON: ${{ secrets.REGISTER_ACCESS_JSON }}
+          REGISTER_JWT_SECRET: ${{ secrets.REGISTER_JWT_SECRET }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+        run: |
+          set -euo pipefail
+          required=(
+            ENTERPRISE_BILLING_TOKEN ENTRA_CLIENT_SECRET GITHUB_APP_CLIENT_SECRET
+            POSTGRES_ADMINISTRATOR_PASSWORD POSTGRES_AUTHENTICATOR_PASSWORD
+            REGISTER_ACCESS_JSON REGISTER_JWT_SECRET SESSION_SECRET
+          )
+          for variable in "${required[@]}"; do
+            if [[ -z "${!variable:-}" ]]; then
+              echo "Missing protected production secret: $variable" >&2
+              exit 1
+            fi
+          done
+          node -e 'JSON.parse(process.env.REGISTER_ACCESS_JSON)'
+          node --input-type=module <<'NODE'
+          const body = new URLSearchParams({
+            client_id: process.env.ENTRA_CLIENT_ID,
+            client_secret: process.env.ENTRA_CLIENT_SECRET,
+            grant_type: 'client_credentials',
+            scope: 'https://graph.microsoft.com/.default',
+          });
+          const response = await fetch(
+            `https://login.microsoftonline.com/${process.env.AZURE_TENANT_ID}/oauth2/v2.0/token`,
+            { method: 'POST', body },
+          );
+          if (!response.ok) {
+            throw new Error(`Microsoft Entra client credential validation failed (${response.status}).`);
+          }
+          NODE
+
+          export PLACEHOLDER_DIGEST="sha256:$(printf '0%.0s' {1..64})"
+          PARAMETERS_FILE="$RUNNER_TEMP/production.parameters.json"
+          export PARAMETERS_FILE
+          umask 077
+          jq -n '{
+            "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+            contentVersion: "1.0.0.0",
+            parameters: {
+              deploymentPrincipalId: { value: env.DEPLOYMENT_PRINCIPAL_ID },
+              enterpriseBillingToken: { value: env.ENTERPRISE_BILLING_TOKEN },
+              entraClientSecret: { value: env.ENTRA_CLIENT_SECRET },
+              githubAppClientSecret: { value: env.GITHUB_APP_CLIENT_SECRET },
+              imageDigests: { value: {
+                app: env.PLACEHOLDER_DIGEST,
+                migration: env.PLACEHOLDER_DIGEST,
+                postgrest: env.PLACEHOLDER_DIGEST
+              } },
+              imageRepositories: { value: {
+                app: env.APP_IMAGE_REPOSITORY,
+                migration: env.MIGRATION_IMAGE_REPOSITORY,
+                postgrest: env.POSTGREST_IMAGE_REPOSITORY
+              } },
+              location: { value: env.LOCATION },
+              names: { value: {
+                containerRegistry: env.CONTAINER_REGISTRY_NAME,
+                containerApp: env.CONTAINER_APP_NAME,
+                containerEnvironment: env.CONTAINER_APPS_ENVIRONMENT_NAME,
+                applicationIdentity: env.APPLICATION_IDENTITY_NAME,
+                keyVault: env.KEY_VAULT_NAME,
+                logAnalytics: env.LOG_ANALYTICS_WORKSPACE_NAME,
+                migrationJob: env.MIGRATION_JOB_NAME,
+                migrationIdentity: env.MIGRATION_IDENTITY_NAME,
+                postgresDatabase: env.POSTGRES_DATABASE_NAME,
+                postgresServer: env.POSTGRES_SERVER_NAME,
+                virtualNetwork: env.VIRTUAL_NETWORK_NAME
+              } },
+              network: { value: {
+                containerAppsSubnetPrefix: env.CONTAINER_APPS_SUBNET_PREFIX,
+                containerAppsSubnetName: env.CONTAINER_APPS_SUBNET_NAME,
+                privateEndpointsSubnetPrefix: env.PRIVATE_ENDPOINTS_SUBNET_PREFIX,
+                privateEndpointsSubnetName: env.PRIVATE_ENDPOINTS_SUBNET_NAME,
+                postgresSubnetPrefix: env.POSTGRES_SUBNET_PREFIX,
+                postgresSubnetName: env.POSTGRES_SUBNET_NAME,
+                virtualNetworkPrefix: env.VIRTUAL_NETWORK_PREFIX
+              } },
+              postgresAdministratorPassword: { value: env.POSTGRES_ADMINISTRATOR_PASSWORD },
+              postgresAuthenticatorPassword: { value: env.POSTGRES_AUTHENTICATOR_PASSWORD },
+              registerAccessJson: { value: env.REGISTER_ACCESS_JSON },
+              registerJwtSecret: { value: env.REGISTER_JWT_SECRET },
+              resourceGroupName: { value: env.RESOURCE_GROUP_NAME },
+              runtime: { value: {
+                entraAllowedGroupObjectId: env.ENTRA_ALLOWED_GROUP_OBJECT_ID,
+                entraClientId: env.ENTRA_CLIENT_ID,
+                githubAppClientId: env.GITHUB_APP_CLIENT_ID,
+                postgresAdministratorLogin: env.POSTGRES_ADMINISTRATOR_LOGIN
+              } },
+              sessionSecret: { value: env.SESSION_SECRET },
+              tags: { value: {
+                costCenter: env.COST_CENTER,
+                environment: "prod",
+                owner: env.OWNER,
+                workload: "ghcp-ai-credits-simulator"
+              } }
+            }
+          }' >"$PARAMETERS_FILE"
+          printf 'PARAMETERS_FILE=%s\n' "$PARAMETERS_FILE" >>"$GITHUB_ENV"
+
+      - name: Preview Azure changes
+        run: |
+          set -euo pipefail
+          az deployment sub what-if \
+            --name "ghcp-what-if-$GITHUB_RUN_ID" \
+            --location "$LOCATION" \
+            --template-file infra/subscription.bicep \
+            --parameters "@$PARAMETERS_FILE" \
+            --parameters shouldDeployApplication=true shouldDeployMigrationJob=true shouldEnableExternalIngress=true
+
+      - name: Deploy foundation
+        run: |
+          set -euo pipefail
+          az deployment sub create \
+            --name "ghcp-foundation-$GITHUB_RUN_ID" \
+            --location "$LOCATION" \
+            --template-file infra/subscription.bicep \
+            --parameters "@$PARAMETERS_FILE" \
+            --parameters shouldDeployApplication=false shouldDeployMigrationJob=false \
+            --output none
+
+      - name: Configure Microsoft Entra callback
+        run: |
+          set -euo pipefail
+          default_domain="$(az containerapp env show \
+            --name "$CONTAINER_APPS_ENVIRONMENT_NAME" \
+            --resource-group "$RESOURCE_GROUP_NAME" \
+            --query properties.defaultDomain --output tsv)"
+          entra_callback="https://$CONTAINER_APP_NAME.$default_domain/.auth/login/aad/callback"
+          mapfile -t redirect_uris < <(az ad app show \
+            --id "$ENTRA_CLIENT_ID" \
+            --query 'web.redirectUris[]' --output tsv)
+          if [[ ! " ${redirect_uris[*]} " =~ [[:space:]]${entra_callback}[[:space:]] ]]; then
+            redirect_uris+=("$entra_callback")
+            az ad app update \
+              --id "$ENTRA_CLIENT_ID" \
+              --web-redirect-uris "${redirect_uris[@]}" \
+              --output none
+          fi
+          printf 'Microsoft Entra callback: `%s`\n' "$entra_callback" >>"$GITHUB_STEP_SUMMARY"
+          printf 'GitHub App callback: `%s`\n' \
+            "https://$CONTAINER_APP_NAME.$default_domain/auth/github/callback" \
+            >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Build and publish immutable images
+        run: |
+          set -euo pipefail
+          login_server="$(az acr show --name "$CONTAINER_REGISTRY_NAME" --query loginServer --output tsv)"
+          for attempt in {1..12}; do
+            if az acr login --name "$CONTAINER_REGISTRY_NAME"; then
+              break
+            fi
+            if [[ "$attempt" == '12' ]]; then
+              echo 'AcrPush role did not become effective before the timeout.' >&2
+              exit 1
+            fi
+            sleep 10
+          done
+
+          app_tag="$login_server/$APP_IMAGE_REPOSITORY:$GITHUB_SHA"
+          migration_tag="$login_server/$MIGRATION_IMAGE_REPOSITORY:$GITHUB_SHA"
+          docker build --target app --tag "$app_tag" .
+          docker build --target migration --tag "$migration_tag" .
+          docker push "$app_tag"
+          docker push "$migration_tag"
+          az acr import \
+            --name "$CONTAINER_REGISTRY_NAME" \
+            --source "$POSTGREST_SOURCE_IMAGE" \
+            --image "$POSTGREST_IMAGE_REPOSITORY:$GITHUB_SHA" \
+            --force
+
+          app_digest="$(az acr repository show --name "$CONTAINER_REGISTRY_NAME" --image "$APP_IMAGE_REPOSITORY:$GITHUB_SHA" --query digest --output tsv)"
+          migration_digest="$(az acr repository show --name "$CONTAINER_REGISTRY_NAME" --image "$MIGRATION_IMAGE_REPOSITORY:$GITHUB_SHA" --query digest --output tsv)"
+          postgrest_digest="$(az acr repository show --name "$CONTAINER_REGISTRY_NAME" --image "$POSTGREST_IMAGE_REPOSITORY:$GITHUB_SHA" --query digest --output tsv)"
+          for digest in "$app_digest" "$migration_digest" "$postgrest_digest"; do
+            if [[ ! "$digest" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+              echo 'Registry returned an invalid image digest.' >&2
+              exit 1
+            fi
+          done
+
+          updated="$RUNNER_TEMP/production.parameters.updated.json"
+          jq \
+            --arg app "$app_digest" \
+            --arg migration "$migration_digest" \
+            --arg postgrest "$postgrest_digest" \
+            '.parameters.imageDigests.value = {
+              app: $app,
+              migration: $migration,
+              postgrest: $postgrest
+            }' "$PARAMETERS_FILE" >"$updated"
+          chmod 600 "$updated"
+          mv "$updated" "$PARAMETERS_FILE"
+
+      - name: Deploy private migration job
+        run: |
+          set -euo pipefail
+          az deployment sub create \
+            --name "ghcp-migration-$GITHUB_RUN_ID" \
+            --location "$LOCATION" \
+            --template-file infra/subscription.bicep \
+            --parameters "@$PARAMETERS_FILE" \
+            --parameters shouldDeployApplication=false shouldDeployMigrationJob=true \
+            --output none
+
+      - name: Apply database migrations
+        run: |
+          set -euo pipefail
+          execution_name="$(az containerapp job start \
+            --name "$MIGRATION_JOB_NAME" \
+            --resource-group "$RESOURCE_GROUP_NAME" \
+            --query name --output tsv)"
+          for attempt in {1..60}; do
+            execution_status="$(az containerapp job execution show \
+              --name "$MIGRATION_JOB_NAME" \
+              --resource-group "$RESOURCE_GROUP_NAME" \
+              --job-execution-name "$execution_name" \
+              --query properties.status --output tsv)"
+            case "$execution_status" in
+              Succeeded)
+                exit 0
+                ;;
+              Failed|Stopped|Degraded)
+                echo "Migration execution ended with status: $execution_status" >&2
+                exit 1
+                ;;
+            esac
+            sleep 10
+          done
+          echo 'Migration execution did not finish before the timeout.' >&2
+          exit 1
+
+      - name: Deploy application with internal ingress
+        run: |
+          set -euo pipefail
+          az deployment sub create \
+            --name "ghcp-application-internal-$GITHUB_RUN_ID" \
+            --location "$LOCATION" \
+            --template-file infra/subscription.bicep \
+            --parameters "@$PARAMETERS_FILE" \
+            --parameters shouldDeployApplication=true shouldDeployMigrationJob=true shouldEnableExternalIngress=false \
+            --output none
+
+      - name: Verify internal application admission
+        run: |
+          set -euo pipefail
+          container_app="$(az containerapp show \
+            --name "$CONTAINER_APP_NAME" \
+            --resource-group "$RESOURCE_GROUP_NAME" \
+            --output json)"
+          jq -e '.properties.configuration.ingress.external == false' <<<"$container_app" >/dev/null
+          provisioning_state="$(jq -r '.properties.provisioningState' <<<"$container_app")"
+          if [[ "$provisioning_state" != 'Succeeded' ]]; then
+            echo "Internal Container App provisioning state is $provisioning_state." >&2
+            exit 1
+          fi
+
+          auth_config="$(az rest --method get \
+            --url "https://management.azure.com/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$RESOURCE_GROUP_NAME/providers/Microsoft.App/containerApps/$CONTAINER_APP_NAME/authConfigs/current?api-version=2025-01-01" \
+            --output json)"
+          jq -e \
+            --arg client "$ENTRA_CLIENT_ID" \
+            --arg group "$ENTRA_ALLOWED_GROUP_OBJECT_ID" \
+            '.properties.platform.enabled == true
+              and .properties.httpSettings.requireHttps == true
+              and .properties.globalValidation.unauthenticatedClientAction == "RedirectToLoginPage"
+              and .properties.identityProviders.azureActiveDirectory.registration.clientId == $client
+              and any(.properties.identityProviders.azureActiveDirectory.validation.defaultAuthorizationPolicy.allowedPrincipals.groups[]; . == $group)' \
+            <<<"$auth_config" >/dev/null
+
+      - name: Enable public application ingress
+        id: deploy_app
+        run: |
+          set -euo pipefail
+          deployment_name="ghcp-application-public-$GITHUB_RUN_ID"
+          az deployment sub create \
+            --name "$deployment_name" \
+            --location "$LOCATION" \
+            --template-file infra/subscription.bicep \
+            --parameters "@$PARAMETERS_FILE" \
+            --parameters shouldDeployApplication=true shouldDeployMigrationJob=true shouldEnableExternalIngress=true \
+            --output none
+          application_origin="$(az deployment sub show \
+            --name "$deployment_name" \
+            --query properties.outputs.applicationOrigin.value \
+            --output tsv)"
+          printf 'application_origin=%s\n' "$application_origin" >>"$GITHUB_OUTPUT"
+
+      - name: Verify readiness and traffic
+        id: verify
+        env:
+          APPLICATION_ORIGIN: ${{ steps.deploy_app.outputs.application_origin }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            --retry 12 --retry-all-errors --retry-delay 5 \
+            "$APPLICATION_ORIGIN/readyz" >/dev/null
+          az containerapp ingress traffic set \
+            --name "$CONTAINER_APP_NAME" \
+            --resource-group "$RESOURCE_GROUP_NAME" \
+            --revision-weight latest=100 \
+            --output none
+          latest_weight="$(az containerapp ingress traffic show \
+            --name "$CONTAINER_APP_NAME" \
+            --resource-group "$RESOURCE_GROUP_NAME" \
+            --query '[?latestRevision].weight | [0]' --output tsv)"
+          if [[ "$latest_weight" != '100' ]]; then
+            echo 'Latest revision did not receive 100 percent of traffic.' >&2
+            exit 1
+          fi
+          curl --fail --silent --show-error "$APPLICATION_ORIGIN/healthz" >/dev/null
+          printf 'application_origin=%s\n' "$APPLICATION_ORIGIN" >>"$GITHUB_OUTPUT"
+
+      - name: Remove protected parameter file
+        if: always()
+        run: rm -f "${PARAMETERS_FILE:-}" "$RUNNER_TEMP/production.parameters.updated.json"

@@ -21,5 +21,4 @@ LANGUAGE sql SECURITY DEFINER SET search_path = register, pg_temp AS $$
 $$;
 REVOKE ALL ON FUNCTION register.prune_application_sessions() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION register.prune_application_sessions() TO application_sessions;
-NOTIFY pgrst, 'reload schema';
 COMMIT;

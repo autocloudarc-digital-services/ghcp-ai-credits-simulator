@@ -67,5 +67,4 @@ REVOKE ALL ON FUNCTION register.audit_workflow_revision() FROM PUBLIC;
 DROP TRIGGER IF EXISTS audit_workflow_revision ON register.workflows;
 CREATE TRIGGER audit_workflow_revision AFTER INSERT OR UPDATE ON register.workflows
   FOR EACH ROW EXECUTE FUNCTION register.audit_workflow_revision();
-NOTIFY pgrst, 'reload schema';
 COMMIT;

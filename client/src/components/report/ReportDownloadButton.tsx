@@ -44,7 +44,7 @@ export default function ReportDownloadButton({
       a.click();
       URL.revokeObjectURL(url);
       await refreshHistory();
-    } catch (err) {
+    } catch {
       setError('Unable to generate the report. Please ensure the server is running and try again.');
     } finally {
       setIsGenerating(false);

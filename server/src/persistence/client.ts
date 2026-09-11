@@ -12,3 +12,9 @@ export function persistenceClient(role: 'application_sessions' | 'application_da
   });
   return client;
 }
+
+export async function checkPersistenceReadiness(): Promise<void> {
+  await persistenceClient('application_sessions', 'readiness').head('/application_sessions', {
+    params: { select: 'id', limit: 0 },
+  });
+}

@@ -31,6 +31,23 @@ import {
 } from '../types';
 
 const router = Router();
+const activeAssessments = new Map<string, { owner: string; jobId: string; heartbeat: NodeJS.Timeout }>();
+const INTERRUPTED_ASSESSMENT_ERROR = 'Assessment was interrupted by application shutdown. Run it again with the required credentials.';
+
+export async function interruptActiveAssessments(): Promise<{ attempted: number; failed: number }> {
+  const active = Array.from(activeAssessments.entries());
+  for (const [key, assessment] of active) {
+    clearInterval(assessment.heartbeat);
+    activeAssessments.delete(key);
+  }
+  const updates = await Promise.allSettled(active.map(([, assessment]) =>
+    updateAssessment(assessment.owner, assessment.jobId, {
+      status: 'failed',
+      error: INTERRUPTED_ASSESSMENT_ERROR,
+    })
+  ));
+  return { attempted: active.length, failed: updates.filter((result) => result.status === 'rejected').length };
+}
 
 router.use((_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
 
@@ -149,6 +166,8 @@ async function runAssessment(
 ) {
   const heartbeat = setInterval(() => { void updateAssessment(owner, jobId, {}).catch(() => {}); }, 30000);
   heartbeat.unref();
+  const activeKey = `${owner}:${jobId}`;
+  activeAssessments.set(activeKey, { owner, jobId, heartbeat });
 
   try {
     const now = new Date();
@@ -851,6 +870,7 @@ async function runAssessment(
     await updateAssessment(owner, jobId, { status: 'failed', error: message });
   } finally {
     clearInterval(heartbeat);
+    activeAssessments.delete(activeKey);
   }
 }
 

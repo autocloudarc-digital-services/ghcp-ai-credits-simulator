@@ -10,5 +10,4 @@ RETURNS jsonb LANGUAGE sql STABLE SECURITY INVOKER SET search_path = pg_catalog,
 $$;
 REVOKE ALL ON FUNCTION register.export_register() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION register.export_register() TO register_api;
-NOTIFY pgrst, 'reload schema';
 COMMIT;

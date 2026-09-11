@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Mesh } from 'three';
+import { BufferGeometry, Mesh, MeshStandardMaterial } from 'three';
 import { Text } from '@react-three/drei';
 import ShockwaveRing from '../effects/ShockwaveRing';
 
@@ -10,12 +10,11 @@ interface StopBlockProps {
 }
 
 export default function StopBlock({ position, active }: StopBlockProps) {
-  const meshRef = useRef<Mesh>(null);
+  const meshRef = useRef<Mesh<BufferGeometry, MeshStandardMaterial>>(null);
 
   useFrame(({ clock }) => {
     if (meshRef.current) {
-      const material = meshRef.current.material as any;
-      material.emissiveIntensity = active ? 0.7 + Math.sin(clock.getElapsedTime() * 5) * 0.3 : 0.15;
+      meshRef.current.material.emissiveIntensity = active ? 0.7 + Math.sin(clock.getElapsedTime() * 5) * 0.3 : 0.15;
     }
   });
 

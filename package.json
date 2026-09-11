@@ -14,6 +14,8 @@
     "build": "npm run build --workspace=client && npm run build --workspace=server",
     "build:client": "npm run build --workspace=client",
     "build:server": "npm run build --workspace=server",
+    "runtime:test": "npm run build:server && node --test scripts/runtime-config-test.mjs scripts/github-auth-test.mjs scripts/runtime-server-test.mjs",
+    "container:build": "docker build --target app -t ghcp-ai-credits-simulator:local . && docker build --target migration -t ghcp-ai-credits-migration:local .",
     "register:db:up": "node scripts/register-db.mjs up",
     "register:db:migrate": "node scripts/register-db.mjs migrate",
     "register:db:status": "node scripts/register-db.mjs status",
@@ -26,5 +28,8 @@
   "devDependencies": {
     "concurrently": "^8.2.2",
     "js-yaml": "^5.4.1"
+  },
+  "overrides": {
+    "qs": "6.16.0"
   }
 }

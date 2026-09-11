@@ -19,11 +19,33 @@ export interface StoredRecord {
   updated_at: string;
 }
 
+function configuredGatewayUrl(value: string): string {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw Object.assign(new Error('Active Register gateway URL must be absolute.'), { status: 503 });
+  }
+
+  const loopback = url.hostname === '127.0.0.1' || url.hostname === '[::1]';
+  const validProtocol = url.protocol === 'https:' || (url.protocol === 'http:' && loopback);
+  const validStructure = !url.username && !url.password && !url.search && !url.hash
+    && !url.hostname.includes('*') && url.pathname === '/';
+  if (!validProtocol || !validStructure) {
+    throw Object.assign(new Error('Active Register gateway URL must use HTTPS, or HTTP on numeric loopback, with no credentials, path, query, fragment, or wildcard.'), { status: 503 });
+  }
+  return url.origin;
+}
+
 export function registerSettings() {
   const localFile = path.resolve(__dirname, '../../../.local/register.env');
   const local = process.env.NODE_ENV !== 'production' && existsSync(localFile) ? parseEnv(readFileSync(localFile, 'utf8')) : {};
   const secret = process.env.REGISTER_JWT_SECRET ?? local.REGISTER_JWT_SECRET;
-  const url = process.env.REGISTER_GATEWAY_URL ?? `http://127.0.0.1:${local.REGISTER_GATEWAY_PORT ?? '3302'}`;
+  const configuredUrl = process.env.REGISTER_GATEWAY_URL?.trim();
+  if (process.env.NODE_ENV === 'production' && !configuredUrl) {
+    throw Object.assign(new Error('REGISTER_GATEWAY_URL is required in production.'), { status: 503 });
+  }
+  const url = configuredGatewayUrl(configuredUrl ?? `http://127.0.0.1:${local.REGISTER_GATEWAY_PORT ?? '3302'}`);
   if (!secret || secret.length < 32) throw Object.assign(new Error('Active Register storage is not configured.'), { status: 503 });
   return { secret, url };
 }

@@ -54,5 +54,4 @@ END;
 $$;
 REVOKE ALL ON FUNCTION register.save_record(jsonb,integer,uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION register.save_record(jsonb,integer,uuid) TO register_api;
-NOTIFY pgrst, 'reload schema';
 COMMIT;
