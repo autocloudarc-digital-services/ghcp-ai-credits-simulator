@@ -15,6 +15,7 @@ import StarField from './effects/StarField';
 import FlowParticles from './effects/FlowParticles';
 import SceneControls from './controls/SceneControls';
 import FallbackToggle from './controls/FallbackToggle';
+import governanceTiers from 'ghcp-ai-credits-simulator-shared/governanceTiers.json';
 
 const NODE_Y = {
   pool: 9,
@@ -48,16 +49,17 @@ function Fallback2DFlow({
   overageCredits: number;
 }) {
   const steps = [
+    { label: 'Applicable ULB', value: 'Individual > Cost center > Universal; always hard-stop', color: 'bg-blue-500' },
     { label: 'Enterprise Included AI Credits Pool', value: `${Math.round(fillLevel * 100)}% full`, color: 'bg-teal-400' },
-    { label: 'Governance Shield (3-Tier)', value: 'Active', color: 'bg-blue-500' },
+    { label: 'Paid usage policy', value: 'Required before metered usage', color: 'bg-blue-500' },
     { label: 'Budget Exceeded?', value: utilization > 0.8 ? 'At risk' : 'Healthy', color: 'bg-amber-400' },
     { label: 'Overage Ticker', value: `${Math.round(overageCredits).toLocaleString()} credits`, color: 'bg-orange-500' },
-    { label: 'ULB Tiers', value: 'Universal / Overage / Abundant / Exponential', color: 'bg-teal-400' },
+    { label: 'Modeled usage cohorts', value: 'Universal / Overage / Abundant / Exponential', color: 'bg-teal-400' },
     { label: 'Cost Center Ring', value: `${Math.round(utilization * 100)}% utilized`, color: 'bg-teal-400' },
-    { label: 'Enterprise Spending Limit Wall', value: 'Monitoring', color: 'bg-amber-400' },
+    ...governanceTiers.filter(control => control.group === 'Metered budgets').map(control => ({ label: control.title, value: 'Scope, exclusions, and Stop usage require verification', color: 'bg-amber-400' })),
     {
-      label: overageActive ? 'STOP: Usage Halted' : 'CONTINUE: Usage Permitted',
-      value: overageActive ? 'Blocked' : 'Flowing',
+      label: overageActive ? 'Modeled overage exposure' : 'No modeled overage',
+      value: 'Not a provider enforcement decision',
       color: overageActive ? 'bg-red-500' : 'bg-green-400',
     },
   ];
@@ -67,7 +69,7 @@ function Fallback2DFlow({
       {steps.map((s, idx) => (
         <div key={s.label} className="flex items-center gap-3">
           <div className={`w-2.5 h-2.5 rounded-full ${s.color}`} />
-          <div className="flex-1 bg-slate-900/60 border border-slate-700 rounded-md px-3 py-2 flex items-center justify-between">
+          <div className="flex-1 min-w-0 bg-slate-900/60 border border-slate-700 rounded-md px-3 py-2 flex flex-wrap gap-x-3 gap-y-1 items-center justify-between">
             <span className="text-sm text-slate-300">{s.label}</span>
             <span className="text-xs font-numeric text-slate-400">{s.value}</span>
           </div>

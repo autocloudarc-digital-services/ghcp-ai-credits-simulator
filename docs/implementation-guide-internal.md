@@ -22,6 +22,7 @@ The implementation should produce these outcomes:
 * One approved enterprise spending limit
 * One Universal User-Level Budget (Universal ULB) baseline
 * Approved cost-center ULB overrides for eligible user cohorts
+* Individual ULB exceptions and separate cost center or organization metered budgets where needed
 * Approved organization policy profiles mapped to business requirements
 * A profile register with named owners, approvers, assignments, and evidence
 * Reconciled assessment, simulator, and billing records
@@ -129,24 +130,20 @@ approval. Record each approval before production assignment.
 > license. Label the rate basis on every comparison. Review and rerun all
 > affected assessments, scenarios, approvals, and reports after August 31, 2026. Do not approve a variance until rate-basis differences are isolated.
 
-## Three-tier budget hierarchy
+## Budget Control Scopes
 
-ULB means User-Level Budget. AIC means AI Credit. The implemented governance
-hierarchy applies controls in this order:
+GitHub documents six controls, not numbered governance tiers. ULB precedence is
+individual, then cost center, then universal. ULBs cap total per-user consumption
+across included and metered usage and always hard-stop. Separate cost center,
+organization, and enterprise budgets govern aggregate metered charges in USD,
+with Stop usage required for enforcement. Cost center exclusions and licensing
+attribution affect which metered boundaries apply.
 
-| Tier | Control                   | Scope                                 | Purpose                                                                            |
-| ---- | ------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------- |
-| 1    | Enterprise Spending Limit | Metered overage across the enterprise | Provides the final enterprise hard cap after the included pool is consumed.        |
-| 2    | Universal ULB             | Each user across the enterprise       | Provides the default monthly per-user ceiling of 5,000 credits.                    |
-| 3    | Cost Center ULB Overrides | Approved users in mapped cost centers | Replaces the Universal ULB with a 6,000, 7,000, or 8,000 monthly per-user ceiling. |
-
-The Tier 3 assignment is the most specific per-user control and takes
-precedence over the Tier 2 default for mapped users. Tier 1 remains the
-enterprise backstop across all metered overage. A user reaching an applicable
-ULB hard stop cannot continue metered usage under that profile. If aggregate
-metered overage reaches the enterprise spending hard stop, affected usage stops
-regardless of remaining user-level headroom. Validate exact provider behavior
-in the target environment before rollout.
+Use the [verified designations and official sources](governance-budget-controls.md)
+for scope, precedence, units, alerts, and catalog mapping. Numeric tiers in legacy
+workflow JSON are historical metadata, not authoritative classifications. New
+recommendations use budget type and scope, including when reading older records.
+Organization policy profiles remain separate from organization metered budgets.
 
 Class 1 represents the included pool. It is not a configurable hard stop in the
 built-in catalog, but its exhaustion determines when metered overage exposure
@@ -542,7 +539,7 @@ contains:
 | User-Level Budget (ULB)     | Monthly per-user credit ceiling used by Universal and cost-center profiles.                                 |
 | Universal ULB               | Enterprise-wide default ULB, represented by canonical Class 3 at 5,000 credits per user per month.          |
 | Cost-center ULB override    | More specific Class 4, 5, or 6 per-user ceiling for an approved mapped cohort.                              |
-| Enterprise Spending Limit   | Tier 1 hard cap on metered overage across the enterprise.                                                   |
+| Enterprise Spending Limit   | Enterprise metered budget; stopping requires Stop usage and respects cost center exclusions.                |
 | Organization policy profile | Class 7 through 10 planning record for SKU, model, and feature settings. It is not an organization budget.  |
 | Hard stop                   | Configured behavior that prevents further applicable usage when a supported limit reaches 100%.             |
 | Advisory heuristic          | Application rule that identifies a candidate action but requires human validation and approval.             |

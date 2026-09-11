@@ -31,6 +31,15 @@ Metered budgets use numeric USD amounts and enumerated SKUs. License and entitle
 baselines are informational, never enforcement controls. Thresholds are observed,
 provider-supported values, not hard-coded defaults. Unknowns remain unknown.
 
+The [official GitHub control mapping](governance-budget-controls.md) distinguishes
+all six budget controls without numbered tiers. GitHub documents billing-cycle
+ULBs as always-hard-stop controls configured in USD; this register retains integer
+AI credits as its normalized unit and requires tenant reset evidence. Convert
+units explicitly rather than interpreting credit amounts as dollars. Cost center
+ULBs and cost center metered budgets are different record types; organization
+policy profiles are not organization metered budgets. No source documentation
+review changes a saved record's approval or verified enforcement state.
+
 ## Evidence Boundaries
 
 The register records provider facts and human decisions; it does not apply GitHub
@@ -97,7 +106,8 @@ The same PostgreSQL volume also stores application data in account-scoped tables
 | --- | --- |
 | `register.application_sessions` | AES-256-GCM encrypted login sessions, including OAuth and refresh tokens, with expiry |
 | `register.assessment_jobs` | Assessment inputs without billing tokens, status, results, warnings, and capture timestamps |
-| `register.workflows` | Simulator inputs and results, up to four scenarios, review progress, recommendations, visualization preference, assessment reference, and cost-center allocation plans |
+| `register.workflows` | Versioned simulator inputs and results, up to four scenarios, review progress, recommendations, visualization preference, assessment reference, allocation plans, and Governance Insights view/filter preferences |
+| `register.workflow_revisions` | Append-only, account-owned workflow snapshots with revision, schema version, database recording time, and origin |
 | `register.generated_reports` | PDF bytes, filename, creation time, and the generating input snapshot with assessment reference |
 
 Application ownership uses the numeric GitHub ID verified during OAuth sign-in.
@@ -130,12 +140,72 @@ Existing in-memory jobs and PDFs cannot be recovered after their old process
 exits. Old unscoped browser caches are not automatically imported into a signed-in
 account; run a new assessment and resave prior allocation plans as needed.
 
-The existing backup command includes all six register and application tables.
-`npm run register:db:verify-recovery` compares all six tables after container
+The existing backup command includes all seven register and application tables.
+`npm run register:db:verify-recovery` compares all seven tables after container
 recreation and an isolated backup restore. Run it without concurrent writes.
 Backups contain sensitive assessment data and encrypted credentials; protect
 them and establish an operator-managed retention and off-host backup policy.
 There is no automatic deletion of assessment or report history.
+
+## Governance Insights Persistence
+
+Migration `006-governance-insights.sql` adds workflow audit history and version
+metadata without deleting or replacing Active Register records or revisions.
+Assessment jobs, generated reports, register records, and register revisions now
+have a positive `schema_version`, initially `1`. This identifies the stored
+payload contract, not evidence completeness or provider API certification.
+
+Workflow JSON uses `schemaVersion: 1`. The API supplies defaults for older
+documents; unsupported versions are rejected. `governanceInsights` stores the
+selected view, separate findings and register searches, priority, lifecycle phase,
+and the attention-only filter. Search strings are limited to 200 characters.
+Preferences follow the authenticated account and use the existing optimistic
+workflow revision checks. They do not grant access to another register tenant.
+
+Every workflow save atomically appends a full snapshot to
+`register.workflow_revisions`. Runtime clients may read their own history but
+cannot insert, alter, or delete historical rows directly. The owner comes from
+the server-signed identity, and the database supplies the recording timestamp.
+The migration copies only each existing workflow's current revision, labeled
+`legacy-baseline`; its timestamp is the migration recording time, not an invented
+historical action. Older revisions that were never stored cannot be reconstructed.
+
+`GET /api/workflow/history` returns up to 50 revisions, newest first, and a
+`nextBeforeRevision` cursor. Pass that value as `?beforeRevision=<revision>` to
+retrieve older entries. Responses are authenticated, account-scoped, and no-store.
+History is currently exposed through this API, not a restore or history editor.
+
+Completing an insights review persists a workflow acknowledgement only after its
+assessment and confirmed simulation are saved. Changing those source inputs
+requires saving an unreviewed state first. Prior snapshots retain the acknowledged
+assessment ID and simulation values. A workflow acknowledgement is not a provider
+test pass, register approval, or certification of the separately loaded register
+inventory. Register records retain their own tenant-specific revision history.
+
+Full snapshots include filters and recommendations and can grow with frequent
+edits. No automatic history retention or deletion policy is introduced. Include
+this table in capacity planning, protected backups, and an approved retention plan.
+
+## Future Schema Changes
+
+For each future feature that introduces durable state:
+
+1. Define the owning account or register tenant, source provenance, units, null
+    semantics, and payload version before adding fields or tables.
+2. Add a numbered, repeatable migration in `server/src/register/migrations`.
+    Prefer additive changes; preserve historical evidence and make any backfill
+    distinguishable from user activity. Back up before applying it.
+3. Extend the server validator, client types, and hydration defaults together.
+    For incompatible payloads, add an explicit version transition and update the
+    database version guard before writing the new version. Do not accept arbitrary
+    unvalidated extension JSON as a substitute for a feature contract.
+4. Route writes through authenticated, CSRF-protected APIs with account or tenant
+    isolation, optimistic concurrency, and atomic history where required.
+5. Add focused compatibility, access, concurrency, and history tests. Add new
+    durable tables to the recovery fingerprints in `scripts/register-db.mjs`.
+6. Run migration repeatability checks, `npm run persistence:test`, and
+    `npm run register:check`. Verify backup restoration without concurrent writes
+    before declaring the new persistence path ready.
 
 ## Evidence Entry
 

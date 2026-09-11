@@ -1,0 +1,38 @@
+[
+    {
+        "id": "individual-ulb",
+        "group": "User-level budgets",
+        "title": "Individual user-level budget",
+        "description": "Per-user consumption cap across included and metered usage. Overrides cost center and universal ULBs; always a hard stop. Optional expiration falls back to the next applicable ULB."
+    },
+    {
+        "id": "cost-center-ulb",
+        "group": "User-level budgets",
+        "title": "Cost center user-level budget",
+        "description": "One per-user amount for every current and future member of a cost center. Overrides the universal ULB, but not an individual ULB. Always a hard stop across included and metered usage."
+    },
+    {
+        "id": "universal-ulb",
+        "group": "User-level budgets",
+        "title": "Universal user-level budget",
+        "description": "Default per-user consumption cap for every Copilot-licensed user without a more specific ULB. Always a hard stop across included and metered usage."
+    },
+    {
+        "id": "cost-center-metered-budget",
+        "group": "Metered budgets",
+        "title": "Cost center budget (metered)",
+        "description": "Caps aggregate metered charges attributed to a cost center, not each member's consumption. Does not override a ULB. Charges also count against the enterprise budget unless cost center exclusion is enabled."
+    },
+    {
+        "id": "organization-metered-budget",
+        "group": "Metered budgets",
+        "title": "Organization budget (metered)",
+        "description": "Caps metered charges attributed to the organization that bills the Copilot license when no cost center applies. Can further restrict, not override, enterprise controls. Multiple licensing organizations can make attribution vary each billing cycle."
+    },
+    {
+        "id": "enterprise-metered-budget",
+        "group": "Metered budgets",
+        "title": "Enterprise budget (enterprise spending limit)",
+        "description": "Enterprise-wide metered spending boundary, not a total bill or a universal ULB. Applies to otherwise unallocated metered usage and non-excluded cost center charges. Excluded cost centers retain their own budget boundary."
+    }
+]

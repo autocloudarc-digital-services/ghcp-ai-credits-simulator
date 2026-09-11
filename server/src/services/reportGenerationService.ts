@@ -1,6 +1,8 @@
 import React from 'react';
 import { AssessmentResult, Recommendation, SimulatorConfig } from '../types';
 import { budgetProfileClasses } from '../data/budgetProfileClassesServer';
+import governanceTiers from 'ghcp-ai-credits-simulator-shared/governanceTiers.json';
+import { budgetControlLabel } from 'ghcp-ai-credits-simulator-shared/governanceControls';
 
 export interface ReportInput {
   simulatorConfig: SimulatorConfig;
@@ -58,8 +60,8 @@ function buildDocument(
         Text,
         { style: styles.paragraph },
         `${simulatorConfig.enterpriseName} manages ${totalUsers.toLocaleString()} licensed GitHub Copilot seats. ` +
-          `This report outlines the current AI credit consumption posture and recommends a three-tier governance ` +
-          `architecture comprising ${recommendations.length} prioritized actions.`
+          `This report outlines the current AI credit consumption posture and documents six budget controls ` +
+          `with ${recommendations.length} prioritized budget and organization policy actions.`
       ),
 
       React.createElement(Text, { style: styles.sectionTitle }, '2. License Inventory'),
@@ -103,9 +105,8 @@ function buildDocument(
       React.createElement(
         Text,
         { style: styles.paragraph },
-        'A three-tier governance model is recommended: Tier 1 Enterprise Spending Limit (hard cap on metered ' +
-          'overage), Tier 2 Universal User-Level Budget (per-user cap across the enterprise), and Tier 3 Cost ' +
-          'Center ULB Overrides (per-team refinements for overage, abundant, and exponential usage cohorts).'
+        governanceTiers.map(control => `${control.title}. ${control.description}`).join('\n\n') +
+          '\n\nULBs are checked first, then included availability, then metered budgets. Metered budgets stop usage only with Stop usage enabled (off by default); paid usage policy must allow overage. Applicable overlapping budgets can still block usage. Included usage controls are separate, license-derived pool caps. These are documented rules, not verified tenant settings.'
       ),
 
       React.createElement(Text, { style: styles.sectionTitle }, '5. Budget Profile Configuration Guide'),
@@ -145,21 +146,21 @@ function buildDocument(
       React.createElement(
         Text,
         { style: styles.paragraph },
-        'All budgets should alert at 75% and 90% of their configured threshold. Tier 1 alerts route to ' +
-          'enterprise administrators; Tier 3 alerts route to cost-center and team leads.'
+        'Metered budget alerts support 75%, 90%, and 100% thresholds for enterprise, cost center, and organization budgets. ' +
+          'Assign accountable recipients. ULB alerts are not consistently available; use cost center or enterprise monitoring as well.'
       ),
 
       React.createElement(Text, { style: styles.sectionTitle }, '8. Implementation Roadmap (30/60/90-day)'),
-      React.createElement(Text, { style: styles.bullet }, '\u2022 Days 1-30: Configure Tier 1 Enterprise Spending Limit and Tier 2 Universal ULB.'),
-      React.createElement(Text, { style: styles.bullet }, '\u2022 Days 31-60: Establish cost centers and Tier 3 overrides for identified power users.'),
-      React.createElement(Text, { style: styles.bullet }, '\u2022 Days 61-90: Tune alert thresholds, review consumption trends, and re-assess.'),
+      React.createElement(Text, { style: styles.bullet }, '\u2022 Days 1-30: Establish the universal ULB and enterprise metered budget, with Stop usage and paid usage policy reviewed.'),
+      React.createElement(Text, { style: styles.bullet }, '\u2022 Days 31-60: Configure cost center ULBs, individual ULB exceptions, and separate cost center metered budgets.'),
+      React.createElement(Text, { style: styles.bullet }, '\u2022 Days 61-90: Review organization metered budgets, license attribution, cost center exclusions, alerts, and enforcement evidence.'),
 
       React.createElement(Text, { style: styles.sectionTitle }, '9. Recommendations Summary'),
       ...recommendations.map((rec, idx) =>
         React.createElement(
           Text,
           { style: styles.bullet, key: idx },
-          `\u2022 [${rec.priority.toUpperCase()}] ${rec.budgetClass.name} — ${rec.rationale}`
+          `\u2022 [${rec.priority.toUpperCase()}] ${budgetControlLabel(rec.budgetClass)}: ${rec.budgetClass.name} — ${rec.rationale}`
         )
       ),
 
@@ -167,7 +168,7 @@ function buildDocument(
       React.createElement(
         Text,
         { style: styles.paragraph },
-        'GitHub Enterprise Billing API (2026-03-10), GitHub Copilot AI Credits and Usage-Based Billing documentation.'
+        'GitHub: Budgets for usage-based billing. https://docs.github.com/en/copilot/concepts/billing/budgets-for-usage-based-billing (checked September 11, 2026).'
       ),
 
       React.createElement(

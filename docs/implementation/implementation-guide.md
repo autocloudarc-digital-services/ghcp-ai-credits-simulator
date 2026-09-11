@@ -514,8 +514,9 @@ exit criteria.
 
 *Define enterprise user level and organizational budgets based on the previously established teams, cost centers, and organizational structures and configurations.*
 
-Define the approved financial control hierarchy using the established teams, cost centers, organizations, SKUs, and profile assignments. Distinguish the
-included-credit baseline, enterprise metered-overage boundary, universal per-user limit, cost-center ULB overrides, and organization or SKU allocations.
+Use the [official GitHub budget control designations](../governance-budget-controls.md), checked September 11, 2026, rather than numbered financial tiers.
+Distinguish individual, cost center, and universal ULBs from cost center, organization, and enterprise metered budgets. Included-credit baselines, included usage controls,
+license budgets, SKU allocations, and access-policy profiles remain separate.
 
 Layered budgets answer different questions: how much entitlement is available, how much aggregate overage the enterprise accepts, how much one user may consume,
 and which owner is accountable for an allocation. Documenting those layers prevents a single value from being used for incompatible decisions.
@@ -544,8 +545,8 @@ spend can reach its boundary while individual users remain below theirs. Test bo
 Configure the enterprise spend budget as the approved limit or monitoring threshold for aggregate metered AI Credit charges. Record the amount, currency
 or credit basis, period, included and excluded services, alert recipients, enforcement selection, approval authority, and emergency decision path.
 
-This budget is the final financial backstop after included credits and more specific usage controls are considered. It provides a clear boundary for
-forecasting, escalation, and executive risk acceptance.
+This USD budget governs applicable metered charges, not included consumption or the entire invoice. Stop usage is off by default and must be enabled to cap charges.
+Cost center charges count against it by default unless cost center exclusion is enabled. An excluded cost center retains its own metered budget and all applicable ULBs.
 
 The amount may not equal the total provider invoice because licenses, commitments, adjustments, or other products can sit outside its scope. Alerts
 may lag consumption, and a stop setting may affect supported metered activity without reversing charges already incurred. Validate the exact boundary and
@@ -561,9 +562,9 @@ the value, reset period, alerts, enforcement posture, included population, exclu
 The universal profile establishes equitable baseline treatment and limits concentration risk without requiring an individual decision for every user. It
 also makes higher-usage exceptions visible because they must be assigned to a separate profile.
 
-A universal value should not be selected from the average alone; legitimate workloads and interruption impact can vary widely. Confirm whether the provider
-counts all models and features toward the same boundary, how mid-period assignments behave, and whether the ULB stops usage or only signals. Monitor for
-users whose approved work is repeatedly interrupted.
+A universal value should not be selected from the average alone; legitimate workloads and interruption impact can vary widely. GitHub ULBs always hard-stop total
+AI credit consumption across included and metered usage in a billing cycle; there is no Stop usage toggle. Individual ULBs override cost center ULBs, which override
+the universal default. Configure USD equivalents of modeled AI credits and do not rely on ULB alerts as the only monitoring signal.
 
 ### 13.2 User-Cost-Center Level (Overage ULBs)
 
@@ -578,12 +579,22 @@ where interruption tolerance or risk warrants tighter control.
 An overage ULB is not a shared pool that any cohort member may consume, and the word "overage" does not itself authorize additional spend. Confirm that the more
 specific profile overrides rather than adds to the universal ULB, prevent overlapping cohort assignments, and review membership frequently enough to remove stale exceptions.
 
-### 13.3 Organization (SKU based)
+An individual ULB overrides both defaults for one user. Use optional expiration for temporary exceptions; expiration restores the cost center ULB, otherwise the universal
+ULB, or no ULB if neither applies. A cost center ULB sets a per-user amount for all current and future members, not a team-wide monetary pool.
+
+Create a separate cost center metered budget when aggregate paid charges need a cap. It cannot extend an exhausted ULB. Review direct user assignment, attribution,
+enterprise exclusions, paid usage policy, and Stop usage before relying on it. Included usage controls are distinct license-derived caps on included consumption.
+
+### 13.3 Organization Metered Budgets and SKU Allocations
 
 *Develop organization (SKU based) budgets for AI credits.*
 
-Organization and SKU-based budgets allocate or monitor expected AI Credit consumption for an accountable organization and license population. Define the
-SKU, license count, included-credit basis, forecast, metered-overage tolerance, owner, reporting period, and reconciliation method for each allocation.
+An organization metered budget caps USD charges attributed to the organization billing the Copilot license when no cost center applies. It can further restrict,
+not override, enterprise controls. Stop usage is required for a cap. If multiple organizations license the same user, billed attribution can vary each billing cycle;
+direct user assignment to cost centers provides more predictable attribution.
+
+SKU and license allocations below describe entitlement and license planning, not an organization metered budget. Keep license count, included credits, observed charges,
+and approved metered spending amounts separate. A screenshot of a Copilot license-count budget is not evidence of an AI-credit metered budget or its enforcement.
 
 This view explains enterprise exposure by business boundary and entitlement type. It helps identify whether a variance is caused by population, rate,
 consumption, or allocation changes and gives organization owners a meaningful planning target.

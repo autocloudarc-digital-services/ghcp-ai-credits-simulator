@@ -27,7 +27,22 @@ export const defaultSimulatorConfig: SimulatorConfig = {
   },
 };
 
+export interface GovernanceInsightsPreferences {
+  view: 'overview' | 'findings' | 'register';
+  findingsQuery: string;
+  registerQuery: string;
+  priority: 'all' | 'critical' | 'high' | 'medium' | 'low';
+  phase: 'all' | 'Prepare' | 'Baseline' | 'Design' | 'Approve' | 'Pilot' | 'Rollout' | 'Operate';
+  attentionOnly: boolean;
+}
+
+export const defaultGovernanceInsights: GovernanceInsightsPreferences = {
+  view: 'overview', findingsQuery: '', registerQuery: '', priority: 'all', phase: 'all', attentionOnly: false,
+};
+
 interface AppState {
+  governanceInsights: GovernanceInsightsPreferences;
+  setGovernanceInsights: (preferences: Partial<GovernanceInsightsPreferences>) => void;
   hydrationVersion: number;
   allocationPlans: Record<string, AllocationPlan>;
   setAllocationPlan: (key: string, plan: AllocationPlan) => void;
@@ -75,6 +90,8 @@ interface AppState {
 }
 
 export const useAppStore = create<AppState>()((set) => ({
+  governanceInsights: defaultGovernanceInsights,
+  setGovernanceInsights: (preferences) => set(state => ({ governanceInsights: { ...state.governanceInsights, ...preferences } })),
   hydrationVersion: 0,
   allocationPlans: {},
   setAllocationPlan: (key, plan) => set(state => ({ allocationPlans: { ...state.allocationPlans, [key]: plan } })),
@@ -115,7 +132,7 @@ export const useAppStore = create<AppState>()((set) => ({
       recommendations: [],
     })),
 
-  setSimulatorResult: (result) => set({ simulatorResult: result }),
+  setSimulatorResult: (result) => set({ simulatorResult: result, hasReviewedDashboard: false, hasReviewedRecommendations: false }),
 
   addScenario: (scenario) =>
     set((state) => ({ scenarios: [...state.scenarios, scenario].slice(-4) })),
@@ -128,10 +145,11 @@ export const useAppStore = create<AppState>()((set) => ({
   removeScenario: (id) =>
     set((state) => ({ scenarios: state.scenarios.filter((s) => s.id !== id) })),
 
-  setAssessmentResult: (result) => set({ assessmentResult: result }),
+  setAssessmentResult: (result) => set({ assessmentResult: result, hasConfirmedSimulation: false, hasReviewedDashboard: false, hasReviewedRecommendations: false }),
   setIsAssessing: (val) => set({ isAssessing: val }),
   setIsConnected: (val, enterprise) =>
     set({ isConnected: val, connectedEnterprise: enterprise ?? null, ...(!val ? {
+      governanceInsights: defaultGovernanceInsights,
       assessmentId: null, assessmentResult: null, simulatorConfig: defaultSimulatorConfig, allocationPlans: {},
       simulatorResult: null, scenarios: [], recommendations: [], use3DVisualizer: true,
       hasConfirmedSimulation: false, hasReviewedDashboard: false, hasReviewedRecommendations: false,
@@ -140,6 +158,7 @@ export const useAppStore = create<AppState>()((set) => ({
   setRecommendations: (recs) => set({ recommendations: recs }),
   completeAssessment: (result, enterpriseName, assessmentId) =>
     set((state) => ({
+      governanceInsights: defaultGovernanceInsights,
       assessmentId,
       assessmentResult: result,
       simulatorConfig: {
@@ -166,6 +185,7 @@ export const useAppStore = create<AppState>()((set) => ({
   markRecommendationsReviewed: () => set({ hasReviewedRecommendations: true }),
   resetWorkflow: () =>
     set({
+      governanceInsights: defaultGovernanceInsights,
       assessmentId: null,
       assessmentResult: null,
       simulatorResult: null,

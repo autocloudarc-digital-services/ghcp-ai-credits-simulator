@@ -9,6 +9,14 @@ const codespacesHost =
 
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    include: ['ghcp-ai-credits-simulator-shared/governanceControls'],
+  },
+  build: {
+    commonjsOptions: {
+      include: [/node_modules/, /shared\/governanceControls\.js$/],
+    },
+  },
   resolve: {
     alias: {
       '@shared': path.resolve(__dirname, '../shared'),

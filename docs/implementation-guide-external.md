@@ -20,6 +20,11 @@ consumption. User-Level Budget (ULB) means a customer-defined per-user spending
 or consumption boundary where the provider supports one. Confirm both terms
 against current provider documentation before adopting them.
 
+For GitHub Copilot, use the [verified budget control designations](governance-budget-controls.md).
+Individual, cost center, and universal ULBs are per-user consumption controls;
+cost center, organization, and enterprise metered budgets are separate USD
+controls. GitHub does not designate them as numbered governance tiers.
+
 The governance process should produce:
 
 * A defined scope and accountable ownership model

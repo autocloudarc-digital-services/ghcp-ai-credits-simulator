@@ -1,9 +1,11 @@
 import axios from 'axios';
-import { defaultSimulatorConfig, useAppStore } from '../store/appStore';
+import { defaultGovernanceInsights, defaultSimulatorConfig, useAppStore } from '../store/appStore';
 
 function snapshot() {
   const state = useAppStore.getState();
   return {
+    schemaVersion: 1,
+    governanceInsights: state.governanceInsights,
     allocationPlans: state.allocationPlans,
     simulatorConfig: state.simulatorConfig, simulatorResult: state.simulatorResult, scenarios: state.scenarios,
     assessmentId: state.assessmentId, recommendations: state.recommendations,
@@ -65,15 +67,16 @@ export async function loadWorkflow() {
     const response = await axios.get('/api/workflow');
     if (current !== generation) return;
     const { document, assessment, latestAssessment } = response.data;
+    if (document?.schemaVersion !== undefined && document.schemaVersion !== 1) throw new Error('Unsupported workflow version.');
     accountId = response.data.accountId;
     revision = response.data.revision;
-    useAppStore.setState({ simulatorConfig: defaultSimulatorConfig, simulatorResult: null, scenarios: [], assessmentId: null,
+    useAppStore.setState({ governanceInsights: defaultGovernanceInsights, simulatorConfig: defaultSimulatorConfig, simulatorResult: null, scenarios: [], assessmentId: null,
       assessmentResult: null, recommendations: [], allocationPlans: {}, use3DVisualizer: true,
       hasConfirmedSimulation: false, hasReviewedDashboard: false, hasReviewedRecommendations: false });
     if (document) {
       if (document.simulatorResult?.projectedExhaustionDay === null) document.simulatorResult.projectedExhaustionDay = Infinity;
       for (const scenario of document.scenarios) if (scenario.result?.projectedExhaustionDay === null) scenario.result.projectedExhaustionDay = Infinity;
-      useAppStore.setState({ ...document, allocationPlans: document.allocationPlans ?? {}, assessmentResult: assessment?.result ?? null });
+      useAppStore.setState({ ...document, governanceInsights: { ...defaultGovernanceInsights, ...document.governanceInsights }, allocationPlans: document.allocationPlans ?? {}, assessmentResult: assessment?.result ?? null });
     }
     else if (latestAssessment) useAppStore.getState().completeAssessment(latestAssessment.result, latestAssessment.input.enterpriseSlug, latestAssessment.id);
     useAppStore.setState(state => ({ hydrationVersion: state.hydrationVersion + 1 }));

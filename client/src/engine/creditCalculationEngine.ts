@@ -85,7 +85,7 @@ export function generateBurnDownSeries(
 
   // Without governance: linear/unconstrained daily burn based on observed rate.
   // With governance: burn rate is capped once population-weighted ULB ceilings
-  // would otherwise be exceeded, simulating the effect of Tier 2/3 controls.
+  // would otherwise be exceeded, approximating per-user ULB controls.
   const ulbCeilingPerDay =
     totalUsers > 0 ? (RECOMMENDED_ENTERPRISE_ULB * totalUsers) / BILLING_CYCLE_DAYS : Infinity;
 
@@ -212,7 +212,6 @@ export function generateRecommendations(
       totalUsers > 0 ? Math.round((totalIncludedPool / totalUsers) * 1.3) : RECOMMENDED_ENTERPRISE_ULB;
     recommendations.push({
       priority: 'critical',
-      tier: 2,
       budgetClass: findClass('universal-ulb'),
       rationale:
         'Usage is highly concentrated among a small subset of users, exposing the enterprise ' +
@@ -223,14 +222,15 @@ export function generateRecommendations(
       implementationSteps: [
         'Navigate to Enterprise Settings > Billing > Budgets in the GitHub Enterprise admin console.',
         `Create a new Universal ULB with a per-user monthly limit of ${recommendedUlb.toLocaleString()} AI credits.`,
-        'Enable "Stop usage" so the budget hard-stops metered consumption once the limit is reached.',
-        'Configure alert thresholds at 75% and 90% of the budget, notifying enterprise admins.',
+        'ULBs always hard-stop total consumption across included and metered usage; there is no Stop usage toggle. Convert the modeled credit amount to its USD equivalent when configuring GitHub.',
+        'ULB alerts are not consistently available. Monitor cost center or enterprise usage and configure supported metered budget alerts at 75%, 90%, and 100%.',
+        'An individual ULB overrides a cost center ULB, which overrides this universal default. Use optional individual expiration for temporary exceptions.',
         'Communicate the new policy to all Copilot users prior to activation.',
       ],
     });
   }
 
-  // Rule 2: Power User Identification -> Cost Center ULB tiers (Classes 4-6)
+  // Rule 2: Power User Identification -> Cost Center ULB cohorts (Classes 4-6)
   if (topUsers.length > 0) {
     const averageConsumption = totalConsumption / Math.max(1, totalUsers || topUsers.length);
     const powerUsers = topUsers.filter((u) => u.creditsConsumed > averageConsumption * 3);
@@ -244,7 +244,6 @@ export function generateRecommendations(
     if (moderateUsers.length > 0) {
       recommendations.push({
         priority: 'medium',
-        tier: 3,
         budgetClass: findClass('ulb-cost-center-overage-users'),
         rationale: `${moderateUsers.length} user(s) are consuming 1-2x the average, indicating elevated ` +
           'but not yet risky usage. Route them into the Overage Users cost center with a modestly ' +
@@ -261,7 +260,6 @@ export function generateRecommendations(
     if (highUsers.length > 0) {
       recommendations.push({
         priority: 'high',
-        tier: 3,
         budgetClass: findClass('ulb-cost-center-abundant-users'),
         rationale: `${highUsers.length} user(s) are consuming 2-3x the average. These "abundant" users ` +
           'likely have legitimate high-intensity workloads (e.g., heavy agent/refactor usage) and should ' +
@@ -271,14 +269,13 @@ export function generateRecommendations(
           'Create the "Abundant Users" cost center (aic-0012-abd) and assign identified users.',
           'Apply a 7,000 credit/user/month ULB scoped to this cost center.',
           'Enable Auto mode plus additional frontier model options.',
-          'Set alert thresholds at 75%/90% with notifications to team leads.',
+          'Use separate cost center metered-budget alerts at 75%, 90%, and 100%; do not rely on ULB alerts alone.',
         ],
       });
     }
     if (powerUsers.length > 0) {
       recommendations.push({
         priority: 'high',
-        tier: 3,
         budgetClass: findClass('ulb-cost-center-exponential-users'),
         rationale: `${powerUsers.length} user(s) are consuming more than 3x the average, flagged as ` +
           '"exponential" power users. These are typically AI-platform SMEs or automation-heavy engineers. ' +
@@ -303,22 +300,21 @@ export function generateRecommendations(
   if (exhaustionDay < 25 && burnRate > 0) {
     recommendations.push({
       priority: 'critical',
-      tier: 1,
       budgetClass: findClass('enterprise-spending-limit'),
       rationale:
         `At the current burn rate, the included pool is projected to exhaust by day ` +
         `${Math.round(exhaustionDay)} of the 30-day billing cycle, leaving the enterprise exposed to ` +
-        'uncapped metered overage for the remainder of the cycle. An Enterprise Spending Limit provides ' +
-        'a hard ceiling on total overage spend as a Tier 1 backstop.',
+        'potential metered overage for the remainder of the cycle. An enterprise budget can cap ' +
+        'applicable metered charges when Stop usage is enabled; excluded cost centers retain separate budget boundaries. License fees are additional.',
       configuredValue: Math.round(projectedOverage * 1.2 * OVERAGE_RATE_PER_CREDIT * 100) / 100,
       implementationSteps: [
         'Navigate to Enterprise Settings > Billing > Spending Limits.',
         `Set the metered overage spending limit to $${(
           Math.round(projectedOverage * 1.2 * OVERAGE_RATE_PER_CREDIT * 100) / 100
         ).toLocaleString()} (120% of projected overage) as a safety buffer.`,
-        'Enable "Stop usage" once the spending limit is reached to guarantee a hard cap.',
-        'Set alert thresholds at 75% and 90% of the spending limit.',
-        'Pair this Tier 1 control with Tier 2 Universal ULB to reduce reliance on the hard stop.',
+        'Enable Stop usage (off by default), confirm the AI credit paid usage policy, and validate cost center exclusions and provider enforcement.',
+        'Set alert thresholds at 75%, 90%, and 100% of the enterprise budget.',
+        'Pair the enterprise metered budget with ULBs. Raising this budget cannot unblock a user who has exhausted the applicable ULB.',
       ],
     });
   }
@@ -335,7 +331,6 @@ export function generateRecommendations(
   if (totalModelUsage > 0 && frontierShare > 0.3) {
     recommendations.push({
       priority: 'medium',
-      tier: 3,
       budgetClass: findClass('org-policy-standard'),
       rationale:
         `Frontier models account for ${Math.round(frontierShare * 100)}% of total model usage, which ` +
@@ -347,6 +342,7 @@ export function generateRecommendations(
         'Restrict model access to gpt-5-mini and claude-haiku for standard business users.',
         'Disable Agent Mode and Cloud Agent for these organizations to limit high-consumption workflows.',
         'Monitor for legitimate exceptions and route them to engineering/architect org policies instead.',
+        'Pair organization policy with a separate organization-scoped USD metered budget for the covered AI credit SKUs; verify provider behavior before relying on Stop usage.',
       ],
     });
   }
@@ -372,7 +368,6 @@ export function generateRecommendations(
       const budgetClass = findClass(slug);
       recommendations.push({
         priority,
-        tier: 3,
         budgetClass,
         rationale: `Organization "${orgName}" consumed ${consumption.toLocaleString()} AI credits, ` +
           `${consumption > avgOrgConsumption ? 'above' : 'at or below'} the ${Math.round(
@@ -384,6 +379,8 @@ export function generateRecommendations(
           `Assign organization "${orgName}" to cost center ${budgetClass.costCenterId}.`,
           `Apply the "${budgetClass.name}" org policy including model and feature access rules.`,
           'Validate license mix (Business vs. Enterprise) matches the assigned profile.',
+          `Review whether an organization metered budget applies to licenses billed through "${orgName}". Prefer direct user cost center assignment for predictable attribution when users have multiple licensing organizations.`,
+          'Confirm cost-center attribution and exclusions before configuring the budget. Included credit amounts and ULBs are not metered USD budget amounts; validate Stop usage with provider evidence.',
           'Re-assess quarterly and re-map organizations as usage evolves.',
         ],
       });
@@ -391,7 +388,6 @@ export function generateRecommendations(
   } else {
     recommendations.push({
       priority: 'low',
-      tier: 3,
       budgetClass: findClass('org-policy-engineering'),
       rationale:
         'No live assessment data is available yet. Run an assessment against connected GitHub ' +
@@ -401,6 +397,7 @@ export function generateRecommendations(
         'Connect a GitHub Enterprise account on the Assessment page.',
         'Run an assessment to collect real per-organization consumption data.',
         'Return to Recommendations once results are available for org-specific guidance.',
+        'Assess an organization-scoped USD metered budget separately from included credits and ULBs once scope, attribution, covered SKUs, and provider behavior are verified.',
       ],
     });
   }

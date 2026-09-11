@@ -20,7 +20,7 @@ export const budgetProfileClasses: BudgetProfileClass[] = [
     budgetType: 'metered-overage',
     skus: ['All AI Credit SKUs'],
     stopUsage: true,
-    alertThresholds: [0.75, 0.9],
+    alertThresholds: [0.75, 0.9, 1],
   },
   {
     id: 3,
@@ -34,7 +34,6 @@ export const budgetProfileClasses: BudgetProfileClass[] = [
     frequency: 'per-month',
     stopUsage: true,
     modelOption1: 'auto-mode',
-    alertThresholds: [0.75, 0.9],
   },
   {
     id: 4,
@@ -52,7 +51,6 @@ export const budgetProfileClasses: BudgetProfileClass[] = [
     modelOption1: 'auto-mode',
     modelOption2: 'open-ai-gpt-5.6-sol',
     modelOption3: 'open-ai-gpt-5.6-terra',
-    alertThresholds: [0.75, 0.9],
   },
   {
     id: 5,
@@ -70,7 +68,6 @@ export const budgetProfileClasses: BudgetProfileClass[] = [
     modelOption1: 'auto-mode',
     modelOption2: 'open-ai-gpt-5.6-sol',
     modelOption3: 'open-ai-5.6-luna',
-    alertThresholds: [0.75, 0.9],
   },
   {
     id: 6,
@@ -88,7 +85,6 @@ export const budgetProfileClasses: BudgetProfileClass[] = [
     modelOption1: 'auto-mode',
     modelOption2: 'open-ai-gpt-5.6-terra',
     modelOption3: 'open-ai-5.6-luna',
-    alertThresholds: [0.75, 0.9],
   },
   {
     id: 7,

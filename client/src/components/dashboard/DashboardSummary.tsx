@@ -31,27 +31,27 @@ export default function DashboardSummary({ result, totalUsers }: DashboardSummar
 
   const cards = [
     {
-      label: 'Total Enterprise Pool Size',
+      label: 'Modeled Included Pool',
       value: result ? `${formatCredits(result.totalIncludedPool)} credits` : '—',
       icon: Wallet,
       color: 'text-teal-400',
     },
     {
-      label: 'Burn Rate',
+      label: 'Projected Daily Burn',
       value: result ? `${formatCredits(result.projectedDailyBurnRate)} credits/day` : '—',
       icon: TrendingUp,
       color: 'text-blue-500',
     },
     {
-      label: 'Days Until Exhaustion',
+      label: 'Projected Exhaustion Cycle Day',
       value: result && isFinite(result.projectedExhaustionDay)
-        ? `${Math.max(0, Math.round(result.projectedExhaustionDay))} days`
-        : 'N/A',
+        ? `Day ${Math.max(0, Math.ceil(result.projectedExhaustionDay))}`
+        : result ? 'Not projected' : 'Unknown',
       icon: Users,
       color: 'text-amber-400',
     },
     {
-      label: 'Overage Risk Level',
+      label: 'Modeled Overage Risk',
       value: overageRiskLevel,
       icon: AlertTriangle,
       color: riskColor,
@@ -69,9 +69,9 @@ export default function DashboardSummary({ result, totalUsers }: DashboardSummar
             <span className="text-xs uppercase tracking-wide text-slate-400">{card.label}</span>
             <card.icon className={`w-4 h-4 ${card.color}`} />
           </div>
-          <span className={`font-numeric text-2xl font-semibold ${card.color}`}>{card.value}</span>
-          {card.label === 'Total Enterprise Pool Size' && (
-            <span className="text-xs text-slate-500">{totalUsers.toLocaleString()} licensed users</span>
+          <span className={`font-numeric break-words text-xl font-semibold ${card.color}`}>{card.value}</span>
+          {card.label === 'Modeled Included Pool' && (
+            <span className="text-xs text-slate-500">{totalUsers.toLocaleString()} planned license seats</span>
           )}
         </div>
       ))}

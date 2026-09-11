@@ -71,6 +71,7 @@ function fingerprint(database = "active_register") {
         'sessions', (SELECT md5(COALESCE(string_agg(to_jsonb(session_row)::text,'' ORDER BY id),'')) FROM register.application_sessions session_row),
         'assessments', (SELECT md5(COALESCE(string_agg(to_jsonb(job_row)::text,'' ORDER BY id),'')) FROM register.assessment_jobs job_row),
         'workflows', (SELECT md5(COALESCE(string_agg(to_jsonb(workflow_row)::text,'' ORDER BY owner_id),'')) FROM register.workflows workflow_row),
+        'workflow_revisions', (SELECT md5(COALESCE(string_agg(to_jsonb(workflow_history_row)::text,'' ORDER BY owner_id,revision),'')) FROM register.workflow_revisions workflow_history_row),
         'reports', (SELECT md5(COALESCE(string_agg(to_jsonb(report_row)::text,'' ORDER BY id),'')) FROM register.generated_reports report_row)
       );`,
     ],

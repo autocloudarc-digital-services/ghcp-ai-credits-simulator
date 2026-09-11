@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Building2, ClipboardList, FileText } from 'lucide-react';
 import { useAppStore } from '../store/appStore';
 import { calculateGovernanceReadinessScore, generateRecommendations } from '../engine/creditCalculationEngine';
@@ -9,7 +10,8 @@ import ActiveRegister from '../components/report/ActiveRegister';
 
 export default function Report() {
   const { simulatorConfig, assessmentResult, recommendations } = useAppStore();
-  const [activeView, setActiveView] = useState<'cost-centers' | 'executive' | 'register'>('cost-centers');
+  const [searchParams] = useSearchParams();
+  const [activeView, setActiveView] = useState<'cost-centers' | 'executive' | 'register'>(() => searchParams.get('view') === 'register' ? 'register' : 'cost-centers');
 
   const effectiveRecommendations = useMemo(
     () => (recommendations.length > 0 ? recommendations : generateRecommendations(assessmentResult, simulatorConfig)),

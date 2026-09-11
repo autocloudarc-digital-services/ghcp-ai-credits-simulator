@@ -55,6 +55,12 @@ export async function saveWorkflow(owner: string, document: unknown, revision: n
   return (await persistenceClient('application_data', owner).post('/rpc/save_workflow', { candidate: document, expected_revision: revision })).data[0];
 }
 
+export async function workflowHistory(owner: string, beforeRevision?: number) {
+  return (await persistenceClient('application_data', owner).get('/workflow_revisions', { params: {
+    order: 'revision.desc', limit: 51, ...(beforeRevision ? { revision: `lt.${beforeRevision}` } : {}),
+  } })).data;
+}
+
 export async function saveReport(owner: string, id: string, filename: string, input: unknown, buffer: Buffer) {
   await persistenceClient('application_data', owner).post('/generated_reports', { id, owner_id: owner, filename, input, pdf_base64: buffer.toString('base64') });
 }

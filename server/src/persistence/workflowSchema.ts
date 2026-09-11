@@ -15,11 +15,20 @@ const result = z.object({
   governanceImpact: z.object({ withoutGovernance: z.array(point).max(366), withGovernance: z.array(point).max(366) }).strict(),
 }).strict();
 export const recommendationsSchema = z.array(z.object({
-  priority: z.enum(['critical', 'high', 'medium', 'low']), tier: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  priority: z.enum(['critical', 'high', 'medium', 'low']), tier: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]).optional(),
   budgetClass: z.object({ id: count, name: z.string(), slug: z.string(), scope: z.enum(['enterprise', 'organization', 'cost-center', 'user']), budgetType: z.enum(['included', 'metered-overage', 'ulb', 'org-policy']), skus: z.array(z.string()) }).passthrough(),
   rationale: z.string().max(20000), configuredValue: amount, implementationSteps: z.array(z.string().max(20000)).max(100),
 }).strict()).max(100);
 export const workflowSchema = z.object({
+  schemaVersion: z.literal(1).default(1),
+  governanceInsights: z.object({
+    view: z.enum(['overview', 'findings', 'register']).default('overview'),
+    findingsQuery: z.string().max(200).default(''),
+    registerQuery: z.string().max(200).default(''),
+    priority: z.enum(['all', 'critical', 'high', 'medium', 'low']).default('all'),
+    phase: z.enum(['all', 'Prepare', 'Baseline', 'Design', 'Approve', 'Pilot', 'Rollout', 'Operate']).default('all'),
+    attentionOnly: z.boolean().default(false),
+  }).strict().default({}),
   allocationPlans: z.record(z.string().max(200), z.object({ budget: amount.positive(), percentages: z.record(z.string().max(200), amount.max(100)) }).strict()).default({}),
   simulatorConfig: simulatorConfigSchema,
   simulatorResult: result.nullable(),
@@ -27,7 +36,11 @@ export const workflowSchema = z.object({
   assessmentId: z.string().uuid().nullable(),
   recommendations: recommendationsSchema,
   hasConfirmedSimulation: z.boolean(), hasReviewedDashboard: z.boolean(), hasReviewedRecommendations: z.boolean(), use3DVisualizer: z.boolean(),
-}).strict();
+}).strict().superRefine((document, context) => {
+  if (document.hasReviewedDashboard && (!document.assessmentId || !document.hasConfirmedSimulation || !document.simulatorResult)) {
+    context.addIssue({ code: 'custom', path: ['hasReviewedDashboard'], message: 'Review requires an assessment and confirmed simulation.' });
+  }
+});
 
 export function containsCredentialField(value: unknown): boolean {
   if (!value || typeof value !== 'object') return false;

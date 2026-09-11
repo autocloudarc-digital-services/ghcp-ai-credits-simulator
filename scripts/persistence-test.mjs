@@ -7,6 +7,75 @@ const {
   PostgresSessionStore,
 } = require("../server/dist/persistence/sessionStore.js");
 const { persistenceClient } = require("../server/dist/persistence/client.js");
+const tierFourRecommendation = {
+  priority: "low",
+  budgetClass:
+    require("../server/dist/data/budgetProfileClassesServer.js").budgetProfileClasses.find(
+      (profile) => profile.slug === "org-policy-standard",
+    ),
+  rationale:
+    "Review the organization-scoped USD metered budget separately from included credits.",
+  configuredValue: 19000,
+  implementationSteps: [
+    "Verify organization attribution, covered SKUs, and provider behavior.",
+  ],
+};
+
+test("documented budget controls classify by type and scope while legacy tier metadata remains readable", () => {
+  const {
+    recommendationsSchema,
+  } = require("../server/dist/persistence/workflowSchema.js");
+  const controls = require("../shared/governanceTiers.json");
+  const {
+    classifyBudgetControl,
+    budgetControlLabel,
+  } = require("../shared/governanceControls.js");
+  assert.deepEqual(
+    controls.map((control) => control.id),
+    [
+      "individual-ulb",
+      "cost-center-ulb",
+      "universal-ulb",
+      "cost-center-metered-budget",
+      "organization-metered-budget",
+      "enterprise-metered-budget",
+    ],
+  );
+  for (const [budgetType, scope, expected] of [
+    ["ulb", "user", "individual-ulb"],
+    ["ulb", "cost-center", "cost-center-ulb"],
+    ["ulb", "enterprise", "universal-ulb"],
+    ["metered-overage", "cost-center", "cost-center-metered-budget"],
+    ["metered-overage", "organization", "organization-metered-budget"],
+    ["metered-overage", "enterprise", "enterprise-metered-budget"],
+    ["org-policy", "organization", "organization-policy"],
+    ["included", "enterprise", "included-pool"],
+    ["ulb", "organization", "unclassified"],
+  ]) {
+    assert.equal(classifyBudgetControl({ budgetType, scope }), expected);
+  }
+  assert.equal(
+    budgetControlLabel(tierFourRecommendation.budgetClass),
+    "Organization policy (not a budget)",
+  );
+  assert.equal(
+    recommendationsSchema.parse([tierFourRecommendation])[0].tier,
+    undefined,
+  );
+  for (const tier of [1, 2, 3, 4]) {
+    assert.equal(
+      recommendationsSchema.parse([{ ...tierFourRecommendation, tier }])[0]
+        .tier,
+      tier,
+    );
+  }
+  assert.equal(
+    recommendationsSchema.safeParse([{ ...tierFourRecommendation, tier: 5 }])
+      .success,
+    false,
+  );
+});
+
 test(
   "fresh Express instances restore encrypted sessions and retain CSRF and logout protection",
   { skip: process.env.REGISTER_INTEGRATION !== "1" },
@@ -86,6 +155,7 @@ test(
     const bytes = Buffer.from("%PDF-1.7 fixture report");
     context.mock.method(renderer, "generateReportPdf", async (snapshot) => {
       assert.equal(snapshot.assessmentResult.totalCreditsConsumed, 42);
+      assert.deepEqual(snapshot.recommendations, [tierFourRecommendation]);
       return bytes;
     });
     const app = express();
@@ -113,7 +183,7 @@ test(
     const input = {
       assessmentId: id,
       assessmentResult: { totalCreditsConsumed: 999 },
-      recommendations: [],
+      recommendations: [tierFourRecommendation],
       simulatorConfig: {
         enterpriseName: "Fixture",
         licenseCountBusiness: 1,
@@ -228,7 +298,7 @@ test(
       simulatorResult: null,
       scenarios: [],
       assessmentId: id,
-      recommendations: [],
+      recommendations: [tierFourRecommendation],
       hasConfirmedSimulation: false,
       hasReviewedDashboard: false,
       hasReviewedRecommendations: false,
@@ -270,7 +340,109 @@ test(
     const loaded = (
       await request(app).get("/").set("x-fixture-account", owner).expect(200)
     ).body;
-    assert.deepEqual(loaded.document, document);
+    const {
+      workflowSchema,
+    } = require("../server/dist/persistence/workflowSchema.js");
+    assert.deepEqual(loaded.document, workflowSchema.parse(document));
+    assert.equal(loaded.document.governanceInsights.view, "overview");
+    await request(app)
+      .put("/")
+      .set("x-fixture-account", owner)
+      .send({
+        accountId: owner,
+        expectedRevision: 1,
+        document: { ...loaded.document, schemaVersion: 2 },
+      })
+      .expect(400);
+    await request(app)
+      .put("/")
+      .set("x-fixture-account", owner)
+      .send({
+        accountId: owner,
+        expectedRevision: 1,
+        document: {
+          ...loaded.document,
+          governanceInsights: {
+            ...loaded.document.governanceInsights,
+            findingsQuery: "x".repeat(201),
+          },
+        },
+      })
+      .expect(400);
+    await request(app)
+      .put("/")
+      .set("x-fixture-account", owner)
+      .send({
+        accountId: owner,
+        expectedRevision: 1,
+        document: { ...loaded.document, hasReviewedDashboard: true },
+      })
+      .expect(400);
+    const updated = {
+      ...loaded.document,
+      governanceInsights: {
+        ...loaded.document.governanceInsights,
+        view: "register",
+        attentionOnly: true,
+        registerQuery: "draft",
+      },
+    };
+    await request(app)
+      .put("/")
+      .set("x-fixture-account", owner)
+      .send({ accountId: owner, expectedRevision: 1, document: updated })
+      .expect(200);
+    const history = (
+      await request(app)
+        .get("/history")
+        .set("x-fixture-account", owner)
+        .expect(200)
+    ).body;
+    assert.equal(history.revisions.length, 2);
+    assert.deepEqual(history.revisions[0].document, updated);
+    assert.deepEqual(history.revisions[1].document, loaded.document);
+    assert.equal(history.revisions[0].origin, "workflow-save");
+    assert.equal(history.revisions[0].schema_version, 1);
+    assert.equal(
+      (
+        await request(app)
+          .get("/history")
+          .set("x-fixture-account", other)
+          .expect(200)
+      ).body.revisions.length,
+      0,
+    );
+    assert.equal(
+      (
+        await request(app)
+          .get("/history?beforeRevision=2")
+          .set("x-fixture-account", owner)
+          .expect(200)
+      ).body.revisions.length,
+      1,
+    );
+    await request(app)
+      .get("/history?beforeRevision=-1")
+      .set("x-fixture-account", owner)
+      .expect(400);
+    await request(app).get("/history").expect(401);
+    await assert.rejects(
+      persistenceClient("application_data", owner).patch(
+        "/workflow_revisions",
+        { origin: "legacy-baseline" },
+      ),
+    );
+    await assert.rejects(
+      persistenceClient("application_data", owner).delete(
+        "/workflow_revisions",
+      ),
+    );
+    await assert.rejects(
+      persistenceClient("application_data", owner).post(
+        "/workflow_revisions",
+        history.revisions[0],
+      ),
+    );
     assert.equal(loaded.assessment.result.totalCreditsConsumed, 42);
     assert.equal(
       (await request(app).get("/").set("x-fixture-account", other).expect(200))
@@ -282,6 +454,91 @@ test(
       .set("x-fixture-account", owner)
       .send({ accountId: owner, expectedRevision: 0, document })
       .expect(409);
+    const confirmed = {
+      ...updated,
+      hasConfirmedSimulation: true,
+      simulatorResult: {
+        totalIncludedPool: 100,
+        projectedDailyBurnRate: 1,
+        projectedExhaustionDay: 100,
+        projectedOverageCredits: 0,
+        projectedOverageCost: 0,
+        governanceImpact: { withoutGovernance: [], withGovernance: [] },
+      },
+    };
+    await request(app)
+      .put("/")
+      .set("x-fixture-account", owner)
+      .send({ accountId: owner, expectedRevision: 2, document: confirmed })
+      .expect(200);
+    const reviewed = { ...confirmed, hasReviewedDashboard: true };
+    await request(app)
+      .put("/")
+      .set("x-fixture-account", owner)
+      .send({ accountId: owner, expectedRevision: 3, document: reviewed })
+      .expect(200);
+    const changed = {
+      ...reviewed,
+      simulatorConfig: { ...reviewed.simulatorConfig, licenseCountBusiness: 2 },
+    };
+    await request(app)
+      .put("/")
+      .set("x-fixture-account", owner)
+      .send({ accountId: owner, expectedRevision: 4, document: changed })
+      .expect(409);
+    await assert.rejects(
+      data.saveWorkflow(owner, { ...reviewed, schemaVersion: 2 }, 4),
+    );
+    assert.equal((await data.getWorkflow(owner)).revision, 4);
+    assert.equal((await data.workflowHistory(owner)).length, 4);
+    await request(app)
+      .put("/")
+      .set("x-fixture-account", owner)
+      .send({
+        accountId: owner,
+        expectedRevision: 4,
+        document: {
+          ...changed,
+          hasReviewedDashboard: false,
+          hasReviewedRecommendations: false,
+        },
+      })
+      .expect(200);
+    const reviewHistory = (await data.workflowHistory(owner)).find(
+      (entry) => entry.revision === 4,
+    );
+    assert.equal(reviewHistory.document.hasReviewedDashboard, true);
+    assert.equal(reviewHistory.document.assessmentId, id);
+    assert.equal(
+      reviewHistory.document.simulatorConfig.licenseCountBusiness,
+      1,
+    );
+    assert.ok(Number.isFinite(Date.parse(reviewHistory.recorded_at)));
+    for (let revision = 5; revision < 52; revision++)
+      await data.saveWorkflow(
+        owner,
+        { ...confirmed, hasReviewedDashboard: false },
+        revision,
+      );
+    const firstPage = (
+      await request(app)
+        .get("/history")
+        .set("x-fixture-account", owner)
+        .expect(200)
+    ).body;
+    assert.equal(firstPage.revisions.length, 50);
+    assert.equal(firstPage.nextBeforeRevision, 3);
+    const secondPage = (
+      await request(app)
+        .get("/history?beforeRevision=3")
+        .set("x-fixture-account", owner)
+        .expect(200)
+    ).body;
+    assert.deepEqual(
+      secondPage.revisions.map((entry) => entry.revision),
+      [2, 1],
+    );
+    assert.equal(secondPage.nextBeforeRevision, null);
     assert.ok(!JSON.stringify(loaded).includes("fixture-token"));
   },
 );

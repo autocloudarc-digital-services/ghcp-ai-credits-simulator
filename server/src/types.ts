@@ -248,7 +248,7 @@ export interface CostCenterReportingSnapshot {
 
 export interface Recommendation {
   priority: 'critical' | 'high' | 'medium' | 'low';
-  tier: 1 | 2 | 3;
+  tier?: 1 | 2 | 3 | 4;
   budgetClass: BudgetProfileClass;
   rationale: string;
   configuredValue: number;

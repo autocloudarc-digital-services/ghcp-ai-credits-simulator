@@ -27,7 +27,7 @@ export default function UlbTierBars({ position, tiers }: UlbTierBarsProps) {
         );
       })}
       <Text position={[0, 1.6, 0]} fontSize={0.26} color="#e2e8f0" anchorX="center">
-        ULB Tiers
+        Usage Cohorts
       </Text>
     </group>
   );

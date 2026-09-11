@@ -1,17 +1,27 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { accountId, getAssessment, getWorkflow, latestAssessment, saveWorkflow } from '../persistence/applicationStore';
+import { accountId, getAssessment, getWorkflow, latestAssessment, saveWorkflow, workflowHistory } from '../persistence/applicationStore';
 import { containsCredentialField, workflowSchema } from '../persistence/workflowSchema';
 
 const router = Router();
 router.use((_req, res, next) => { res.setHeader('Cache-Control', 'no-store'); next(); });
+router.get('/history', async (req, res, next) => {
+  const parsed = z.object({ beforeRevision: z.coerce.number().int().positive().max(2147483647).optional() }).strict().safeParse(req.query);
+  if (!parsed.success) { res.status(400).json({ message: 'Invalid workflow history cursor.' }); return; }
+  try {
+    const rows = await workflowHistory(accountId(req.session), parsed.data.beforeRevision);
+    const revisions = rows.slice(0, 50);
+    res.json({ revisions, nextBeforeRevision: rows.length > 50 ? revisions[49].revision : null });
+  } catch (error) { next(error); }
+});
 router.get('/', async (req, res, next) => {
   try {
     const owner = accountId(req.session);
     const workflow = await getWorkflow(owner);
     const latest = await latestAssessment(owner);
     const linked = workflow?.document.assessmentId ? await getAssessment(owner, workflow.document.assessmentId) : null;
-    res.json({ accountId: owner, revision: workflow?.revision ?? 0, document: workflow?.document ?? null, assessment: linked?.status === 'complete' ? linked : null, latestAssessment: latest });
+    const document = workflow ? workflowSchema.parse(workflow.document) : null;
+    res.json({ accountId: owner, revision: workflow?.revision ?? 0, document, assessment: linked?.status === 'complete' ? linked : null, latestAssessment: latest });
   } catch (error) { next(error); }
 });
 router.put('/', async (req, res, next) => {

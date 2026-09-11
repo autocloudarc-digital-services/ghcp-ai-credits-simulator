@@ -1,5 +1,6 @@
 import { budgetProfileClasses } from '../../data/budgetProfileClasses';
 import { AssessmentResult, Recommendation, SimulatorConfig } from '../../types';
+import governanceTiers from 'ghcp-ai-credits-simulator-shared/governanceTiers.json';
 
 interface ReportPreviewProps {
   simulatorConfig: SimulatorConfig;
@@ -56,7 +57,7 @@ export default function ReportPreview({
         <p className="text-sm text-slate-300">
           {simulatorConfig.enterpriseName} manages {totalUsers.toLocaleString()} licensed GitHub Copilot
           seats. Current governance readiness is scored at {governanceScore}/100, with {recommendations.length}{' '}
-          recommended actions across the three governance tiers to reduce unmanaged overage risk and align
+          recommended actions covering budget controls and organization policies to reduce unmanaged overage risk and align
           spend with organizational priorities.
         </p>
       </section>
@@ -110,10 +111,10 @@ export default function ReportPreview({
 
       <section>
         <h3 className="text-lg font-semibold text-teal-400 mb-2">4. Governance Architecture</h3>
-        <p className="text-sm text-slate-300">
-          A three-tier governance model is recommended: Tier 1 Enterprise Spending Limit, Tier 2 Universal
-          User-Level Budget, and Tier 3 Cost Center ULB Overrides.
-        </p>
+        <ul className="space-y-2 text-sm text-slate-300">
+          {governanceTiers.map(control => <li key={control.id}><strong>{control.title}.</strong> {control.description}</li>)}
+        </ul>
+        <p className="mt-2 text-sm text-slate-300">ULBs are checked first, then included availability, then metered budgets. Metered budgets stop usage only with Stop usage enabled (off by default); paid usage policy must allow overage. Applicable overlapping budgets can still block usage. Included usage controls are separate, license-derived pool caps. These are documented rules, not verified tenant settings.</p>
       </section>
 
       <section>
@@ -151,24 +152,25 @@ export default function ReportPreview({
       <section>
         <h3 className="text-lg font-semibold text-teal-400 mb-2">7. Alerting Strategy</h3>
         <p className="text-sm text-slate-300">
-          Alerts should fire at 75% and 90% of each budget threshold, routed to enterprise and cost-center
-          administrators respectively.
+          Metered budget alerts support 75%, 90%, and 100% thresholds for enterprise, cost center,
+          and organization budgets. Assign accountable recipients. ULB alerts are not consistently
+          available; use cost center or enterprise monitoring as well.
         </p>
       </section>
 
       <section>
         <h3 className="text-lg font-semibold text-teal-400 mb-2">8. Implementation Roadmap (30/60/90-day)</h3>
         <ul className="text-sm text-slate-300 list-disc list-inside space-y-1">
-          <li>Days 1-30: Configure Tier 1 Enterprise Spending Limit and Tier 2 Universal ULB.</li>
-          <li>Days 31-60: Establish cost centers and Tier 3 overrides for identified power users.</li>
-          <li>Days 61-90: Tune alert thresholds, review consumption trends, and re-assess.</li>
+          <li>Days 1-30: Establish the universal ULB and enterprise metered budget, with Stop usage and paid usage policy reviewed.</li>
+          <li>Days 31-60: Configure cost center ULBs, individual ULB exceptions, and separate cost center metered budgets.</li>
+          <li>Days 61-90: Review organization metered budgets, license attribution, cost center exclusions, alerts, and enforcement evidence.</li>
         </ul>
       </section>
 
       <section>
         <h3 className="text-lg font-semibold text-teal-400 mb-2">9. References</h3>
         <p className="text-sm text-slate-500">
-          GitHub Enterprise Billing API (2026-03-10), GitHub Copilot AI Credits documentation.
+          <a href="https://docs.github.com/en/copilot/concepts/billing/budgets-for-usage-based-billing" className="underline">GitHub: Budgets for usage-based billing</a> (checked September 11, 2026).
         </p>
       </section>
     </div>

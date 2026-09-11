@@ -34,7 +34,7 @@ export default function OverageTicker({ position, overageCredits, active }: Over
           emissiveIntensity={active ? 0.8 : 0.1}
         />
       </mesh>
-      <Text position={[0, -1.1, 0]} fontSize={0.24} color={active ? '#f97316' : '#64748b'} anchorX="center">
+      <Text position={[0, 1.1, 0]} fontSize={0.24} color={active ? '#f97316' : '#64748b'} anchorX="center">
         Overage: {Math.round(displayValue).toLocaleString()} credits
       </Text>
     </group>
