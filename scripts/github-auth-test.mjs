@@ -92,7 +92,9 @@ test("GitHub callback sends the PKCE verifier and clears transient state", async
         },
       };
     });
-    context.mock.method(axios, "get", async () => ({ data: { id: 15109536 } }));
+    context.mock.method(axios, "get", async () => ({
+      data: { id: 123456789 },
+    }));
 
     assert.deepEqual(
       await exchangeCodeForToken("authorization-code", state, session),
@@ -102,7 +104,7 @@ test("GitHub callback sends the PKCE verifier and clears transient state", async
     );
     assert.equal(session.oauthState, undefined);
     assert.equal(session.oauthCodeVerifier, undefined);
-    assert.equal(session.githubUserId, "15109536");
+    assert.equal(session.githubUserId, "123456789");
     assert.equal(getTokenFromSession(session), "github-access-token");
   });
 });

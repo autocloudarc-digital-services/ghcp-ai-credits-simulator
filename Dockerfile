@@ -28,6 +28,8 @@ LABEL org.opencontainers.image.licenses="MIT"
 ENV NODE_ENV=production \
   PORT=3001
 WORKDIR /app
+RUN rm -rf /usr/local/lib/node_modules/npm \
+  && rm -f /usr/local/bin/npm /usr/local/bin/npx
 COPY --from=runtime-dependencies --chown=node:node /workspace/node_modules node_modules
 COPY --from=build --chown=node:node /workspace/server/dist server/dist
 COPY --from=build --chown=node:node /workspace/client/dist client/dist
@@ -44,7 +46,8 @@ FROM postgres:17-bookworm@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd2202
 LABEL org.opencontainers.image.licenses="MIT"
 RUN apt-get update \
   && apt-get install --no-install-recommends --yes ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/* \
+  && rm -f /usr/local/bin/gosu
 COPY server/src/register/migrations /migrations
 COPY scripts/migrate-entrypoint.sh /usr/local/bin/migrate-register
 RUN chmod 0555 /usr/local/bin/migrate-register
