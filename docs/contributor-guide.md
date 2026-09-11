@@ -33,8 +33,12 @@ Install or provide:
 * A classic GitHub token with `manage_billing:enterprise` only when testing the
   billing endpoints that require it
 
-The included dev container supplies Node.js, npm, Docker, GitHub CLI, and the VS
-Code extensions used by the repository.
+The included dev container supplies Node.js, npm, Docker with Compose, GitHub
+CLI, Azure CLI with Bicep, Azure Developer CLI (`azd`), and the VS Code
+extensions used by the repository. These Azure CLIs support contributor and
+validation work; they do not replace the protected production workflow. The
+repository does not define an `azure.yaml` project or support `azd up` for
+production.
 
 ## Install Dependencies
 

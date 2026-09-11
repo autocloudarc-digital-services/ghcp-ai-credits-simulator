@@ -491,8 +491,9 @@ and does not interpret them as empty.
 Codespaces is the recommended path when local endpoint security or an internal
 npm proxy prevents access to packages from the public npm registry. This
 repository includes a dev container based on Node.js 22. It installs locked npm
-dependencies, GitHub CLI, Docker with Compose, and the VS Code extensions used
-for TypeScript, GitHub Actions, pull requests, Markdown, and dependency work.
+dependencies, GitHub CLI, Azure CLI with Bicep, Azure Developer CLI (`azd`),
+Docker with Compose, and the VS Code extensions used for TypeScript, GitHub
+Actions, pull requests, Markdown, and dependency work.
 
 ### Create the Codespace
 
@@ -508,12 +509,20 @@ for TypeScript, GitHub Actions, pull requests, Markdown, and dependency work.
 node --version
 npm --version
 gh --version
+az version
+az bicep version
+azd version
 docker version
 ```
 
 > [!NOTE]
 > A new Codespace contains changes pushed to GitHub. It does not contain
 > uncommitted files from another computer.
+
+> [!IMPORTANT]
+> The Azure CLIs are contributor and validation tools. This repository does not
+> define an `azure.yaml` project or support `azd up` for production. Use the
+> protected GitHub Actions workflow described below for production releases.
 
 ### Start the Application
 
