@@ -266,7 +266,7 @@ jobs:
           jq -e 'any(.[].supportedServerVersions[]?; .name == "17" and .status == null)' <<<"$sku_data" >/dev/null
 
           az consumption budget list --subscription "$AZURE_SUBSCRIPTION_ID" --output none
-          az lock list --scope "/subscriptions/$AZURE_SUBSCRIPTION_ID" --output json \
+          az lock list --subscription "$AZURE_SUBSCRIPTION_ID" --output json \
             | jq -e 'all(.[]; .level != "ReadOnly")' >/dev/null
 
           if [[ "$(az group exists --name "$RESOURCE_GROUP_NAME")" == 'true' ]]; then
