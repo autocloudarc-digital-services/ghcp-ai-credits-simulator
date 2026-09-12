@@ -262,10 +262,10 @@ jobs:
             'any(.value[]; .principalId == $group)' <<<"$group_assignments" >/dev/null
 
           sku_data="$(az postgres flexible-server list-skus --location "$LOCATION" --output json)"
-          jq -e 'any(.[].supportedFlexibleServerEditions[]?.supportedServerSkus[]?; .name == "Standard_B2ms" and .status == null)' <<<"$sku_data" >/dev/null
+          jq -e 'any(.[].supportedServerEditions[]?.supportedServerSkus[]?; .name == "Standard_B2ms" and .status == null)' <<<"$sku_data" >/dev/null
           jq -e 'any(.[].supportedServerVersions[]?; .name == "17" and .status == null)' <<<"$sku_data" >/dev/null
 
-          az consumption budget list --scope "/subscriptions/$AZURE_SUBSCRIPTION_ID" --output none
+          az consumption budget list --subscription "$AZURE_SUBSCRIPTION_ID" --output none
           az lock list --scope "/subscriptions/$AZURE_SUBSCRIPTION_ID" --output json \
             | jq -e 'all(.[]; .level != "ReadOnly")' >/dev/null
 
