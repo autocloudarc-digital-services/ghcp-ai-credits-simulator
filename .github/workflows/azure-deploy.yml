@@ -224,12 +224,12 @@ jobs:
             --output json)"
           graph_permissions="$(jq -n \
             --arg resource "$graph_service_principal_id" \
-            --argjson assignments "$graph_assignments" \
-            --argjson graph "$graph_service_principal" \
+            --slurpfile assignments <(printf '%s' "$graph_assignments") \
+            --slurpfile graph <(printf '%s' "$graph_service_principal") \
             '[
-              $assignments.value[]
+              $assignments[0].value[]
               | select(.resourceId == $resource) as $assignment
-              | $graph.appRoles[]
+              | $graph[0].appRoles[]
               | select(.id == $assignment.appRoleId)
               | .value
             ]')"
