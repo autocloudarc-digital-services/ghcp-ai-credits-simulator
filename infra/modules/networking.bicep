@@ -36,53 +36,66 @@ resource virtualNetwork 'Microsoft.Network/virtualNetworks@2024-05-01' = {
         network.virtualNetworkPrefix
       ]
     }
+    // Keep subnet writes in one VNet operation to avoid AnotherOperationInProgress
+    // and preserve the subnets when the foundation is redeployed.
+    subnets: [
+      {
+        name: network.containerAppsSubnetName
+        properties: {
+          addressPrefix: network.containerAppsSubnetPrefix
+          delegations: [
+            {
+              name: 'container-apps-environments'
+              properties: {
+                serviceName: 'Microsoft.App/environments'
+              }
+            }
+          ]
+        }
+      }
+      {
+        name: network.postgresSubnetName
+        properties: {
+          addressPrefix: network.postgresSubnetPrefix
+          delegations: [
+            {
+              name: 'postgres-flexible-server'
+              properties: {
+                serviceName: 'Microsoft.DBforPostgreSQL/flexibleServers'
+              }
+            }
+          ]
+          serviceEndpoints: [
+            {
+              service: 'Microsoft.Storage'
+            }
+          ]
+        }
+      }
+      {
+        name: network.privateEndpointsSubnetName
+        properties: {
+          addressPrefix: network.privateEndpointsSubnetPrefix
+          privateEndpointNetworkPolicies: 'Disabled'
+        }
+      }
+    ]
   }
 }
 
-resource containerAppsSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' = {
+resource containerAppsSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
   parent: virtualNetwork
   name: network.containerAppsSubnetName
-  properties: {
-    addressPrefix: network.containerAppsSubnetPrefix
-    delegations: [
-      {
-        name: 'container-apps-environments'
-        properties: {
-          serviceName: 'Microsoft.App/environments'
-        }
-      }
-    ]
-  }
 }
 
-resource postgresSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' = {
+resource postgresSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
   parent: virtualNetwork
   name: network.postgresSubnetName
-  properties: {
-    addressPrefix: network.postgresSubnetPrefix
-    delegations: [
-      {
-        name: 'postgres-flexible-server'
-        properties: {
-          serviceName: 'Microsoft.DBforPostgreSQL/flexibleServers'
-        }
-      }
-    ]
-    serviceEndpoints: [
-      {
-        service: 'Microsoft.Storage'
-      }
-    ]
-  }
 }
 
-resource privateEndpointsSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' = {
+resource privateEndpointsSubnet 'Microsoft.Network/virtualNetworks/subnets@2024-05-01' existing = {
   parent: virtualNetwork
   name: network.privateEndpointsSubnetName
-  properties: {
-    addressPrefix: network.privateEndpointsSubnetPrefix
-    privateEndpointNetworkPolicies: 'Disabled'
-  }
 }
 
 resource keyVaultPrivateDnsZone 'Microsoft.Network/privateDnsZones@2024-06-01' = {
