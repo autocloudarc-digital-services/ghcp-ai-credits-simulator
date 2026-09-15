@@ -219,10 +219,18 @@ from a workstation.
 4. Enter the current negotiated monthly estimate in USD.
 5. Enter a concise change reason.
 6. Start the workflow and review the validation job.
-7. Inspect the complete what-if output before approving the `production`
-   environment deployment.
+7. Review the commit, protected configuration, cost estimate, and change reason
+   before approving the `production` environment deployment. What-if runs after
+   approval inside the deploy job; provisioning follows without a second pause.
 8. Confirm that the final readiness check succeeds and that the environment URL
    resolves through Microsoft Entra admission.
+
+For a new deployment, add the generated HTTPS origin plus
+`/auth/github/callback` to your production GitHub App before attempting GitHub
+sign-in. The workflow updates the Entra redirect URI, not the GitHub App
+registration. Follow the [GitHub App and PAT setup](../README.md#github-app-setup)
+for credential names and end-to-end acceptance checks. Health and readiness do
+not prove GitHub authorization.
 
 The workflow deploys in this order:
 

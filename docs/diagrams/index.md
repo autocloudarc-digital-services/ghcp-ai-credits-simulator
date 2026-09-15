@@ -1,7 +1,21 @@
 ---
-title: Implementation Guide Diagram Index
-description: Index of SVG workflow diagrams referenced by the internal and external AI Credits implementation guides
+title: Onboarding and Implementation Diagram Index
+description: PNG and Mermaid onboarding diagrams plus SVG workflows for the implementation guides
 ---
+
+## Onboarding Diagrams
+
+| Diagram | PNG preview | Editable source |
+| ------- | ----------- | --------------- |
+| Optional local testing or direct Azure deployment | [Onboarding PNG](../images/onboarding-flowchart.png) | [Mermaid source](onboarding-flowchart.mmd) |
+| Local services and persistence boundaries | [Architecture PNG](../images/local-architecture.png) | [Mermaid source](architecture-flowchart.mmd) |
+
+The PNGs were exported with Mermaid 11.12.0, SVG text labels
+(`htmlLabels: false`), a white background, and 2x scale. When updating them,
+validate the Mermaid source and export the entire SVG view box, not only the
+visible browser viewport. Check the final PNG for clipping and readable labels.
+
+For the executable setup steps, use the [repository README](../../README.md).
 
 ## Implementation guide diagrams
 

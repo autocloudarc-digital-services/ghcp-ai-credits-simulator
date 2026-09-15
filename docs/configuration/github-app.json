@@ -1,0 +1,79 @@
+{
+    "configurationVersion": 1,
+    "kind": "GitHubAppOnboardingSpecification",
+    "description": "Nonsecret desired settings; not a GitHub API request or an automatically applied manifest.",
+    "registration": {
+        "owner": "YOUR-ORGANIZATION",
+        "name": "YOUR-ID-ai-credits-dev",
+        "maximumNameLength": 34,
+        "nameMustBeGloballyUnique": true,
+        "description": "Enterprise AI Credit assessment and governance planning",
+        "homepageUrl": "https://github.com/YOUR-OWNER/ghcp-ai-credits-simulator",
+        "installationVisibility": "only-owner-account",
+        "crossOrganizationInstallationRequiresPublicApp": true,
+        "approvalRequired": true
+    },
+    "authentication": {
+        "method": "oauth-authorization-code",
+        "pkce": "S256",
+        "stateRequired": true,
+        "clientAuthentication": "client-secret",
+        "expireUserAuthorizationTokens": true,
+        "requestOAuthOnInstall": false,
+        "deviceFlow": false,
+        "setupUrl": null,
+        "redirectOnUpdate": false,
+        "callbackPath": "/auth/github/callback",
+        "callbackUrlsByEnvironment": {
+            "local": "http://localhost:5173/auth/github/callback",
+            "codespaces": "https://CODESPACE-NAME-5173.FORWARDING-DOMAIN/auth/github/callback",
+            "azure": "https://CONTAINER-APP-FQDN/auth/github/callback"
+        },
+        "separateRegistrationsPerEnvironment": true,
+        "azureCallbackAddedManuallyAfterHostnameIsKnown": true
+    },
+    "permissions": {
+        "members": "read",
+        "organization_administration": "read",
+        "organization_copilot_seat_management": "read"
+    },
+    "repositoryPermissions": "none requested; retain read-only metadata if added by GitHub",
+    "webhooks": {
+        "active": false,
+        "url": null,
+        "secretRequired": false,
+        "events": []
+    },
+    "appSigningKey": {
+        "requiredByRuntime": false,
+        "format": null,
+        "algorithm": null,
+        "keySizeBits": null,
+        "reason": "This runtime does not generate app JWTs or installation access tokens."
+    },
+    "x509Certificate": {
+        "requiredByRuntime": false,
+        "subject": null,
+        "subjectAlternativeNames": [],
+        "issuer": null,
+        "thumbprint": null,
+        "validityDays": null,
+        "reason": "Not applicable to GitHub user OAuth; Azure and Codespaces supply HTTPS separately."
+    },
+    "credentialNames": {
+        "local": {
+            "clientId": "GITHUB_APP_CLIENT_ID",
+            "clientSecret": "GITHUB_APP_CLIENT_SECRET"
+        },
+        "codespacesSecrets": {
+            "clientId": "GHCP_APP_CLIENT_ID",
+            "clientSecret": "GHCP_APP_CLIENT_SECRET"
+        },
+        "productionEnvironment": {
+            "clientIdVariable": "GH_APP_CLIENT_ID",
+            "clientSecretSecret": "GH_APP_CLIENT_SECRET"
+        }
+    },
+    "instructions": "../../README.md#github-app-setup",
+    "providerReference": "https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app"
+}

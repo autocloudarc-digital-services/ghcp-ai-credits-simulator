@@ -1,0 +1,58 @@
+{
+    "configurationVersion": 1,
+    "kind": "ClassicPATOnboardingSpecification",
+    "description": "Nonsecret creation and rotation requirements; GitHub does not accept this file as a PAT creation request.",
+    "tokenType": "classic",
+    "note": "YOUR-ID-ai-credits-dev-billing",
+    "owner": "YOUR-AUTHORIZED-GITHUB-USER",
+    "intendedEnterpriseSlug": "YOUR-ENTERPRISE-SLUG",
+    "environment": "development",
+    "creation": {
+        "method": "user-approved-github-settings",
+        "url": "https://github.com/settings/tokens/new",
+        "ownerMustHaveRequiredEnterpriseBillingAndInventoryAccess": true,
+        "organizationAndEnterprisePolicyMustPermitClassicPATs": true,
+        "samlSsoAuthorizationRequiredWhereEnforced": true,
+        "respectIpAllowLists": true
+    },
+    "scopes": [
+        "manage_billing:enterprise",
+        "read:enterprise"
+    ],
+    "scopePurposes": {
+        "manage_billing:enterprise": "Enterprise usage, budgets and cost centers; grants broader authority than read-only reporting.",
+        "read:enterprise": "Enterprise teams, memberships, organization assignments and enterprise Copilot seat inventory."
+    },
+    "doNotAddByDefault": [
+        "admin:enterprise",
+        "admin:org",
+        "repo",
+        "workflow",
+        "manage_billing:copilot"
+    ],
+    "lifetime": {
+        "suggestedDaysForInitialTesting": 30,
+        "useShorterPolicyMaximumIfRequired": true,
+        "allowNoExpiration": false,
+        "rotateBeforeExpiration": true,
+        "separateTokenPerEnvironment": true
+    },
+    "usageBoundary": {
+        "serverMethod": "GET",
+        "enterpriseIsAnIntendedTargetNotATokenRestriction": true,
+        "notAGeneralOrganizationApiFallback": true,
+        "notForUserLoginOrDeploymentAuthentication": true,
+        "fineGrainedTokenIsNotADropInReplacement": true
+    },
+    "secretNames": {
+        "localEnvironment": "GHCP_ENTERPRISE_BILLING_TOKEN",
+        "codespaces": "GHCP_ENTERPRISE_BILLING_TOKEN",
+        "productionEnvironment": "GH_ENTERPRISE_BILLING_TOKEN"
+    },
+    "storeTokenValueInThisFile": false,
+    "instructions": "../../README.md#enterprise-billing-pat-setup",
+    "providerReferences": [
+        "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens",
+        "https://docs.github.com/en/rest/enterprise-teams/enterprise-teams"
+    ]
+}

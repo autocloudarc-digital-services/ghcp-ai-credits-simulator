@@ -1,33 +1,28 @@
 ---
-title: From repository to first run
+title: Local testing or direct Azure deployment
 config:
   theme: neutral
   flowchart:
     curve: linear
 ---
 flowchart TD
-    Environment{"Choose your environment"}
-    Codespaces["Codespaces<br/>Create from your trusted fork<br/>Wait for npm ci"]
-    Local["Local VS Code<br/>Clone your fork<br/>Run npm clean-install"]
-    Storage["Start persistence<br/>npm run register:db:up"]
-    Start["Start the application<br/>npm run dev"]
-    Preview["Open port 5173<br/>Inspect the Assessment form<br/>Live actions require sign-in"]
-    Intent{"Ready for live enterprise data?"}
-    Explore["Not yet<br/>Read the redacted screenshots<br/>Build and test the project"]
-    Configure["Use your own GitHub App<br/>Set the exact callback and credentials<br/>Obtain authorized enterprise access"]
-    Assess["Restart the app, then connect GitHub<br/>Complete an assessment<br/>Continue to Simulator"]
+  Fork["Fork and review the repository<br/>Use your own accounts and credentials"]
+  Environment{"Choose your first target"}
+  Local["Local host or Codespaces<br/>Install dependencies and start storage<br/>Configure development App and PAT"]
+  DevCheck["Start app on port 5173<br/>Verify login, assessment and tests<br/>Optionally follow Azure path next"]
+  Azure["Prepare production identities<br/>GitHub App and PAT, OIDC and Entra<br/>Protect environment secrets and review cost"]
+  Workflow["Run the reviewed release<br/>Validation, then environment approval<br/>Preflight, what-if and provisioning"]
+  Verify["Add GitHub callback for deployed URL<br/>Verify readiness and Entra access<br/>Sign in to GitHub and run assessment"]
 
-    Environment --> Codespaces
-    Environment --> Local
-    Codespaces --> Storage
-    Local --> Storage
-    Storage --> Start --> Preview --> Intent
-    Intent -->|No| Explore
-    Intent -->|Yes| Configure --> Assess
+  Fork --> Environment
+  Environment -->|Optional local test| Local
+  Local --> DevCheck
+  Environment -->|Direct to Azure| Azure
+  Azure --> Workflow --> Verify
 
     classDef setup fill:#e0f2fe,stroke:#0369a1,color:#0c4a6e
     classDef ready fill:#dcfce7,stroke:#15803d,color:#14532d
     classDef access fill:#fef9c3,stroke:#a16207,color:#713f12
-    class Codespaces,Local,Storage,Start setup
-    class Preview,Explore ready
-    class Configure,Assess access
+  class Fork,Local,Workflow setup
+  class DevCheck,Verify ready
+  class Azure access
