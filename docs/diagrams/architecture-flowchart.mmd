@@ -1,38 +1,30 @@
-flowchart LR
-    User[Browser user]
-    GitHub[GitHub OAuth and billing APIs]
+---
+title: Local development services and data boundaries
+config:
+  theme: neutral
+  flowchart:
+    curve: linear
+---
+flowchart TD
+    Browser["Browser<br/>React UI, Zustand and calculation engine"]
+    Vite["Vite development server<br/>localhost:5173"]
+    Server["Express API<br/>localhost:3001<br/>Sessions, CSRF and authenticated routes"]
+    GitHub["GitHub<br/>OAuth and authorized assessment APIs"]
+    Gateway["PostgREST gateway<br/>127.0.0.1:3302<br/>Short-lived role-scoped JWTs"]
+    Database[("PostgreSQL 17<br/>Sessions, assessments, workflows,<br/>reports and Active Register")]
+    Volume[("Persistent Docker volume<br/>ghcp-active-register_register_data")]
 
-    subgraph Client[React client on port 5173]
-        Vite[Vite development server]
-        Router[Dashboard, Simulator, Assessment, Recommendations, Report]
-        Store[Zustand application state]
-        Engine[Credit calculation engine]
-        Visuals[Recharts and React Three Fiber]
-    end
+    Browser <-->|Page and assets| Vite
+    Vite <-->|/auth and /api proxy| Server
+    Browser <-->|User authorization redirect| GitHub
+    Server <-->|Server-side tokens| GitHub
+    Server <-->|Role-scoped persistence requests| Gateway
+    Gateway <-->|Private Docker network| Database
+    Database --- Volume
 
-    subgraph Server[Express server on port 3001]
-        Security[CORS, sessions, CSRF, and rate limits]
-        Auth[Authentication routes]
-        Assessment[Assessment routes and jobs]
-        Report[Report routes and PDF renderer]
-        Memory[(In-memory sessions, jobs, and reports)]
-    end
-
-    Shared[Shared TypeScript contracts]
-
-    User --> Vite
-    Vite --> Router
-    Router <--> Store
-    Store --> Engine
-    Engine --> Visuals
-    Vite -- /auth and /api proxy --> Security
-    Security --> Auth
-    Security --> Assessment
-    Security --> Report
-    Auth <--> GitHub
-    Assessment <--> GitHub
-    Security <--> Memory
-    Assessment <--> Memory
-    Report <--> Memory
-    Shared -. types .-> Client
-    Shared -. types .-> Server
+    classDef client fill:#e0f2fe,stroke:#0369a1,color:#0c4a6e
+    classDef service fill:#dcfce7,stroke:#15803d,color:#14532d
+    classDef external fill:#fef9c3,stroke:#a16207,color:#713f12
+    class Browser,Vite client
+    class Server,Gateway,Database,Volume service
+    class GitHub external

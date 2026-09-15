@@ -1,0 +1,33 @@
+---
+title: From repository to first run
+config:
+  theme: neutral
+  flowchart:
+    curve: linear
+---
+flowchart TD
+    Environment{"Choose your environment"}
+    Codespaces["Codespaces<br/>Create from your trusted fork<br/>Wait for npm ci"]
+    Local["Local VS Code<br/>Clone your fork<br/>Run npm clean-install"]
+    Storage["Start persistence<br/>npm run register:db:up"]
+    Start["Start the application<br/>npm run dev"]
+    Preview["Open port 5173<br/>Inspect the Assessment form<br/>Live actions require sign-in"]
+    Intent{"Ready for live enterprise data?"}
+    Explore["Not yet<br/>Read the redacted screenshots<br/>Build and test the project"]
+    Configure["Use your own GitHub App<br/>Set the exact callback and credentials<br/>Obtain authorized enterprise access"]
+    Assess["Restart the app, then connect GitHub<br/>Complete an assessment<br/>Continue to Simulator"]
+
+    Environment --> Codespaces
+    Environment --> Local
+    Codespaces --> Storage
+    Local --> Storage
+    Storage --> Start --> Preview --> Intent
+    Intent -->|No| Explore
+    Intent -->|Yes| Configure --> Assess
+
+    classDef setup fill:#e0f2fe,stroke:#0369a1,color:#0c4a6e
+    classDef ready fill:#dcfce7,stroke:#15803d,color:#14532d
+    classDef access fill:#fef9c3,stroke:#a16207,color:#713f12
+    class Codespaces,Local,Storage,Start setup
+    class Preview,Explore ready
+    class Configure,Assess access
