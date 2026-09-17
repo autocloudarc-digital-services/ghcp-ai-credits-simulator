@@ -12,6 +12,13 @@ keywords:
 estimated_reading_time: 8
 ---
 
+## Code of Conduct
+
+All contributors and community participants are expected to follow the
+[Code of Conduct](../CODE_OF_CONDUCT.md). It adopts the Microsoft Open Source
+Code of Conduct standards and includes private reporting guidance and
+expectations for AI-generated contributions.
+
 ## Development Boundary
 
 Local VS Code and GitHub Codespaces are the supported contributor environments.

@@ -701,6 +701,8 @@ ghcp-ai-credits-simulator/
 Focused contributions to calculations, accessibility, integrations,
 documentation, governance controls, and deployment safety are welcome. Review
 the [Contributor Guide](docs/contributor-guide.md) before opening a pull request.
+All participants are expected to follow the [Code of Conduct](CODE_OF_CONDUCT.md),
+which adopts the Microsoft Open Source Code of Conduct standards.
 
 Run the relevant build, lint, and test commands for code changes. For
 Markdown-only changes, run `git diff --check` and a Markdown linter when one is
