@@ -383,6 +383,12 @@ repository `GITHUB_TOKEN`, an Azure credential, or an installation access token.
 | `read:enterprise` | Enterprise teams, memberships, organization assignments, and enterprise Copilot seat inventory |
 | `read:org` | Organization details, member inventory, teams, and team membership read through the billing token |
 
+GitHub can normalize scope lists by omitting scopes implied by broader grants.
+`manage_billing:enterprise` includes `read:enterprise`; the token settings UI
+can show the latter checked and disabled. Its absence from `X-OAuth-Scopes`
+alone does not establish missing enterprise read access. Do not add
+`admin:enterprise` to compensate for a normalized header.
+
 Do not add `manage_billing:copilot` by default: the enterprise seat reader can
 use `read:enterprise`. For organization details, members, teams, and team
 membership, credential selection is: nonblank token supplied for the assessment,
@@ -853,13 +859,120 @@ and enterprise token/IP policies are independent checks.
 3. After editing scopes, regenerating, or replacing a PAT, recheck its SSO
   authorizations. Respect organization token restrictions and the owner's
   actual access; adding broad administrative scopes does not repair SSO.
-4. If the failing deployment still uses the GitHub-session credential, the
-  PAT's SSO configuration will not affect that request. Deploy the inventory
-  reader change, or establish the required GitHub user/app SSO authorization
-  and reconnect when that credential is intentionally used.
+4. If the failing deployment uses the GitHub-session credential, the PAT's SSO
+  configuration will not affect that request. Establish the required GitHub
+  user/app SSO authorization and reconnect when that credential is intentionally
+  used. Before choosing PAT-backed inventory, check whether the organization
+  permits classic PATs; see [Classic PAT Organization Restrictions](#classic-pat-organization-restrictions).
 5. Run a new assessment and inspect the source warnings. Scope checkboxes and
   successful login are configuration evidence; only successful retrieval
   verifies API access. Keep unavailable counts unknown until retrieval succeeds.
+
+### Classic PAT Organization Restrictions
+
+> [!NOTE]
+> "Some enterprise governance data is unavailable" followed by a member-list
+> `403` and "Verify organization membership and read:org access" is a generic
+> application hint, not proof that either prerequisite is missing. The current
+> error formatter can replace GitHub's more specific denial with this hint.
+
+In the September 17 investigation, a direct request with the replacement PAT
+returned `200` from `/user`, identified the expected owner, and reported
+`read:org` among its scopes. Both the organization-membership and member-list
+requests nevertheless returned `403` with this underlying GitHub message:
+
+```text
+`autocloudarc-digital-services` forbids access via a personal access token (classic). Please use a GitHub App, OAuth App, or a personal access token with fine-grained permissions.
+```
+
+This is a token-type policy restriction, not invalid credentials or evidence
+of missing `read:org`. SSO authorization and organization ownership do not
+override it. The membership property `is_public` only controls public visibility;
+making membership public does not authorize the PAT. Keep the organization's
+approved visibility and access policies rather than weakening them to silence
+the warning.
+
+The GitHub App's **Members: Read-only** permission, installation approval, and
+SSO access apply to requests using that App's credential. They do not transfer
+to a classic PAT. Current organization inventory readers prefer the supplied
+or configured PAT, so even a correctly approved App cannot fix those PAT-backed
+requests. Leaving the form token blank selects the configured server PAT when
+one exists; it does not force GitHub App authentication.
+
+The recommended remediation is separate credential routing: retain the classic
+PAT for enterprise endpoints that require it, and use an approved GitHub App
+user credential for organization/member/team inventory. A separately scoped,
+approved fine-grained PAT may be appropriate for supported organization
+endpoints, but it is not a drop-in replacement for the complete enterprise
+assessment or its classic-PAT-only enterprise-team reader. The current form
+does not provide separate enterprise and organization token fields.
+
+> [!IMPORTANT]
+> This routing separation is a recommended follow-up, not an implemented fix
+> in this README update. Do not replace the enterprise token with a fine-grained
+> PAT and assume all endpoints will work, automatically retry policy denials
+> using another identity, or disable the organization's classic-PAT restriction.
+> Validate the chosen credential per endpoint and run a new assessment after
+> an approved routing change is deployed.
+
+### Diagnose The Exact Credential
+
+Use read-only requests from the environment whose credential you intend to
+test. Do not assume that a new terminal, an already-running server, the
+assessment password field, and Azure share the same value.
+
+1. Request `GET /user` with that credential. `200` identifies its owner;
+  `401 Bad credentials` means GitHub rejected it, for example because it was
+  revoked, expired, or copied incorrectly. Resolve authentication before
+  diagnosing membership or scopes. A token settings page does not prove the
+  running process holds its current value.
+2. Request `GET /user/memberships/orgs/ORGANIZATION`, then
+  `GET /orgs/ORGANIZATION/members?filter=all&role=all&per_page=1&page=1`.
+  Inspect the status and sanitized GitHub `message`, not just the app's hint.
+  Active organization owners normally appear as `state: active`, `role: admin`
+  in the membership API. Discard returned member records when testing access.
+3. Capture `X-OAuth-Scopes` for granted classic-token scopes,
+  `X-Accepted-OAuth-Scopes` for endpoint requirements, the category from
+  `X-GitHub-SSO` (without its authorization URL), rate-limit remaining, and
+  `X-GitHub-Request-Id`. Missing headers do not prove that no permissions were
+  granted; account for implied scopes. A classic-PAT policy denial requires
+  a different approved credential type, not more scopes.
+4. Never print Authorization headers, cookies, token values, or complete HTTP
+  client error objects. Sanitize provider messages before sharing them and
+  retain only the request ID, status, endpoint, and necessary diagnostic fields.
+5. Retest with a fresh assessment rather than restoring saved results. A
+  successful local PAT test does not prove the Azure secret is the same, and
+  an assessment marked complete can still contain source failures.
+
+For a zsh terminal, load a replacement without echoing its value or putting it
+in shell history. Run this prompt first, enter the secret directly in the
+terminal, and only then run the diagnostic commands:
+
+```zsh
+unsetopt XTRACE VERBOSE
+read -rs 'GHCP_ENTERPRISE_BILLING_TOKEN?Replacement PAT (hidden): '
+printf '\n'
+export GHCP_ENTERPRISE_BILLING_TOKEN
+```
+
+Restart the local development server from that same terminal after a successful
+credential test. Existing processes and other terminals retain their own
+environment; updating one shell does not refresh them. Update the approved
+Codespaces secret separately for future sessions. Never paste a PAT into chat.
+
+GitHub CLI authentication is independent. In Codespaces, `GITHUB_TOKEN` (or
+`GH_TOKEN`) can override stored CLI credentials and prevent `gh auth login`
+from storing a new login. For an intentional separate CLI login, use:
+
+```bash
+env -u GITHUB_TOKEN -u GH_TOKEN gh auth login
+env -u GITHUB_TOKEN -u GH_TOKEN gh auth status
+```
+
+These commands unset the overrides only for each invocation. They do not
+change `GHCP_ENTERPRISE_BILLING_TOKEN`, the GitHub App session, or Azure's secret.
+A diagnostic that reads the billing-token environment variable directly does
+not require `gh auth login`.
 
 ### Assessment Scope And Partial Results
 
@@ -888,6 +1001,19 @@ do not rewrite that evidence. Create a new assessment for verification. An
 enterprise-team roster is not a complete organization membership list, and
 missing member inventory must not be replaced with zero or declared reconciled.
 
+#### When Partial Results Can Be Used
+
+You may continue reviewing independently retrieved billing or usage data when
+those sources have no warnings and the decision does not depend on complete
+organization membership. Keep the source limitation visible in reports and
+record its decision impact, accountable owner, and follow-up date.
+
+Do not treat member counts, user coverage, or membership-based allocations as
+complete. Do not use incomplete inventory for reconciliation sign-off or
+rollout approval that requires verified population coverage. Retain unknowns
+as unknown, not zero; do not hide the warning or substitute an enterprise-team
+roster for the full organization membership list.
+
 ### Local Works But Azure Fails
 
 Local edits, a Git commit, an image build, a workflow dispatch, and a serving
@@ -912,6 +1038,26 @@ production is running the same code or credential configuration.
   confirm readiness and traffic on the intended image, then create a new
   assessment using the configured token. Check member retrieval rather than
   relying only on the "GitHub authenticated" or "Saved to PostgreSQL" labels.
+
+Check whether the Container App's Key Vault reference includes a specific
+secret version. A versioned URI remains pinned: creating a newer Key Vault
+version does not update that reference. After rotation, use the approved
+deployment/secret rollout path to update the reference and verify which
+revision receives traffic. The environment variable's name identifies its
+purpose, not the GitHub account that owns the PAT stored there.
+
+In a fresh, authorized production assessment during this investigation, the
+token field was blank and the configured-PAT endpoints returned `401`, even
+though a later direct test with a replacement PAT authenticated successfully.
+These are different observations, not proof that the two environments used
+the same token. If an operator cannot read Key Vault, do not grant additional
+access merely to diagnose the app: an authorized assessment through the normal
+application path can test the configured credential without exposing it.
+
+If the UI reports "Another tab changed this workflow," that is a separate
+persistence conflict. Preserve unsaved work, coordinate open tabs, and reload
+saved data only after deciding which state to keep. Do not overwrite another
+tab's workflow or mistake the save conflict for the GitHub authorization error.
 
 ### Protected Deployment And Partial Failures
 
