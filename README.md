@@ -109,6 +109,10 @@ packages. The Vite development server proxies `/auth` and `/api` requests to
 Express. PostgreSQL stores sessions, assessments, workflows, allocation plans,
 reports, and Active Register history.
 
+See the [unstructured storage assessment](docs/active-register.md#unstructured-storage-assessment)
+for current PDF persistence and the deferred proposal for private evidence attachments
+and object storage.
+
 <!-- markdownlint-disable-next-line MD033 -->
 <details>
 <!-- markdownlint-disable-next-line MD033 -->
