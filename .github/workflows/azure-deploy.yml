@@ -411,7 +411,7 @@ jobs:
             --parameters shouldDeployApplication=false shouldDeployMigrationJob=false \
             --output none
 
-      - name: Configure Microsoft Entra callback
+      - name: Configure Microsoft Entra callback and token claims
         run: |
           set -euo pipefail
           default_domain="$(az containerapp env show \
@@ -424,11 +424,13 @@ jobs:
             --query 'web.redirectUris[]' --output tsv)
           if [[ ! " ${redirect_uris[*]} " =~ [[:space:]]${entra_callback}[[:space:]] ]]; then
             redirect_uris+=("$entra_callback")
-            az ad app update \
-              --id "$ENTRA_CLIENT_ID" \
-              --web-redirect-uris "${redirect_uris[@]}" \
-              --output none
           fi
+          az ad app update \
+            --id "$ENTRA_CLIENT_ID" \
+            --web-redirect-uris "${redirect_uris[@]}" \
+            --enable-id-token-issuance true \
+            --set groupMembershipClaims=ApplicationGroup \
+            --output none
           printf 'Microsoft Entra callback: `%s`\n' "$entra_callback" >>"$GITHUB_STEP_SUMMARY"
           printf 'GitHub App callback: `%s`\n' \
             "https://$CONTAINER_APP_NAME.$default_domain/auth/github/callback" \
