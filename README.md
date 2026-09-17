@@ -349,7 +349,8 @@ these GitHub App credentials.
 
 The server uses an additional **personal access token (classic)** for the
 enterprise billing, cost-center, budget, seat, and enterprise-team requests
-implemented in the billing service. It is not the user's login credential, the
+implemented in the billing service, plus organization details, member inventory,
+teams, and team membership. It is not the user's login credential, the
 repository `GITHUB_TOKEN`, an Azure credential, or an installation access token.
 
 ### Create The Token
@@ -380,11 +381,25 @@ repository `GITHUB_TOKEN`, an Azure credential, or an installation access token.
 | ----------------- | ------------------------------- |
 | `manage_billing:enterprise` | Enterprise billing usage, budgets, and cost centers |
 | `read:enterprise` | Enterprise teams, memberships, organization assignments, and enterprise Copilot seat inventory |
+| `read:org` | Organization details, member inventory, teams, and team membership read through the billing token |
 
 Do not add `manage_billing:copilot` by default: the enterprise seat reader can
-use `read:enterprise`. This shared PAT is not an automatic fallback for every
-organization API failure. Check the failed endpoint and the signed-in user's
-GitHub App authorization before changing scopes.
+use `read:enterprise`. For organization details, members, teams, and team
+membership, credential selection is: nonblank token supplied for the assessment,
+then server-configured `GHCP_ENTERPRISE_BILLING_TOKEN`, then the GitHub session
+credential when neither PAT is available. A denied request is not retried with
+a different credential. Other endpoints retain their own credential rules;
+this shared PAT is not a universal fallback for every GitHub API failure.
+GitHub sign-in remains required to identify the user and own saved data.
+
+> [!IMPORTANT]
+> Billing-token support for organization inventory was introduced in commit
+> `2eb11ff`. Older deployments use the GitHub-session credential for those
+> requests even when `GHCP_ENTERPRISE_BILLING_TOKEN` is configured. Authorizing
+> the PAT for SSO does not repair a request made with that different credential.
+> See [Local Works But Azure Fails](#local-works-but-azure-fails).
+
+Review the token's authority separately from the application's read-only use.
 
 > [!WARNING]
 > `manage_billing:enterprise` is broader than read-only reporting even though
@@ -457,7 +472,9 @@ secret location above. Do not regenerate it on each application start.
 3. Start GitHub login from the application, check the app name and requested
   permissions on GitHub, authorize, and confirm you return to the same origin.
   A callback visited directly fails state validation by design.
-4. Enter your exact enterprise slug and run assessment. Inspect usage, budgets,
+4. Enter your exact enterprise slug and an explicit comma-separated list of
+  organization slugs, then run assessment. Gray examples are placeholders, not
+  submitted values. Inspect usage, budgets,
   cost centers, organizations, and teams. Resolve reported permission or
   endpoint errors; an empty result is not proof of successful authorization.
 5. Verify access with your intended user roles. Active Register access remains
@@ -680,21 +697,268 @@ ghcp-ai-credits-simulator/
 
 ## Troubleshooting
 
+Start with the failing layer: local persistence, Microsoft Entra admission,
+GitHub login, GitHub API authorization, or deployed application version. Success
+at one layer does not prove the others work. The procedures below reflect
+observed failures and verified configuration fixes; a new assessment is still
+required to prove end-to-end data access after remediation.
+
 | Symptom | Check |
 | ------- | ----- |
+| Stuck on "Validating GitHub session" or "Unable to validate your GitHub session" | Check PostgreSQL/PostgREST readiness before retrying; see [Startup And Session Validation](#startup-and-session-validation) |
 | OAuth returns to the wrong host or port | Match the GitHub App callback to `CALLBACK_URL` and the browser origin |
+| GitHub says `redirect_uri` is not associated with the application | Register the exact callback on the app matching the request's Client ID; see [Callback And Browser-Origin Mismatches](#callback-and-browser-origin-mismatches) |
 | Login returns `503` or says OAuth is not configured | Export both App credential values before starting the server; the server does not load `.env` automatically |
 | GitHub rejects the client credentials | Use the Client ID, not App ID; confirm the secret belongs to that registration and has not been revoked |
 | Invalid or missing OAuth state | Restart login from the application in the same browser; do not open the callback directly or initiate OAuth during app installation |
+| Entra returns `AADSTS50105` | Use the intended tenant account and verify direct membership in the assigned admission group; see [Microsoft Entra Admission And Callback Errors](#microsoft-entra-admission-and-callback-errors) |
+| Azure returns HTTP `401` at sign-in or its callback | Start a fresh sign-in and verify ID-token issuance and assigned-group claims; do not disable authentication |
 | PAT-backed endpoints return `401` | Replace an expired or revoked PAT, update the secret, then restart development or redeploy production |
 | Assessment endpoints return `403` | Check which credential the endpoint uses, the user's role, app installation/permissions, PAT scopes, SSO, IP policy, and rate limits |
+| Organization members return `403` with a SAML SSO warning | Authorize the credential actually used by the deployed code; see [PAT Scopes And SAML SSO](#pat-scopes-and-saml-sso) |
 | Enterprise endpoints return `404` | Verify the enterprise slug and whether the token can view the resource |
+| Organization requests return `404`, including an unintended name such as `demouser` | Correct the assessment scope and create a new assessment; see [Assessment Scope And Partial Results](#assessment-scope-and-partial-results) |
 | Azure readiness passes but GitHub login fails | Add the deployed `/auth/github/callback` URL to the production GitHub App; Entra's callback is different |
+| Inventory works locally but not on Azure | Compare the serving revision/image with the fix commit and confirm environment-specific secret configuration |
 | Codespaces uses stale credentials | Check the `GHCP_*` Codespaces secret names and restart; Actions secrets and `GITHUB_TOKEN` are not substitutes |
 | Port `5173` returns an empty response in Codespaces | Confirm both development processes are running and your browser is authorized to access the forwarded port |
 | PostgreSQL-backed tests fail | Start Docker and run `npm run register:db:up` |
+| Workflow dispatch returns `403 Resource not accessible by integration` | Use an authorized GitHub Actions operator; the Codespaces integration token may lack workflow-dispatch permission |
+| Deployment fails at readiness or traffic verification | Inspect actual Azure state before retrying; earlier steps may already have changed production |
 | Active Register returns `403` after successful login | Verify the numeric GitHub ID, tenant, and role mapping; GitHub login alone does not grant register access |
 | The 3D view is unavailable | Enable WebGL or use the 2D fallback |
+
+### Startup And Session Validation
+
+The frontend can respond on `5173` while its API or persistent session store is
+unavailable. Session validation depends on PostgreSQL through PostgREST; a
+running Vite process is not sufficient.
+
+1. From the repository root, run `npm run register:db:status`. If the local
+  services are absent or stopped, run `npm run register:db:up`.
+2. Start both application processes with `npm run dev`. Check
+  <http://localhost:3001/healthz> for process liveness and
+  <http://localhost:3001/readyz> for storage readiness. Both should return
+  `200`; `503` from readiness requires persistence investigation.
+3. Check <http://localhost:5173/auth/status> through Vite's proxy. A response
+  containing `connected: false` means the request completed and GitHub login
+  is needed; it is not a storage failure.
+4. Once the backend responds, use **Retry** or reload the page. Current client
+  code bounds the `/auth/status` request to 10 seconds and keeps application
+  routes gated on validation failure. This timeout does not establish a
+  deadline for every later workflow hydration or save request.
+5. If authentication succeeds but saved-data loading fails, investigate
+  persistence and use the saved-data reload action only after considering
+  unsaved changes. Do not treat a login success as proof that data was saved.
+
+> [!WARNING]
+> Use the repository database helper. Invoking Compose without its environment
+> file can fail with missing `REGISTER_*` variables. Do not delete volumes,
+> regenerate `.local/session-secret`, or replace database credentials merely
+> to clear a spinner: existing encrypted sessions and stored records may depend
+> on them. Follow the [persistence procedures](docs/contributor-guide.md#start-local-persistence).
+
+### Callback And Browser-Origin Mismatches
+
+The app root is the entry point. The following callback paths belong to
+different registrations and are not interchangeable:
+
+| Authentication boundary | Registered callback |
+| ----------------------- | ------------------- |
+| Microsoft Entra admission to Azure | `https://CONTAINER-APP-FQDN/.auth/login/aad/callback` |
+| GitHub data authorization | `https://CONTAINER-APP-FQDN/auth/github/callback` |
+
+1. For an invalid GitHub redirect, inspect the authorization request's
+  `client_id` and decoded `redirect_uri` without sharing its state, code, or
+  other authentication parameters. Open that exact GitHub App registration.
+2. Add the exact callback from [Choose The Owner And Callback](#choose-the-owner-and-callback),
+  leave **Allow wildcard matching** off, and save. Preserve still-needed
+  callbacks; remove an obsolete Codespace entry only after confirming it is
+  no longer used. Prefer separate production and development registrations.
+3. If app settings return `404`, verify the owning account: organization-owned
+  apps live under the organization's settings, not personal developer
+  settings. Complete organization SSO and GitHub **Confirm access** directly
+  in the browser when required. Do not send verification codes to an assistant.
+4. In Codespaces, unset `CLIENT_ORIGIN` and `CALLBACK_URL` allow the server to
+  derive the forwarded hostname. For local forwarded-port testing instead,
+  explicitly set both to the matching localhost origin and callback before
+  starting the server. A `.env` file alone does not change runtime values.
+5. Use the same browser origin throughout login. Switching between localhost,
+  `127.0.0.1`, a Codespaces URL, and the Azure URL can lose the session cookie
+  or OAuth state. A new Codespace has a new hostname and may need a new callback.
+6. Restart **Connect GitHub Enterprise** from the running app after saving.
+  Do not reload an old authorization URL or visit either callback manually.
+
+A private forwarded port can appear unavailable to a browser without Codespaces
+access. Authenticate to the owning GitHub account and open the URL from VS Code's
+Ports view; do not make the API, database gateway, or application public as an
+authentication workaround.
+
+### Microsoft Entra Admission And Callback Errors
+
+`AADSTS50105` means Entra authenticated an account that lacks application
+assignment. It is distinct from GitHub's SAML SSO authorization for API access.
+
+1. Check the account named in the Entra error. A cached work account can differ
+  from the tenant account intended for this app. Use a private browser window
+  or **Use another account** and sign in with the approved tenant identity.
+2. An authorized administrator should verify that the enterprise application
+  has **Assignment required** enabled and that the user is a direct member
+  of the assigned admission security group. Nested-group membership is not
+  sufficient for application assignment. Do not add an unintended account
+  merely because it appeared in the error.
+3. For an HTTP `401` after identity verification, inspect the admission app
+  registration and Container Apps authentication configuration. The configured
+  hybrid login requests `code id_token`; ID-token issuance must be enabled.
+  The group's authorization policy also needs group IDs in the token. This
+  deployment sets `groupMembershipClaims=ApplicationGroup` so claims include
+  assigned groups, and leaves implicit access-token issuance disabled.
+4. Confirm the tenant issuer, Client ID, audience, exact Entra callback, secret
+  reference, and allowed group agree with the approved configuration. Correct
+  missing settings through the protected deployment configuration; a valid
+  group assignment alone does not prove the token contains the required claim.
+5. Obtain a fresh sign-in after changes. If needed, use
+  `https://CONTAINER-APP-FQDN/.auth/login/aad?post_login_redirect_uri=%2F&prompt=select_account`.
+  If that complete flow returns to the callback with `401`, retain the UTC
+  time and correlation/request IDs for an authorized sign-in-log review.
+
+> [!CAUTION]
+> Keep assignment requirements, allowed-group restrictions, and platform
+> authentication enabled. Do not enable anonymous access or broad group
+> membership to remove a login error. `/healthz` and `/readyz` are intentionally
+> anonymous probes, not proof of successful Entra or GitHub sign-in.
+
+### PAT Scopes And SAML SSO
+
+A PAT with `read:org` can still receive `403` when it is not SSO-authorized for
+the organization. Scopes, SSO authorization, the token owner's membership/roles,
+and enterprise token/IP policies are independent checks.
+
+1. Identify the failed endpoint and the deployed credential-selection behavior.
+  For current organization inventory readers, a supplied assessment token
+  overrides the server token. Leave the field blank to use the configured
+  token; confirm that you did not supply a different, expired, or unauthorized
+  token. Never print token values to compare environments.
+2. In the token owner's GitHub settings, open **Personal access tokens > Tokens
+  (classic)**. Verify the scopes in [Create The Token](#create-the-token), then
+  use **Configure SSO > Authorize** for every affected organization. Establish
+  an organization SSO session first if no authorization option is shown.
+3. After editing scopes, regenerating, or replacing a PAT, recheck its SSO
+  authorizations. Respect organization token restrictions and the owner's
+  actual access; adding broad administrative scopes does not repair SSO.
+4. If the failing deployment still uses the GitHub-session credential, the
+  PAT's SSO configuration will not affect that request. Deploy the inventory
+  reader change, or establish the required GitHub user/app SSO authorization
+  and reconnect when that credential is intentionally used.
+5. Run a new assessment and inspect the source warnings. Scope checkboxes and
+  successful login are configuration evidence; only successful retrieval
+  verifies API access. Keep unavailable counts unknown until retrieval succeeds.
+
+### Assessment Scope And Partial Results
+
+The enterprise slug, organization slug, user login, and display name are
+different identifiers. Copy the enterprise slug from
+`github.com/enterprises/ENTERPRISE` and enter actual organization logins in
+**Organizations (comma separated)**. The gray examples in the form are only
+placeholders.
+
+> [!WARNING]
+> The assessment currently falls back to `[enterpriseSlug]` when the
+> organization list is empty. An enterprise name is not necessarily an
+> organization, so this can issue invalid `/orgs/...` requests. Until that
+> fallback is revised, explicitly provide the intended organization list.
+
+Remove an unintended value such as `demouser`, correct the scope, and select
+**Assess Now** instead of restoring an old assessment. A `404` can also conceal
+a real resource from an unauthorized credential; do not assume every `404`
+means the resource does not exist. If the name persists, inspect the saved
+assessment inputs and enterprise-discovered or team-assigned organization list.
+Governance discovery includes organizations beyond the explicitly selected
+billing scope, so narrowing the form does not suppress all inventory warnings.
+
+Saved assessment warnings describe the original retrieval; configuration fixes
+do not rewrite that evidence. Create a new assessment for verification. An
+enterprise-team roster is not a complete organization membership list, and
+missing member inventory must not be replaced with zero or declared reconciled.
+
+### Local Works But Azure Fails
+
+Local edits, a Git commit, an image build, a workflow dispatch, and a serving
+Azure revision are separate stages. A successful local test does not prove
+production is running the same code or credential configuration.
+
+1. Record the source commit that contains the fix. In Azure Portal, inspect
+  the Container App's active revisions, traffic weights, and application image
+  digest. Match that digest to the source-commit tag in Container Registry;
+  do not infer the deployed version from the repository's latest commit.
+2. Check the runtime environment variable name and secret reference, without
+  revealing values. The protected Actions secret `GH_ENTERPRISE_BILLING_TOKEN`
+  is mapped through Key Vault and the Container App secret to runtime
+  `GHCP_ENTERPRISE_BILLING_TOKEN`. A configured reference does not prove the
+  secret is current, valid, or used by an older image.
+3. Update credentials through the intended environment's approved secret path.
+  Changing a Codespaces secret does not update GitHub Actions or Azure, and
+  editing a GitHub environment secret does not by itself update a running
+  container. Restart development or complete the reviewed production secret
+  update and rollout as applicable.
+4. Deploy through the [protected production workflow](docs/azure-deployment.md),
+  confirm readiness and traffic on the intended image, then create a new
+  assessment using the configured token. Check member retrieval rather than
+  relying only on the "GitHub authenticated" or "Saved to PostgreSQL" labels.
+
+### Protected Deployment And Partial Failures
+
+If CLI dispatch fails with `403 Resource not accessible by integration`, no run
+may have been created. Check the workflow run list before retrying. Use an
+authorized operator's **Actions > Azure production deployment > Run workflow**
+session or an approved automation identity; do not expand the assessment PAT
+with workflow-management permissions. Browser SSO, MFA, and protected-environment
+approval must still be completed by the authorized person.
+
+Each dispatch needs a current verified negotiated monthly estimate greater
+than zero and no more than `$209.51`, the explicit `$209.51` public-retail
+ceiling acknowledgement, a change reason, and the required production review.
+Do not reuse stale estimates, fabricate approval, bypass environment protection,
+or deploy Bicep directly to avoid a failed gate. The workflow proceeds from
+what-if into provisioning; what-if is not a separate post-preview approval gate.
+
+> [!CAUTION]
+> A failed workflow is not an automatic rollback. In a session-observed run,
+> release validation passed but **Verify readiness and traffic** failed after
+> earlier deployment steps had run. Images, secrets, database migrations,
+> application revisions, and ingress may already have changed. Do not report
+> deployment success or assume the prior image is still serving.
+
+On a partial failure, inspect the first failing step and Azure deployment
+operations, revision health, container logs, image digest, ingress, and traffic
+weights. Preserve the failure evidence and prior-state information. If probes
+fail, diagnose readiness and authentication routing rather than making protected
+routes anonymous. If traffic verification fails, compare the actual routed
+revision and weights with the intended image, not just a "latest" flag.
+Use the reviewed remediation or rollback process, accounting for any applied
+database migrations, before rerunning. A rerun can repeat infrastructure and
+migration work; it is not merely a test retry.
+
+### Exposed Tokens And Other Secrets
+
+Treat a credential pasted into chat, an issue, a log, a screenshot, or a commit
+as exposed even if the message is later corrected or deleted.
+
+1. Revoke the exposed credential promptly in its issuing system. Do not test,
+  repeat, or reuse it while troubleshooting.
+2. Create a replacement with the minimum approved scopes and expiry, then
+  authorize its required organization SSO access.
+3. Store it only through the approved secret manager and environment-specific
+  configuration path. Update each affected consumer and rotate related
+  credentials only where the exposure requires it.
+4. Restart or roll out the affected runtime, then verify access with a new
+  assessment. Review the available provider audit records for unexpected use
+  and follow the [Security Policy](SECURITY.md) for private reporting.
+
+Do not put secrets in workflow inputs, shell arguments, documentation, or
+support transcripts. Redact OAuth authorization codes, session cookies, and
+authentication state from diagnostic links; request IDs and UTC timestamps are
+usually sufficient to locate the corresponding sign-in failure.
 
 ## Contributing
 
