@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -142,6 +142,113 @@ test("missing migration job name still fails the required variable check", () =>
     result.stderr,
     /Missing protected production variable: MIGRATION_JOB_NAME/,
   );
+});
+
+function publishImages(overrides = {}) {
+  const step = steps.find((step) => step.name === "Build and publish immutable images");
+  const directory = mkdtempSync(join(tmpdir(), "azure-deploy-test-"));
+  const parametersPath = join(directory, "parameters.json");
+  const parameters = { parameters: { imageDigests: { value: {} }, preserved: { value: true } } };
+  writeFileSync(parametersPath, JSON.stringify(parameters));
+  try {
+    const result = spawnSync("bash", ["-c", `
+    az() {
+      echo "az $*" >&2
+      case "$*" in
+        "acr show --name registry --query loginServer --output tsv")
+          echo registry.azurecr.io ;;
+        "acr login --name registry") ;;
+        "acr repository show --name registry --image app:commit --query digest --output tsv")
+          echo "$APP_DIGEST" ;;
+        "acr repository show --name registry --image migration:commit --query digest --output tsv")
+          echo "$MIGRATION_DIGEST" ;;
+        "acr repository show --name registry --image postgrest:commit --query digest --output tsv")
+          echo "$POSTGREST_DIGEST" ;;
+        *) return 1 ;;
+      esac
+    }
+    docker() {
+      echo "docker $*" >&2
+      case "$*" in
+        "build --target app --tag registry.azurecr.io/app:commit ." | \\
+        "build --target migration --tag registry.azurecr.io/migration:commit ." | \\
+        "push registry.azurecr.io/app:commit" | \\
+        "push registry.azurecr.io/migration:commit") ;;
+        "pull --platform linux/amd64 $POSTGREST_SOURCE_IMAGE")
+          return "$PULL_STATUS" ;;
+        "tag $POSTGREST_SOURCE_IMAGE registry.azurecr.io/postgrest:commit")
+          return "$TAG_STATUS" ;;
+        "push registry.azurecr.io/postgrest:commit")
+          return "$PUSH_STATUS" ;;
+        *) return 1 ;;
+      esac
+    }
+    ${step.run}
+    `], {
+      env: {
+        PATH: process.env.PATH,
+        CONTAINER_REGISTRY_NAME: "registry",
+        APP_IMAGE_REPOSITORY: "app",
+        MIGRATION_IMAGE_REPOSITORY: "migration",
+        POSTGREST_IMAGE_REPOSITORY: "postgrest",
+        POSTGREST_SOURCE_IMAGE: environment.POSTGREST_SOURCE_IMAGE,
+        GITHUB_SHA: "commit",
+        RUNNER_TEMP: directory,
+        PARAMETERS_FILE: parametersPath,
+        APP_DIGEST: `sha256:${"b".repeat(64)}`,
+        MIGRATION_DIGEST: `sha256:${"c".repeat(64)}`,
+        POSTGREST_DIGEST: `sha256:${"d".repeat(64)}`,
+        PULL_STATUS: "0",
+        TAG_STATUS: "0",
+        PUSH_STATUS: "0",
+        ...overrides,
+      },
+      encoding: "utf8",
+    });
+    return { ...result, parameters: JSON.parse(readFileSync(parametersPath, "utf8")) };
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+test("PostgREST is mirrored through the runner and deployed with the destination digest", () => {
+  const result = publishImages();
+  assert.equal(result.status, 0, result.stderr);
+  const source = environment.POSTGREST_SOURCE_IMAGE;
+  assert.ok(result.stderr.includes([
+    `docker pull --platform linux/amd64 ${source}`,
+    `docker tag ${source} registry.azurecr.io/postgrest:commit`,
+    "docker push registry.azurecr.io/postgrest:commit",
+  ].join("\n")));
+  assert.doesNotMatch(result.stderr, /az acr import/);
+  assert.deepEqual(result.parameters.parameters.imageDigests.value, {
+    app: `sha256:${"b".repeat(64)}`,
+    migration: `sha256:${"c".repeat(64)}`,
+    postgrest: `sha256:${"d".repeat(64)}`,
+  });
+  assert.deepEqual(result.parameters.parameters.preserved, { value: true });
+});
+
+test("PostgREST publishing failures stop before resolving deployment digests", () => {
+  for (const variable of ["PULL_STATUS", "TAG_STATUS", "PUSH_STATUS"]) {
+    const result = publishImages({ [variable]: "1" });
+    assert.equal(result.status, 1, variable);
+    assert.doesNotMatch(result.stderr, /az acr repository show/);
+    assert.deepEqual(result.parameters.parameters.imageDigests.value, {});
+    if (variable === "PULL_STATUS") assert.doesNotMatch(result.stderr, /docker tag/);
+    if (variable !== "PUSH_STATUS") {
+      assert.doesNotMatch(result.stderr, /docker push registry.azurecr.io\/postgrest/);
+    }
+  }
+});
+
+test("PostgREST publishing rejects invalid destination digests", () => {
+  for (const digest of ["", "None", "latest", `sha256:${"d".repeat(63)}`]) {
+    const result = publishImages({ POSTGREST_DIGEST: digest });
+    assert.equal(result.status, 1, digest);
+    assert.match(result.stderr, /Registry returned an invalid image digest/);
+    assert.deepEqual(result.parameters.parameters.imageDigests.value, {});
+  }
 });
 
 function verifyReadinessAndTraffic(overrides = {}) {

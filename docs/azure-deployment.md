@@ -227,6 +227,13 @@ from a workstation.
 
 ## Run a Deployment
 
+The workflow pulls the digest-pinned PostgREST image for `linux/amd64` on the
+GitHub Actions runner and pushes it to ACR using the existing Azure login.
+It does not use server-side `az acr import`, whose shared outbound addresses can
+hit Docker Hub's unauthenticated pull limit (HTTP 429). Deployment uses the
+destination ACR digest, which can differ from the source multi-platform digest.
+Image pull or push failures stop the release before migrations.
+
 1. Open **Actions** and select **Azure production deployment**.
 2. Select the reviewed commit or release branch.
 3. Review the prefilled `209.51` public-retail ceiling; dispatch acknowledges it.
