@@ -453,15 +453,15 @@ jobs:
 
           app_tag="$login_server/$APP_IMAGE_REPOSITORY:$GITHUB_SHA"
           migration_tag="$login_server/$MIGRATION_IMAGE_REPOSITORY:$GITHUB_SHA"
+          postgrest_tag="$login_server/$POSTGREST_IMAGE_REPOSITORY:$GITHUB_SHA"
           docker build --target app --tag "$app_tag" .
           docker build --target migration --tag "$migration_tag" .
           docker push "$app_tag"
           docker push "$migration_tag"
-          az acr import \
-            --name "$CONTAINER_REGISTRY_NAME" \
-            --source "$POSTGREST_SOURCE_IMAGE" \
-            --image "$POSTGREST_IMAGE_REPOSITORY:$GITHUB_SHA" \
-            --force
+          # Pull on the runner to avoid Docker Hub limits on ACR's shared import egress.
+          docker pull --platform linux/amd64 "$POSTGREST_SOURCE_IMAGE"
+          docker tag "$POSTGREST_SOURCE_IMAGE" "$postgrest_tag"
+          docker push "$postgrest_tag"
 
           app_digest="$(az acr repository show --name "$CONTAINER_REGISTRY_NAME" --image "$APP_IMAGE_REPOSITORY:$GITHUB_SHA" --query digest --output tsv)"
           migration_digest="$(az acr repository show --name "$CONTAINER_REGISTRY_NAME" --image "$MIGRATION_IMAGE_REPOSITORY:$GITHUB_SHA" --query digest --output tsv)"
