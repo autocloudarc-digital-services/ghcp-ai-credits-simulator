@@ -99,8 +99,10 @@ export default function ApiConfigForm({ onSubmit, isSubmitting, disabled = false
           className="bg-slate-900 border border-slate-700 rounded-md px-3 py-2 text-slate-100 focus:outline-none focus:ring-2 focus:ring-teal-400"
         />
         <span id="enterprise-billing-token-note" className="text-xs leading-relaxed text-slate-500">
-          Use a classic personal access token with read:enterprise to retrieve enterprise teams, billing,
-          budgets, and cost centers. Fine-grained tokens are not supported for enterprise teams. The token is sent only
+          Use a classic personal access token with read:enterprise for enterprise teams, billing,
+          budgets, and cost centers, plus read:org for organization member and team inventory.
+          Authorize the token for SAML SSO in each organization that requires it.
+          Fine-grained tokens are not supported for enterprise teams. The token is sent only
           when this assessment starts, is not saved by the app, and is cleared from this field after submission.
           Leave it blank to use the token configured on the server.
         </span>

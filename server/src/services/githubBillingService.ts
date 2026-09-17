@@ -531,12 +531,15 @@ export async function getEnterpriseTeamOrganizations(
 
 export async function getOrganizationDetails(
   org: string,
-  session: Session
+  session: Session,
+  suppliedBillingToken?: string
 ): Promise<GitHubOrganizationDetails> {
   const organization = await authenticatedGet<GitHubOrganizationDetailsResponse>(
     session,
     org,
-    (validatedOrg) => `/orgs/${validatedOrg}`
+    (validatedOrg) => `/orgs/${validatedOrg}`,
+    undefined,
+    suppliedBillingToken?.trim() || getEnterpriseBillingToken() || undefined
   );
   return {
     id: organization.id,
@@ -548,13 +551,15 @@ export async function getOrganizationDetails(
 
 export async function getOrganizationMembers(
   org: string,
-  session: Session
+  session: Session,
+  suppliedBillingToken?: string
 ): Promise<GitHubOrganizationMember[]> {
   const members = await authenticatedGetAll<GitHubMemberResponse>(
     session,
     org,
     (validatedOrg) => `/orgs/${validatedOrg}/members`,
-    { filter: 'all', role: 'all' }
+    { filter: 'all', role: 'all' },
+    suppliedBillingToken?.trim() || getEnterpriseBillingToken() || undefined
   );
   return members.map((member) => ({
     id: member.id,
@@ -565,13 +570,15 @@ export async function getOrganizationMembers(
 
 export async function getOrganizationTeams(
   org: string,
-  session: Session
+  session: Session,
+  suppliedBillingToken?: string
 ): Promise<GitHubTeam[]> {
   const teams = await authenticatedGetAll<GitHubTeamResponse>(
     session,
     org,
     (validatedOrg) => `/orgs/${validatedOrg}/teams`,
-    { team_type: 'organization' }
+    { team_type: 'organization' },
+    suppliedBillingToken?.trim() || getEnterpriseBillingToken() || undefined
   );
   return teams.map((team) => ({
     id: team.id,
@@ -588,16 +595,18 @@ export async function getOrganizationTeams(
 export async function getTeamMembers(
   org: string,
   teamSlug: string,
-  session: Session
+  session: Session,
+  suppliedBillingToken?: string
 ): Promise<GitHubTeamMember[]> {
   if (!GITHUB_TEAM_SLUG_PATTERN.test(teamSlug)) {
     throw new GitHubBillingServiceError(`Invalid GitHub team slug: "${teamSlug}"`, 400);
   }
   const buildPath = (validatedOrg: string) =>
     `/orgs/${validatedOrg}/teams/${teamSlug}/members`;
+  const credential = suppliedBillingToken?.trim() || getEnterpriseBillingToken() || undefined;
   const [members, maintainers] = await Promise.all([
-    authenticatedGetAll<GitHubMemberResponse>(session, org, buildPath, { role: 'all' }),
-    authenticatedGetAll<GitHubMemberResponse>(session, org, buildPath, { role: 'maintainer' }),
+    authenticatedGetAll<GitHubMemberResponse>(session, org, buildPath, { role: 'all' }, credential),
+    authenticatedGetAll<GitHubMemberResponse>(session, org, buildPath, { role: 'maintainer' }, credential),
   ]);
   const maintainerIds = new Set(maintainers.map((maintainer) => maintainer.id));
   return members.map((member) => ({

@@ -136,17 +136,17 @@ async function mapInBatches<T, TResult>(
   return results;
 }
 
-async function collectOrganizationInventory(org: string, session: Session) {
+async function collectOrganizationInventory(org: string, session: Session, enterpriseBillingToken?: string) {
   const [detailsResult, membersResult, teamsResult] = await Promise.allSettled([
-    getOrganizationDetails(org, session),
-    getOrganizationMembers(org, session),
-    getOrganizationTeams(org, session),
+    getOrganizationDetails(org, session, enterpriseBillingToken),
+    getOrganizationMembers(org, session, enterpriseBillingToken),
+    getOrganizationTeams(org, session, enterpriseBillingToken),
   ]);
   const teams = teamsResult.status === 'fulfilled' ? teamsResult.value : [];
   const teamMemberResults = await settleInBatches(
     teams,
     5,
-    async (team) => ({ team, members: await getTeamMembers(org, team.slug, session) })
+    async (team) => ({ team, members: await getTeamMembers(org, team.slug, session, enterpriseBillingToken) })
   );
   return { org, detailsResult, membersResult, teamsResult, teamMemberResults };
 }
@@ -308,7 +308,7 @@ async function runAssessment(
           enterpriseBillingToken
         ),
       ]),
-      mapInBatches(inventoryOrganizationSlugs, 5, (org) => collectOrganizationInventory(org, session)),
+      mapInBatches(inventoryOrganizationSlugs, 5, (org) => collectOrganizationInventory(org, session, enterpriseBillingToken)),
     ]);
     const [budgetsResult, costCentersResult] = governanceResults;
     const enterpriseLicenseResult = enterpriseLicenseResults[0];
