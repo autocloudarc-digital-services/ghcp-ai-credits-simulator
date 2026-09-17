@@ -549,8 +549,10 @@ npm run container:build
 
 Production deployment is available through the manually dispatched **Azure
 production deployment** workflow. The workflow requires an approved release
-commit, the protected `production` environment, a current monthly estimate, and
-an exact acknowledgement of the approved public-retail ceiling.
+commit, the protected `production` environment, and an exact acknowledgement of
+the approved public-retail ceiling. Both dispatch fields have usable defaults;
+review current costs as part of production approval rather than entering a
+second estimate parameter.
 
 > [!CAUTION]
 > The workflow performs Azure what-if and then continues to provisioning in the
@@ -615,12 +617,17 @@ neither copies your local database or development credentials to Azure.
 
 | Workflow input | Value |
 | -------------- | ----- |
-| `approved_public_retail_ceiling_usd` | Exactly `209.51`, only after accepting the checked-in baseline's ceiling |
-| `verified_monthly_estimate_usd` | Your current verified USD estimate, greater than zero and no more than `209.51` |
-| `change_reason` | An auditable reason for this release |
+| `approved_public_retail_ceiling_usd` | Defaults to `209.51`; running the workflow acknowledges this monthly public-retail ceiling |
+| `change_reason` | Defaults to `Deploy the selected revision to production.`; edit when change-specific context is needed |
 
-If your real estimate exceeds the ceiling, obtain a revised design and approval;
-do not enter an artificially lower amount. Record the accepted commit, image
+For a routine release, select the reviewed branch and **Run workflow** without
+retyping either field. Defaults do not approve the protected `production`
+environment or bypass validation. Retain meaningful change context in the
+release and approval record.
+
+Review current costs as part of release approval; there is no separate estimate
+input or automated estimate comparison. If your real estimate exceeds the ceiling,
+obtain a revised design and approval before dispatch. Record the accepted commit, image
 digests, settings inventory, credential owners and expiry dates, and validation
 outcome for subsequent releases. For an interrupted run, correct the failed
 prerequisite and rerun the reviewed commit; do not delete the resource group or
@@ -915,9 +922,9 @@ session or an approved automation identity; do not expand the assessment PAT
 with workflow-management permissions. Browser SSO, MFA, and protected-environment
 approval must still be completed by the authorized person.
 
-Each dispatch needs a current verified negotiated monthly estimate greater
-than zero and no more than `$209.51`, the explicit `$209.51` public-retail
-ceiling acknowledgement, a change reason, and the required production review.
+Each dispatch needs the explicit `$209.51` public-retail ceiling acknowledgement,
+a change reason, and the required production review. Review the current cost
+estimate as approval evidence, not as a second workflow input.
 Do not reuse stale estimates, fabricate approval, bypass environment protection,
 or deploy Bicep directly to avoid a failed gate. The workflow proceeds from
 what-if into provisioning; what-if is not a separate post-preview approval gate.

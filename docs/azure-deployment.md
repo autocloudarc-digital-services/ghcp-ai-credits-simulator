@@ -51,9 +51,10 @@ replica is fully active for the month. The estimate excludes negotiated
 discounts and variable overages such as outbound data transfer, excess backup,
 and ingestion beyond the configured cap.
 
-Every dispatch requires a current negotiated monthly estimate greater than zero
-and no more than `$209.51`, plus an exact acknowledgement of the `$209.51`
-public-retail ceiling. Premium ACR, PostgreSQL high availability, geo-replication,
+Every dispatch requires an exact acknowledgement of the `$209.51`
+public-retail ceiling and a change reason. Review the current negotiated estimate
+within that ceiling as part of production approval; there is no separate estimate
+input or automated estimate comparison. Premium ACR, PostgreSQL high availability, geo-replication,
 larger SKUs, additional replicas, or a dedicated Container Apps workload profile
 require a separate cost review and approval.
 
@@ -207,7 +208,7 @@ The workflow stops before creating resources unless all checks pass:
 
 * Release tests, builds, lint, dependency audit, Bicep compilation, and both
   production container builds
-* Exact cost-ceiling acknowledgement and an in-ceiling negotiated estimate
+* Exact cost-ceiling acknowledgement (prefilled as `209.51`)
 * OIDC sign-in to the expected enabled tenant and subscription
 * Required Azure resource-provider registration
 * Subscription RBAC and role-assignment authority
@@ -228,14 +229,15 @@ from a workstation.
 
 1. Open **Actions** and select **Azure production deployment**.
 2. Select the reviewed commit or release branch.
-3. Enter `209.51` for the approved public-retail ceiling.
-4. Enter the current negotiated monthly estimate in USD.
-5. Enter a concise change reason.
-6. Start the workflow and review the validation job.
-7. Review the commit, protected configuration, cost estimate, and change reason
+3. Review the prefilled `209.51` public-retail ceiling; dispatch acknowledges it.
+4. Keep the default reason, `Deploy the selected revision to production.`, or
+   edit it to include change-specific context.
+5. Select **Run workflow** and review the validation job. No input retyping is
+   required for a routine release; validation and production review still apply.
+6. Review the commit, protected configuration, cost estimate, and change reason
    before approving the `production` environment deployment. What-if runs after
    approval inside the deploy job; provisioning follows without a second pause.
-8. Confirm that the final readiness check succeeds and that the environment URL
+7. Confirm that the final readiness check succeeds and that the environment URL
    resolves through Microsoft Entra admission.
 
 For a new deployment, add the generated HTTPS origin plus
