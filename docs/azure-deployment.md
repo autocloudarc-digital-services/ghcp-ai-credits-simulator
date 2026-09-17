@@ -27,6 +27,9 @@ The deployment does not copy a contributor's local PostgreSQL volume or `.local`
 files to Azure. Production starts with a new database and applies the ordered
 migrations in `server/src/register/migrations`.
 
+For issue #11's local and Azure persistent structured storage status, see the
+[implementation mapping and verification evidence](active-register.md#persistent-structured-storage-requirement).
+
 ## Approved Lean Topology
 
 The first production deployment is fixed to these cost and reliability choices:
