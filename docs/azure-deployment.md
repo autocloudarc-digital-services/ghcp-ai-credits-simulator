@@ -171,6 +171,19 @@ variables and secrets.
 Use nonoverlapping CIDRs. ACR, Key Vault, PostgreSQL, and Container App names
 must meet Azure naming rules and be available at deployment time.
 
+`MIGRATION_JOB_NAME` must contain 2–32 lowercase letters, digits, or hyphens,
+start with a letter, end with a letter or digit, and contain no consecutive
+hyphens. For example, use `caj-ghcp-ai-credits-migrate-prod`.
+The workflow validates this value before Azure login or resource changes.
+
+If deployment fails with `ContainerAppInvalidName`, update `MIGRATION_JOB_NAME`
+under **Settings → Environments → production → Environment variables** before
+dispatching the protected workflow again. In particular,
+`caj-ghcp-ai-credits-migration-prod` is 34 characters and must be replaced with
+a shorter name such as the example above. A code update does not change this
+protected environment variable. Names are not automatically truncated, so
+deployment and subsequent job execution always target the configured name.
+
 ### Environment Secrets
 
 | Secret                            | Purpose                                                        |

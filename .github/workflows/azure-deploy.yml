@@ -57,6 +57,9 @@ jobs:
       - name: Install dependencies
         run: npm clean-install
 
+      - name: Test deployment configuration validation
+        run: node --test scripts/azure-deploy-test.mjs
+
       - name: Run focused runtime tests
         run: npm run runtime:test
 
@@ -158,6 +161,10 @@ jobs:
               exit 1
             fi
           done
+          if [[ ! "$MIGRATION_JOB_NAME" =~ ^[a-z][a-z0-9-]{0,30}[a-z0-9]$ || "$MIGRATION_JOB_NAME" == *--* ]]; then
+            echo 'Invalid protected production variable MIGRATION_JOB_NAME: use 2-32 lowercase letters, digits, or hyphens; start with a letter, end with a letter or digit, and do not use consecutive hyphens. Set it to a valid name such as caj-ghcp-ai-credits-migrate-prod before rerunning.' >&2
+            exit 1
+          fi
           if [[ "$LOCATION" != 'eastus2' ]]; then
             echo 'AZURE_LOCATION must remain eastus2 for the approved deployment.' >&2
             exit 1

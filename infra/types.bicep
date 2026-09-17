@@ -23,7 +23,9 @@ type ResourceNames = {
   @description('Log Analytics workspace name.')
   logAnalytics: string
 
-  @description('Migration Container Apps job name.')
+  @minLength(2)
+  @maxLength(32)
+  @description('Migration Container Apps job name: lowercase letters, digits, or hyphens; starts with a letter, ends with a letter or digit, and has no consecutive hyphens.')
   migrationJob: string
 
   @description('Migration user-assigned managed identity name.')
