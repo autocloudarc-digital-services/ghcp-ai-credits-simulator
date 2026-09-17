@@ -33,6 +33,8 @@ function WorkflowGate({ allowed, redirectTo, children }: { allowed: boolean; red
 
 export default function App() {
   const [hasCheckedAuthentication, setHasCheckedAuthentication] = useState(false);
+  const [authenticationError, setAuthenticationError] = useState(false);
+  const [authenticationAttempt, setAuthenticationAttempt] = useState(0);
   const {
     assessmentResult,
     setIsConnected,
@@ -46,8 +48,11 @@ export default function App() {
 
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
+    setHasCheckedAuthentication(false);
+    setAuthenticationError(false);
     axios
-      .get('/auth/status')
+      .get('/auth/status', { timeout: 10000, signal: controller.signal })
       .then(async (response) => {
         if (!active) return;
         if (response.data.connected) {
@@ -60,12 +65,13 @@ export default function App() {
       })
       .catch(() => {
         if (!active) return;
+        setAuthenticationError(true);
         setIsConnected(false);
         resetWorkflow();
       })
       .finally(() => { if (active) setHasCheckedAuthentication(true); });
-    return () => { active = false; stopWorkflowPersistence(); };
-  }, [resetWorkflow, setIsConnected]);
+    return () => { active = false; controller.abort(); stopWorkflowPersistence(); };
+  }, [authenticationAttempt, resetWorkflow, setIsConnected]);
 
   const completedAssessment = assessmentResult !== null;
   const access = {
@@ -146,6 +152,13 @@ export default function App() {
         {!hasCheckedAuthentication ? (
           <div className="flex min-h-[50vh] items-center justify-center text-sm text-slate-400">
             Validating GitHub session…
+          </div>
+        ) : authenticationError ? (
+          <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-sm text-slate-400" role="alert">
+            <p>Unable to validate your GitHub session. The server may be unavailable.</p>
+            <button type="button" className="flex items-center gap-2 text-teal-400" onClick={() => setAuthenticationAttempt(attempt => attempt + 1)}>
+              <RefreshCw className="h-4 w-4" /> Retry
+            </button>
           </div>
         ) : <Routes key={hydrationVersion}>
           <Route path="/" element={<Assessment />} />
