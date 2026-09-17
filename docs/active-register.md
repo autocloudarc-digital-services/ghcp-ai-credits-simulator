@@ -188,6 +188,88 @@ with account/tenant isolation rather than browser or process memory as durable s
   authenticated save/reload, application-restart durability, or point-in-time
   restore test against Azure. Those operational acceptance checks remain separate.
 
+## Unstructured Storage Assessment
+
+Assessment for [issue #12](https://github.com/autocloudarc-digital-services/ghcp-ai-credits-simulator/issues/12),
+September 17, 2026.
+
+**Classification:** optional feature enhancement, not a persistence bug.
+**Recommendation:** retain PostgreSQL for the current workload; defer a dedicated
+object store until an approved attachment use case or measured report-storage
+growth justifies the additional service. This assessment does not provision storage
+or implement uploads, and the proposal below is not an approved deployment change.
+
+### Current Coverage And Value
+
+Unstructured content means file bytes such as PDFs, screenshots, or supporting
+documents, rather than the validated record and workflow fields stored as JSON.
+The application already persists one such artifact: generated PDFs. The
+[report store](../server/src/persistence/applicationStore.ts) saves them as
+base64 text in `register.generated_reports`, alongside their owner and input
+snapshot. The [report API](../server/src/routes/report.ts) supports generation,
+history, and account-scoped re-download. PostgreSQL backups include these bytes.
+
+Register evidence currently records links and provenance in structured JSON
+(see [Evidence Entry](#evidence-entry)); it does not upload or retain the linked
+file. There is no general-purpose attachment API or object-storage resource in
+the current Azure topology.
+
+| Option | Benefit | Trade-off and decision |
+| --- | --- | --- |
+| Keep existing PostgreSQL storage and evidence links | Preserves working report downloads, ownership, and one recovery boundary without another service | Links do not preserve external files; base64 adds roughly one-third to raw PDF size before database overhead. Recommended now; measure database and backup growth rather than assume a capacity problem. |
+| Add private object storage with PostgreSQL metadata | Could retain approved evidence attachments and offload larger report bytes | Adds authorization, upload security, retention, cost, and cross-store recovery work. Preferred future design if justified. |
+| Store files on the application container filesystem | Simple temporary staging | Not a durable production store across replacement or scaling; reject for retained artifacts. |
+
+Useful future cases are retaining authorized, sanitized evidence screenshots or
+documents with a register revision, and moving report bytes out of PostgreSQL
+when measured volume or restore time warrants it. A general file drive, arbitrary
+URL importer, public sharing, and replacement of structured governance records
+are outside this proposal. Storing a file does not validate its contents or certify
+provider enforcement.
+
+### Bounded Future Proposal
+
+1. Keep ownership, provenance, history, and artifact metadata in PostgreSQL.
+   Reference immutable object versions using server-generated keys; record size,
+   validated media type, checksum, creation time, and scan state. Personal reports
+   remain account-owned; register attachments require the server-configured tenant
+   and register role. Neither boundary grants access to the other.
+2. Use private Azure Blob Storage for production bytes, with public access disabled,
+   private networking, encryption, and least-privilege application managed identity.
+   Authorize every upload, link, and download through the application; knowledge of
+   an object key is not permission. Do not embed credentials or reusable access
+   tokens in evidence links. Local development needs an explicitly persistent
+   local object-store volume, not the application container's writable layer.
+3. Start with a narrow, approved file-type allowlist, content validation, per-file
+   size and tenant/account quotas, CSRF protection, and rate limits. Quarantine
+   uploads until malware scanning succeeds; failed or unavailable scanning must
+   not release files. Serve downloads as attachments without inline active content.
+   Exclude credentials and require review/redaction of sensitive evidence.
+4. Define retention, deletion authority, and any legal holds before enabling
+   cleanup. Preserve artifacts referenced by historical evidence; never overwrite
+   prior versions to satisfy validation. Audit attachment changes and access
+   without logging contents or access tokens.
+5. Account for the lack of a shared PostgreSQL/blob transaction: stage uploads,
+   finalize references only after integrity and scan checks, make retries
+   idempotent, and reconcile orphaned objects and missing references safely.
+   Back up and restore metadata and matching object versions together. A database
+   dump alone would no longer recover all artifacts.
+
+Before implementation, confirm allowed data, expected sizes/counts, retention,
+recovery objectives, and an operating owner. Review total costs, including
+capacity, operations, network transfer, private endpoints, scanning, and recovery;
+do not assume they fit the existing approved Azure ceiling. Any infrastructure
+addition must use the [protected production workflow](azure-deployment.md#supported-production-path)
+after cost and security approval.
+
+Acceptance for a separate implementation should include additive schema changes,
+cross-account and cross-tenant denial tests, upload-limit and quarantine tests,
+retry/failure reconciliation, and backup/restore tests covering both stores.
+Preserve existing report IDs and downloads during any migration; verify copied
+bytes before retiring database copies. Validate retention and historical references,
+container-replacement durability locally, and Azure recovery separately. No such
+object-storage acceptance tests or operational readiness are claimed by this assessment.
+
 ## Governance Insights Persistence
 
 Migration `006-governance-insights.sql` adds workflow audit history and version
