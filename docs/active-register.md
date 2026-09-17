@@ -147,6 +147,47 @@ Backups contain sensitive assessment data and encrypted credentials; protect
 them and establish an operator-managed retention and off-host backup policy.
 There is no automatic deletion of assessment or report history.
 
+## Persistent Structured Storage Requirement
+
+[Issue #11: create-persistent-structured-storage](https://github.com/autocloudarc-digital-services/ghcp-ai-credits-simulator/issues/11)
+is implemented by the existing PostgreSQL backends for both local and Azure-hosted
+use; no additional storage backend is required. Both use the same ordered
+[SQL migrations](../server/src/register/migrations) and PostgREST access layer.
+The seven structured tables are `register.records`, `register.revisions`, and
+the five application tables listed above. They retain governed records, audit
+history, encrypted sessions, assessments, workflows, and generated reports,
+with account/tenant isolation rather than browser or process memory as durable storage.
+
+| Scenario | Persistence implementation | Operational boundary |
+| --- | --- | --- |
+| Local / Codespaces | [Compose](../compose.register.yaml) runs PostgreSQL 17 with the named `register_data` volume; [database commands](../scripts/register-db.mjs) apply migrations and verify container recreation and isolated dump restoration. | Retain the volume and encryption secrets. Local dumps still need protected off-host copies; this is not HA or disaster recovery. |
+| Azure hosted | [Database Bicep](../infra/modules/database.bicep) provisions private PostgreSQL 17 Flexible Server with 32 GiB auto-growing storage and seven-day backup retention. The [application sidecar](../infra/modules/application.bicep) connects PostgREST to that database; durable data is outside the application containers. | HA and geo-redundant backup are disabled. Use the [protected deployment workflow](azure-deployment.md#supported-production-path), which requires successful migrations before application deployment. Local data is not automatically copied to Azure. |
+
+### Verification Evidence — 2026-09-17
+
+* Local `npm run register:db:up` and `npm run register:db:migrate` succeeded,
+  including reapplying all six migrations. PostgREST reported all seven tables
+  loaded. `npm run register:db:verify-recovery` passed container recreation and
+  isolated backup restoration on a fresh database; this is not populated-data
+  recovery evidence.
+* The server build passed. `node --test scripts/azure-deploy-test.mjs` passed
+  all 12 configuration tests. Running `node --test scripts/persistence-test.mjs
+  scripts/register-test.mjs scripts/register-api-test.mjs` without integration
+  enabled passed 28 tests and skipped seven database integration tests.
+* `npm run persistence:test` was attempted but did **not** pass: requests to
+  `127.0.0.1:3302` timed out in this sandbox, including a direct HTTP probe.
+  Assessment tests also failed on storage access without the integration flag.
+  Local end-to-end verification remains incomplete. The sandbox used Node 24;
+  rerun with the documented Node 22 toolchain and a reachable local gateway,
+  including `REGISTER_INTEGRATION=1 npm run register:test`, then repeat recovery
+  verification with populated data and no concurrent writes.
+* Azure [production deployment run 35257851912](https://github.com/autocloudarc-digital-services/ghcp-ai-credits-simulator/actions/runs/35257851912)
+  succeeded for commit `87cdb358c38d55f320c30075289b2b71feecdc27`. Its job results
+  confirm successful database migrations, internal application admission, and
+  readiness/traffic verification. This is deployment evidence, not a new
+  authenticated save/reload, application-restart durability, or point-in-time
+  restore test against Azure. Those operational acceptance checks remain separate.
+
 ## Governance Insights Persistence
 
 Migration `006-governance-insights.sql` adds workflow audit history and version
@@ -250,7 +291,9 @@ npm run register:db:up
 ```
 
 Backups are PostgreSQL custom-format dumps under `.local/backups/`, with file mode
-0600. They contain register data and audit history, not OAuth tokens. Keep encrypted
+0600. They contain all seven register and application tables, including encrypted
+OAuth/refresh-token sessions, assessments, workflow history, and report bytes.
+One-time assessment billing tokens are not persisted. Keep encrypted
 off-host copies and a retention policy; a local volume and a local dump are not disaster
 recovery. Recovery verification briefly recreates the database container with its existing
 volume, compares record/history fingerprints, restores into a randomly named separate
