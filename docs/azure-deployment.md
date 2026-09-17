@@ -302,8 +302,11 @@ logs or command output.
 Images are deployed by immutable digest. To roll back application code, dispatch
 the protected workflow from the last accepted commit and use a change reason
 that identifies the failed release. The workflow republishes that source,
-rechecks the full topology, applies only idempotent migrations, and shifts all
-traffic after readiness succeeds.
+rechecks the full topology, and applies only idempotent migrations. Container Apps
+single-revision mode automatically shifts all traffic once the new revision is
+ready. The workflow verifies readiness and the latest revision's 100 percent
+traffic weight without issuing a traffic update, which requires multiple-revision
+mode.
 
 Database migrations are forward-only. When a release changes the data contract,
 prepare a compatible forward repair or use point-in-time restore. Do not assume

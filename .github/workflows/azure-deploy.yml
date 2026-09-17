@@ -589,11 +589,6 @@ jobs:
           curl --fail --silent --show-error \
             --retry 12 --retry-all-errors --retry-delay 5 \
             "$APPLICATION_ORIGIN/readyz" >/dev/null
-          az containerapp ingress traffic set \
-            --name "$CONTAINER_APP_NAME" \
-            --resource-group "$RESOURCE_GROUP_NAME" \
-            --revision-weight latest=100 \
-            --output none
           latest_weight="$(az containerapp ingress traffic show \
             --name "$CONTAINER_APP_NAME" \
             --resource-group "$RESOURCE_GROUP_NAME" \
