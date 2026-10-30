@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:22-bookworm-slim@sha256:83f487e0a63425e5b4d146fb5e5be574bcbe1b7b843d3ebafdd95eaf7767a7e5 AS build-dependencies
+FROM node:25-bookworm-slim@sha256:81db02c4b671288a03915da9534dbd54f96d0e7c24d80ccc54f5b36b2e684370 AS build-dependencies
 WORKDIR /workspace
 COPY package.json package-lock.json ./
 COPY client/package.json client/package.json
@@ -15,7 +15,7 @@ COPY server server
 COPY shared shared
 RUN npm run build
 
-FROM node:22-bookworm-slim@sha256:83f487e0a63425e5b4d146fb5e5be574bcbe1b7b843d3ebafdd95eaf7767a7e5 AS runtime-dependencies
+FROM node:25-bookworm-slim@sha256:81db02c4b671288a03915da9534dbd54f96d0e7c24d80ccc54f5b36b2e684370 AS runtime-dependencies
 WORKDIR /workspace
 COPY package.json package-lock.json ./
 COPY server/package.json server/package.json
@@ -23,7 +23,7 @@ COPY shared/package.json shared/package.json
 RUN --mount=type=cache,target=/root/.npm \
   npm clean-install --omit=dev --workspace=server --workspace=shared
 
-FROM node:22-bookworm-slim@sha256:83f487e0a63425e5b4d146fb5e5be574bcbe1b7b843d3ebafdd95eaf7767a7e5 AS app
+FROM node:25-bookworm-slim@sha256:81db02c4b671288a03915da9534dbd54f96d0e7c24d80ccc54f5b36b2e684370 AS app
 LABEL org.opencontainers.image.licenses="MIT"
 ENV NODE_ENV=production \
   PORT=3001
