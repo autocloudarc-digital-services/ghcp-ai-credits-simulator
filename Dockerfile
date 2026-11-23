@@ -42,7 +42,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD ["node", "-e", "require('http').get('http://127.0.0.1:3001/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
 CMD ["node", "server/dist/index.js"]
 
-FROM postgres:17-bookworm@sha256:051f7b7b3abdd564d5d1bd1e8c4b9c1b6e77087d1dd22020ede611c096a272e0 AS migration
+FROM postgres:19-bookworm@sha256:f4859caf96de494e38efa69ed703b08a5bbd9605e152e604f2daec8841c87c41 AS migration
 LABEL org.opencontainers.image.licenses="MIT"
 RUN apt-get update \
   && apt-get install --no-install-recommends --yes ca-certificates \
